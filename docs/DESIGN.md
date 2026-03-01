@@ -51,6 +51,8 @@
 
 [**Ouroboros 标准协议（PROTOCOL）**](https://www.notion.so/Ouroboros-PROTOCOL-316d4991ae1c805d8b8fdc3cfad6fb1f?pvs=21)
 
+[**Ouroboros 标准协议（PROTOCOL）（本地版）**](./PROTOCOL.md)
+
 1. 一级：Agent最原始的工具能力，有了这些能力就可以构建所有二级能力
     1. callModel： 提供模型访问的能力，提示词外部注入
     2. runAgent：Agent 调用能力，与 calModel 比较，callModel更加原始，仅仅只是模型调用的能力，而Agent除了模型调用还有程序编排的能力，也就是它具备ReAct和工具调用的能力
