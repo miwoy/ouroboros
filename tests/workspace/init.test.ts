@@ -13,7 +13,23 @@ describe("initWorkspace", () => {
   it("应该创建所有必需的子目录", async () => {
     const created = await initWorkspace(TEST_WORKSPACE);
 
-    const expectedDirs = ["prompts", "tools", "skills", "agents", "logs", "memory", "tmp"];
+    const expectedDirs = [
+      "prompts",
+      "prompts/system",
+      "prompts/agents",
+      "prompts/skills",
+      "prompts/tools",
+      "prompts/memory",
+      "prompts/schema",
+      "prompts/core",
+      "tools",
+      "skills",
+      "agents",
+      "logs",
+      "memory",
+      "tmp",
+      "vectors",
+    ];
     expect(created).toHaveLength(expectedDirs.length);
 
     for (const dir of expectedDirs) {
@@ -38,7 +54,22 @@ describe("initAgentWorkspace", () => {
 
     expect(agentRoot).toContain("agents/test-agent/workspace");
 
-    const expectedDirs = ["prompts", "tools", "skills", "logs", "memory", "tmp"];
+    const expectedDirs = [
+      "prompts",
+      "prompts/system",
+      "prompts/agents",
+      "prompts/skills",
+      "prompts/tools",
+      "prompts/memory",
+      "prompts/schema",
+      "prompts/core",
+      "tools",
+      "skills",
+      "logs",
+      "memory",
+      "tmp",
+      "vectors",
+    ];
     for (const dir of expectedDirs) {
       const dirStat = await stat(join(agentRoot, dir));
       expect(dirStat.isDirectory()).toBe(true);

@@ -6,13 +6,21 @@ import { join, resolve } from "node:path";
  * 所有动态内容都存储在这些目录中
  */
 const WORKSPACE_DIRS = [
-  "prompts", // 动态提示词
+  "prompts", // 动态提示词（根目录）
+  "prompts/system", // 系统提示词
+  "prompts/agents", // Agent 提示词
+  "prompts/skills", // Skill 提示词
+  "prompts/tools", // Tool 提示词
+  "prompts/memory", // 记忆提示词
+  "prompts/schema", // 自我图式提示词
+  "prompts/core", // 核心提示词
   "tools", // 自定义工具
   "skills", // 自定义技能
   "agents", // Agent 实例及工作空间
   "logs", // 日志（按日期分隔，格式 yyyy-MM-dd.log）
   "memory", // 短期记忆（按日期分隔，格式 yyyy-MM-dd.md）
   "tmp", // 临时文件（任务完成后清理）
+  "vectors", // 向量索引（预留给 qmd）
 ] as const;
 
 /**
@@ -49,8 +57,23 @@ export async function initAgentWorkspace(
 ): Promise<string> {
   const agentRoot = resolve(workspacePath, "agents", agentName, "workspace");
 
-  // Agent 的工作空间也包含基本子目录
-  const agentDirs = ["prompts", "tools", "skills", "logs", "memory", "tmp"] as const;
+  // Agent 的工作空间也包含基本子目录（含提示词子分类）
+  const agentDirs = [
+    "prompts",
+    "prompts/system",
+    "prompts/agents",
+    "prompts/skills",
+    "prompts/tools",
+    "prompts/memory",
+    "prompts/schema",
+    "prompts/core",
+    "tools",
+    "skills",
+    "logs",
+    "memory",
+    "tmp",
+    "vectors",
+  ] as const;
 
   for (const dir of agentDirs) {
     await mkdir(join(agentRoot, dir), { recursive: true });
