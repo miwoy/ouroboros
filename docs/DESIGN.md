@@ -24,7 +24,7 @@
 除系统提示词外，所有动态提示词（系统运行后生成的提示词，或可被用户修改的提示词），都将存于 workspace/prompts 中，如果有模板提示词则复制到此目录中。
 
 1. 解决方案提示词(Super Agent)： 职责定义，与 Agent 协作规范
-2. Agent 提示词： 身份定义，知识库（按需加载），技能组（按需加载）
+2. Agent 提示词： 身份定义（关联到自我图式提示词），知识库（按需加载），技能组（按需加载）
 3. Skill 提示词： 任务编排的提示词
 4. 工具提示词：工具名和描述
 5. 记忆提示词：
@@ -124,10 +124,10 @@
 
 1. 项目使用 config.json 配置所有动态内容，使用 config.example.json 和 [CONFIGURE.md](http://CONFIGURE.md) 描述配置项，配置项需要给出是否必须，默认值和描述
 2. 项目初始化后需要生成 workspace 工作空间，所有动态内容都存于这里，安全凭证需要单独处理。系统生成的 Agent 和 Super Agent，这些Agent也要有独立的Workspace 存放，比如 Base Agent 生成的 Child Agent  是存放在 workspace/agents 下的，而 Child Agent 的工作目录则在 workspace/agents/childAgent/workspace
-3. 项目内需要动态按需加载的提示词，使用 https://github.com/tobi/qmd 储存并向量化，使用 query 动态装配
+3. 项目内需要动态按需加载的提示词，比如短期记忆，使用 https://github.com/tobi/qmd 储存并向量化，使用 query 动态装配
 4. Custom Tools，Custom Skills 需要把名称和描述索引进 https://github.com/tobi/qmd 中，方便按需装配
 5. Logger 日志存在 workspace/logs 下，按日期分隔，格式 yyyy-MM-dd.log
-6. 短期记忆存于 workspace/memory 下，按日期分隔，格式 yyyy-MM-dd.md
+6. 短期记忆存于 workspace/prompts/memory 下，按日期分隔，格式 yyyy-MM-dd.md
 7. 临时文件存于 workspace/tmp/ 中， 每次在使用完事必须清理这些文件，比如 Cold Session，在任务完成后需要清理
 8. 系统要仿照 Nodejs的单线程非阻塞式异步模型，主线程同时只能处理一个任务，执行树阶段可根据是否需要并行工具调用，使用异步的方式进行并行工具调用 
 
