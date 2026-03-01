@@ -13,27 +13,32 @@
         "type": "openai-compatible",
         "apiKey": "ollama",
         "baseUrl": "http://localhost:11434/v1",
-        "defaultModel": "llama3"
+        "defaultModel": "llama3",
+        "models": ["llama3", "qwen2.5", "deepseek-r1"]
       },
       "anthropic": {
         "type": "anthropic",
         "apiKey": "your-anthropic-api-key",
-        "defaultModel": "claude-sonnet-4-20250514"
+        "defaultModel": "claude-sonnet-4-20250514",
+        "models": ["claude-opus-4-20250514", "claude-sonnet-4-20250514", "claude-haiku-4-5-20251001"]
       },
       "openai": {
         "type": "openai",
         "apiKey": "your-openai-api-key",
-        "defaultModel": "gpt-4o"
+        "defaultModel": "gpt-4o",
+        "models": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"]
       },
       "google": {
         "type": "google",
         "apiKey": "your-google-api-key",
-        "defaultModel": "gemini-2.0-flash"
+        "defaultModel": "gemini-2.0-flash",
+        "models": ["gemini-2.0-flash", "gemini-2.5-pro"]
       },
       "groq": {
         "type": "groq",
         "apiKey": "your-groq-api-key",
-        "defaultModel": "llama-3.3-70b-versatile"
+        "defaultModel": "llama-3.3-70b-versatile",
+        "models": ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
       }
     }
   }

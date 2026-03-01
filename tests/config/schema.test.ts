@@ -114,6 +114,42 @@ describe("configSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("应该接受包含 models 列表的提供商配置", () => {
+    const config = {
+      system: {},
+      model: {
+        defaultProvider: "test",
+        providers: {
+          test: {
+            type: "openai" as const,
+            apiKey: "sk-test",
+            defaultModel: "gpt-4o",
+            models: ["gpt-4o", "gpt-4o-mini", "gpt-4.1"],
+          },
+        },
+      },
+    };
+    const result = configSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.model.providers.test.models).toEqual(["gpt-4o", "gpt-4o-mini", "gpt-4.1"]);
+    }
+  });
+
+  it("应该拒绝 models 中的空字符串", () => {
+    const config = {
+      system: {},
+      model: {
+        defaultProvider: "test",
+        providers: {
+          test: { type: "openai", apiKey: "key", models: ["gpt-4o", ""] },
+        },
+      },
+    };
+    const result = configSchema.safeParse(config);
+    expect(result.success).toBe(false);
+  });
+
   it("应该拒绝无效的 baseUrl", () => {
     const config = {
       system: {},

@@ -21,6 +21,8 @@ const modelProviderSchema = z.object({
   baseUrl: z.string().url().optional(),
   /** 默认模型 ID */
   defaultModel: z.string().min(1).optional(),
+  /** 该提供商可用的模型列表（供 client 展示切换） */
+  models: z.array(z.string().min(1)).optional(),
 });
 
 /**
