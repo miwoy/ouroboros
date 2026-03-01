@@ -6,22 +6,31 @@
  * 验证返回包含 "Ouroboros" 的文本响应，且响应格式正确。
  *
  * 使用方式：
- *   npm run test:phase1              # 只测试 defaultProvider
- *   npm run test:phase1 -- --all     # 测试所有已配置的提供商
- *   npm run test:phase1 -- ollama    # 测试指定提供商
+ *   npm run test:phase1                     # 只测试 defaultProvider 的 defaultModel
+ *   npm run test:phase1 -- --all            # 测试所有提供商的所有已配置模型
+ *   npm run test:phase1 -- ollama           # 测试指定提供商的所有已配置模型
+ *   npm run test:phase1 -- ollama:llama3    # 测试指定提供商的指定模型
+ *   npm run test:phase1 -- ollama openai    # 测试多个提供商
  */
 
 import { loadConfig } from "../config/index.js";
+import type { Config, ModelProviderConfig } from "../config/schema.js";
 import { createProviderRegistry, createCallModel } from "../model/index.js";
 import { initWorkspace } from "../workspace/index.js";
 import type { ModelResponse } from "../model/types.js";
 
+/** 测试目标：提供商 + 模型 */
+interface TestTarget {
+  readonly provider: string;
+  readonly model?: string;
+}
+
 /** 测试结果 */
 interface TestResult {
   readonly provider: string;
+  readonly model: string;
   readonly passed: boolean;
   readonly content: string;
-  readonly model: string;
   readonly usage: { promptTokens: number; completionTokens: number };
   readonly error?: string;
 }
@@ -46,23 +55,70 @@ function validateResponseFormat(response: ModelResponse): string[] {
   return errors;
 }
 
-/** 解析命令行参数，确定要测试的提供商列表 */
-function resolveTargetProviders(
-  args: string[],
-  allProviders: string[],
-  defaultProvider: string,
-): string[] {
-  // --all 测试所有提供商
-  if (args.includes("--all")) {
-    return allProviders;
+/**
+ * 展开提供商配置中的 models 列表为测试目标
+ * 如果配置了 models，为每个模型生成一个 target；否则只用 defaultModel
+ */
+function expandProviderModels(
+  providerName: string,
+  providerConfig: ModelProviderConfig,
+): TestTarget[] {
+  const models = providerConfig.models;
+  if (models && models.length > 0) {
+    return models.map((model) => ({ provider: providerName, model }));
   }
-  // 指定了具体名称
+  // 没有 models 列表时，使用 defaultModel（或不指定，由 adapter 决定默认值）
+  return [{ provider: providerName, model: providerConfig.defaultModel }];
+}
+
+/**
+ * 解析命令行参数，确定要测试的目标列表
+ *
+ * 支持格式：
+ *   --all             → 所有提供商 × 所有已配置模型
+ *   provider          → 该提供商的所有已配置模型
+ *   provider:model    → 该提供商的指定模型
+ *   （无参数）         → defaultProvider 的 defaultModel
+ */
+function resolveTestTargets(
+  args: string[],
+  config: Config,
+): TestTarget[] {
+  const providers = config.model.providers;
+  const allNames = Object.keys(providers);
+
+  // --all：所有提供商 × 所有模型
+  if (args.includes("--all")) {
+    return allNames.flatMap((name) => expandProviderModels(name, providers[name]));
+  }
+
+  // 解析具名参数
   const named = args.filter((a) => !a.startsWith("-"));
   if (named.length > 0) {
-    return named;
+    return named.flatMap((arg) => {
+      const colonIdx = arg.indexOf(":");
+      if (colonIdx !== -1) {
+        // provider:model 格式
+        const provider = arg.slice(0, colonIdx);
+        const model = arg.slice(colonIdx + 1);
+        return [{ provider, model }];
+      }
+      // 仅提供商名：展开其所有模型
+      const providerConfig = providers[arg];
+      if (providerConfig) {
+        return expandProviderModels(arg, providerConfig);
+      }
+      return [{ provider: arg }];
+    });
   }
-  // 默认只测试 defaultProvider
-  return [defaultProvider];
+
+  // 默认：只测试 defaultProvider 的 defaultModel
+  return [{ provider: config.model.defaultProvider }];
+}
+
+/** 格式化测试目标显示名 */
+function targetLabel(target: TestTarget): string {
+  return target.model ? `${target.provider}:${target.model}` : target.provider;
 }
 
 async function main(): Promise<void> {
@@ -73,9 +129,9 @@ async function main(): Promise<void> {
   const config = await loadConfig();
   const allProviders = Object.keys(config.model.providers);
   const args = process.argv.slice(2);
-  const targetProviders = resolveTargetProviders(args, allProviders, config.model.defaultProvider);
+  const targets = resolveTestTargets(args, config);
   console.log(`  已注册提供商: ${allProviders.join(", ")}`);
-  console.log(`  本次测试: ${targetProviders.join(", ")}`);
+  console.log(`  本次测试: ${targets.map(targetLabel).join(", ")}`);
 
   // 2. 初始化 workspace
   console.log("[2/4] 初始化 workspace...");
@@ -88,27 +144,29 @@ async function main(): Promise<void> {
   const callModel = createCallModel(config, registry);
   console.log("  callModel 就绪");
 
-  // 4. 逐个测试指定提供商
+  // 4. 逐个测试
   divider("开始测试");
   const prompt = "请回复：你好，Ouroboros";
   const results: TestResult[] = [];
 
-  for (const name of targetProviders) {
-    if (!allProviders.includes(name)) {
-      console.log(`\n▶ 跳过 ${name}（未在 config.json 中配置）`);
+  for (const target of targets) {
+    if (!allProviders.includes(target.provider)) {
+      console.log(`\n▶ 跳过 ${targetLabel(target)}（未在 config.json 中配置）`);
       continue;
     }
 
-    console.log(`\n▶ 测试提供商: ${name}`);
+    const label = targetLabel(target);
+    console.log(`\n▶ 测试: ${label}`);
     try {
       // 非流式调用
       const response = await callModel(
         {
           messages: [{ role: "user", content: prompt }],
+          model: target.model,
           temperature: 0,
           maxTokens: 100,
         },
-        { provider: name },
+        { provider: target.provider },
       );
 
       // 验证格式
@@ -119,10 +177,10 @@ async function main(): Promise<void> {
       const passed = formatErrors.length === 0 && containsKeyword;
 
       results.push({
-        provider: name,
+        provider: target.provider,
+        model: response.model,
         passed,
         content: response.content,
-        model: response.model,
         usage: {
           promptTokens: response.usage.promptTokens,
           completionTokens: response.usage.completionTokens,
@@ -143,26 +201,25 @@ async function main(): Promise<void> {
       if (!passed && !containsKeyword) console.log(`  原因: 响应不包含 'Ouroboros'`);
 
       // 流式调用测试
-      console.log(`\n▶ 测试提供商 (流式): ${name}`);
+      console.log(`\n▶ 测试 (流式): ${label}`);
       let streamContent = "";
       const streamResponse = await callModel(
         {
           messages: [{ role: "user", content: prompt }],
+          model: target.model,
           temperature: 0,
           maxTokens: 100,
         },
         {
-          provider: name,
+          provider: target.provider,
           stream: true,
           onStream: (event) => {
             if (event.type === "text_delta") {
               streamContent += event.text;
-              process.stdout.write(event.text);
             }
           },
         },
       );
-      console.log(); // 换行
 
       const streamPassed = streamResponse.content.includes("Ouroboros");
       console.log(`  流式结果: ${streamPassed ? "✅ 通过" : "❌ 失败"}`);
@@ -172,10 +229,10 @@ async function main(): Promise<void> {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       results.push({
-        provider: name,
+        provider: target.provider,
+        model: target.model ?? "N/A",
         passed: false,
         content: "",
-        model: "N/A",
         usage: { promptTokens: 0, completionTokens: 0 },
         error: message,
       });
@@ -190,14 +247,14 @@ async function main(): Promise<void> {
 
   for (const r of results) {
     const icon = r.passed ? "✅" : "❌";
-    console.log(`  ${icon} ${r.provider} (${r.model})${r.error ? ` — ${r.error}` : ""}`);
+    console.log(`  ${icon} ${r.provider}/${r.model}${r.error ? ` — ${r.error}` : ""}`);
   }
 
   console.log(`\n  总计: ${passed}/${total} 通过`);
 
   if (results.length >= 2 && passed === total) {
     console.log(
-      `  响应格式一致性: ✅ 所有提供商返回相同结构 (content, toolCalls, stopReason, usage, model)`,
+      `  响应格式一致性: ✅ 所有模型返回相同结构 (content, toolCalls, stopReason, usage, model)`,
     );
   }
 
