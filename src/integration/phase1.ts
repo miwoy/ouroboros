@@ -2,11 +2,13 @@
  * 阶段一：系统完整性测试
  *
  * 验证目标：
- * 使用 callModel 接口分别调用两个不同的模型提供商，
- * 发送 "请回复：你好，Ouroboros"，验证两者均返回包含 "Ouroboros" 的文本响应，
- * 且响应格式一致。
+ * 使用 callModel 接口调用模型提供商，发送 "请回复：你好，Ouroboros"，
+ * 验证返回包含 "Ouroboros" 的文本响应，且响应格式正确。
  *
- * 使用方式：npm run test:phase1
+ * 使用方式：
+ *   npm run test:phase1              # 只测试 defaultProvider
+ *   npm run test:phase1 -- --all     # 测试所有已配置的提供商
+ *   npm run test:phase1 -- ollama    # 测试指定提供商
  */
 
 import { loadConfig } from "../config/index.js";
@@ -44,14 +46,36 @@ function validateResponseFormat(response: ModelResponse): string[] {
   return errors;
 }
 
+/** 解析命令行参数，确定要测试的提供商列表 */
+function resolveTargetProviders(
+  args: string[],
+  allProviders: string[],
+  defaultProvider: string,
+): string[] {
+  // --all 测试所有提供商
+  if (args.includes("--all")) {
+    return allProviders;
+  }
+  // 指定了具体名称
+  const named = args.filter((a) => !a.startsWith("-"));
+  if (named.length > 0) {
+    return named;
+  }
+  // 默认只测试 defaultProvider
+  return [defaultProvider];
+}
+
 async function main(): Promise<void> {
   console.log("🐍 Ouroboros 阶段一 · 系统完整性测试\n");
 
   // 1. 加载配置
   console.log("[1/4] 加载配置...");
   const config = await loadConfig();
-  const providerNames = Object.keys(config.model.providers);
-  console.log(`  配置加载成功，已注册提供商: ${providerNames.join(", ")}`);
+  const allProviders = Object.keys(config.model.providers);
+  const args = process.argv.slice(2);
+  const targetProviders = resolveTargetProviders(args, allProviders, config.model.defaultProvider);
+  console.log(`  已注册提供商: ${allProviders.join(", ")}`);
+  console.log(`  本次测试: ${targetProviders.join(", ")}`);
 
   // 2. 初始化 workspace
   console.log("[2/4] 初始化 workspace...");
@@ -64,12 +88,17 @@ async function main(): Promise<void> {
   const callModel = createCallModel(config, registry);
   console.log("  callModel 就绪");
 
-  // 4. 逐个测试每个提供商
+  // 4. 逐个测试指定提供商
   divider("开始测试");
   const prompt = "请回复：你好，Ouroboros";
   const results: TestResult[] = [];
 
-  for (const name of providerNames) {
+  for (const name of targetProviders) {
+    if (!allProviders.includes(name)) {
+      console.log(`\n▶ 跳过 ${name}（未在 config.json 中配置）`);
+      continue;
+    }
+
     console.log(`\n▶ 测试提供商: ${name}`);
     try {
       // 非流式调用
@@ -107,7 +136,9 @@ async function main(): Promise<void> {
 
       console.log(`  模型: ${response.model}`);
       console.log(`  响应: ${response.content}`);
-      console.log(`  Token: ${response.usage.promptTokens} + ${response.usage.completionTokens}`);
+      console.log(
+        `  Token: ${response.usage.promptTokens} + ${response.usage.completionTokens}`,
+      );
       console.log(`  结果: ${passed ? "✅ 通过" : "❌ 失败"}`);
       if (!passed && !containsKeyword) console.log(`  原因: 响应不包含 'Ouroboros'`);
 
@@ -135,7 +166,9 @@ async function main(): Promise<void> {
 
       const streamPassed = streamResponse.content.includes("Ouroboros");
       console.log(`  流式结果: ${streamPassed ? "✅ 通过" : "❌ 失败"}`);
-      console.log(`  流式与非流式内容一致: ${streamContent === streamResponse.content ? "✅" : "⚠️ 不一致"}`);
+      console.log(
+        `  流式内容完整性: ${streamContent === streamResponse.content ? "✅ 一致" : "⚠️ 不一致"}`,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       results.push({
@@ -162,9 +195,10 @@ async function main(): Promise<void> {
 
   console.log(`\n  总计: ${passed}/${total} 通过`);
 
-  // 格式一致性检查
-  if (results.length >= 2) {
-    console.log(`  响应格式一致性: ✅ 所有提供商返回相同结构 (content, toolCalls, stopReason, usage, model)`);
+  if (results.length >= 2 && passed === total) {
+    console.log(
+      `  响应格式一致性: ✅ 所有提供商返回相同结构 (content, toolCalls, stopReason, usage, model)`,
+    );
   }
 
   console.log();

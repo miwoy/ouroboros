@@ -47,27 +47,23 @@ npm install
 cp config.example.json config.json
 ```
 
-2. 编辑 `config.json`，填入 API 密钥（推荐使用环境变量）：
+2. 编辑 `config.json`，配置模型提供商（所有配置直接写在文件中）：
 
 ```json
 {
   "system": {},
   "model": {
-    "defaultProvider": "anthropic",
+    "defaultProvider": "ollama",
     "providers": {
-      "anthropic": {
-        "type": "anthropic",
-        "apiKey": "${ANTHROPIC_API_KEY}"
+      "ollama": {
+        "type": "openai-compatible",
+        "apiKey": "ollama",
+        "baseUrl": "http://localhost:11434/v1",
+        "defaultModel": "llama3"
       }
     }
   }
 }
-```
-
-3. 设置环境变量：
-
-```bash
-export ANTHROPIC_API_KEY="your-api-key"
 ```
 
 > 详细配置说明请参阅 [docs/CONFIGURE.md](docs/CONFIGURE.md)

@@ -4,26 +4,26 @@
     "workspacePath": "./workspace"
   },
   "model": {
-    "defaultProvider": "anthropic",
+    "defaultProvider": "ollama",
     "timeout": 30000,
     "maxRetries": 3,
     "retryBaseDelay": 1000,
     "providers": {
-      "anthropic": {
-        "type": "anthropic",
-        "apiKey": "${ANTHROPIC_API_KEY}",
-        "defaultModel": "claude-sonnet-4-20250514"
-      },
-      "openai": {
-        "type": "openai",
-        "apiKey": "${OPENAI_API_KEY}",
-        "defaultModel": "gpt-4o"
-      },
       "ollama": {
         "type": "openai-compatible",
         "apiKey": "ollama",
         "baseUrl": "http://localhost:11434/v1",
         "defaultModel": "llama3"
+      },
+      "anthropic": {
+        "type": "anthropic",
+        "apiKey": "your-anthropic-api-key",
+        "defaultModel": "claude-sonnet-4-20250514"
+      },
+      "openai": {
+        "type": "openai",
+        "apiKey": "your-openai-api-key",
+        "defaultModel": "gpt-4o"
       }
     }
   }

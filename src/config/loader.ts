@@ -8,15 +8,12 @@ const DEFAULT_CONFIG_PATH = "./config.json";
 
 /**
  * 替换字符串中的环境变量引用
- * 支持 ${ENV_VAR} 格式，未找到的环境变量保持原样
+ * 支持 ${ENV_VAR} 格式，未找到的环境变量保留原始字符串不替换
  */
 function resolveEnvVars(value: string): string {
-  return value.replace(/\$\{([^}]+)\}/g, (_, envName: string) => {
+  return value.replace(/\$\{([^}]+)\}/g, (match, envName: string) => {
     const envValue = process.env[envName];
-    if (envValue === undefined) {
-      throw new ConfigError(`环境变量 "${envName}" 未设置`);
-    }
-    return envValue;
+    return envValue ?? match;
   });
 }
 
@@ -75,9 +72,7 @@ export async function loadConfig(configPath?: string): Promise<Readonly<Config>>
   // 验证 defaultProvider 引用的提供商是否存在
   const config = result.data;
   if (!(config.model.defaultProvider in config.model.providers)) {
-    throw new ConfigError(
-      `默认提供商 "${config.model.defaultProvider}" 未在 providers 中定义`,
-    );
+    throw new ConfigError(`默认提供商 "${config.model.defaultProvider}" 未在 providers 中定义`);
   }
 
   return Object.freeze(config);

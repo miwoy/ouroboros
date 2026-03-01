@@ -52,7 +52,8 @@ describe("loadConfig", () => {
     expect(config.model.providers.test.apiKey).toBe("sk-from-env");
   });
 
-  it("应该在环境变量未设置时抛出 ConfigError", async () => {
+  it("环境变量未设置时应保留原始字符串", async () => {
+    delete process.env.NONEXISTENT_VAR;
     const path = await writeTestConfig({
       system: {},
       model: {
@@ -61,8 +62,8 @@ describe("loadConfig", () => {
       },
     });
 
-    await expect(loadConfig(path)).rejects.toThrow(ConfigError);
-    await expect(loadConfig(path)).rejects.toThrow("NONEXISTENT_VAR");
+    const config = await loadConfig(path);
+    expect(config.model.providers.test.apiKey).toBe("${NONEXISTENT_VAR}");
   });
 
   it("应该在文件不存在时抛出 ConfigError", async () => {
