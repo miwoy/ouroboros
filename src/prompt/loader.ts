@@ -1,17 +1,13 @@
 /**
  * 提示词加载器
  *
- * 提供分类加载、ID 加载和关键词搜索功能。
- * 关键词搜索为简单的文本匹配，为后续 qmd 向量检索预留接口。
+ * 提供分类加载、ID 加载、关键词搜索和语义搜索功能。
+ * 语义搜索通过 qmd 向量索引实现，不可用时自动回退到关键词搜索。
  */
 
 import { listPromptTemplates, loadPromptTemplate } from "./store.js";
-import type {
-  PromptCategory,
-  PromptTemplate,
-  SearchOptions,
-  SearchResult,
-} from "./types.js";
+import { isQmdAvailable, vectorSearch, type VectorSearchOptions } from "./vector.js";
+import type { PromptCategory, PromptTemplate, SearchOptions, SearchResult } from "./types.js";
 
 /** 所有分类（用于遍历查找） */
 const ALL_CATEGORIES: readonly PromptCategory[] = [
@@ -48,10 +44,7 @@ export async function loadByCategory(
  * @param id - 模板 ID
  * @returns 模板对象，不存在时返回 null
  */
-export async function loadById(
-  workspacePath: string,
-  id: string,
-): Promise<PromptTemplate | null> {
+export async function loadById(workspacePath: string, id: string): Promise<PromptTemplate | null> {
   // 尝试从 ID 前缀推断分类
   const prefixCategory = inferCategoryFromId(id);
   if (prefixCategory) {
@@ -70,10 +63,45 @@ export async function loadById(
 }
 
 /**
+ * 语义搜索模板
+ *
+ * 优先使用 qmd 向量索引进行语义检索（混合检索 + LLM 重排序），
+ * qmd 不可用时自动回退到关键词搜索。
+ *
+ * @param workspacePath - workspace 根目录
+ * @param query - 搜索查询
+ * @param options - 搜索选项
+ * @returns 匹配结果列表（按相关性降序）
+ */
+export async function searchBySemantic(
+  workspacePath: string,
+  query: string,
+  options?: SearchOptions & { readonly mode?: VectorSearchOptions["mode"] },
+): Promise<readonly SearchResult[]> {
+  // 检测 qmd 是否可用
+  const qmdReady = await isQmdAvailable();
+  if (!qmdReady) {
+    // 回退到关键词搜索
+    return searchByKeyword(workspacePath, query, options);
+  }
+
+  try {
+    return await vectorSearch(workspacePath, query, {
+      mode: options?.mode ?? "query",
+      limit: options?.limit,
+      minScore: options?.threshold,
+    });
+  } catch {
+    // qmd 执行失败时回退到关键词搜索
+    return searchByKeyword(workspacePath, query, options);
+  }
+}
+
+/**
  * 关键词搜索模板
  *
  * 在模板的 name、description、tags 中匹配关键词，
- * 计算简单的命中率分数。为后续向量检索预留接口。
+ * 计算简单的命中率分数。适用于 qmd 不可用时的回退方案。
  *
  * @param workspacePath - workspace 根目录
  * @param query - 搜索关键词
@@ -155,10 +183,7 @@ function tokenize(text: string): readonly string[] {
  * - description 匹配: +1（每个 term）
  * - tags 匹配: +2（每个 tag 命中）
  */
-function calculateScore(
-  template: PromptTemplate,
-  queryTerms: readonly string[],
-): number {
+function calculateScore(template: PromptTemplate, queryTerms: readonly string[]): number {
   let score = 0;
 
   for (const term of queryTerms) {

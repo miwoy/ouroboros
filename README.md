@@ -30,6 +30,24 @@ Ouroboros 是一个分层递归的 Agent 框架，核心理念是**自指循环*
 
 - Node.js >= 20
 - npm >= 10
+- [qmd](https://github.com/tobi/qmd)（可选，用于提示词向量语义检索）
+
+#### 安装 qmd（可选）
+
+qmd 是一个本地搜索引擎，支持 BM25 全文检索、向量语义匹配和 LLM 重排序。Ouroboros 的提示词系统使用 qmd 实现语义检索，未安装时自动回退到关键词匹配。
+
+```bash
+# 通过 npm 全局安装
+npm install -g @tobilu/qmd
+
+# 或通过 bun
+bun install -g @tobilu/qmd
+
+# 验证安装
+qmd status
+```
+
+> 首次使用时 qmd 会自动下载所需模型（约 2GB），包括嵌入模型、重排序模型和查询扩展模型。
 
 ### 安装
 
@@ -92,6 +110,7 @@ ouroboros/
 │   ├── config/           # 配置系统（加载、校验、类型定义）
 │   ├── model/            # 模型抽象层（多提供商统一接口）
 │   │   └── providers/    # pi-ai 适配器（统一多模型接口）
+│   ├── prompt/           # 提示词系统（模板引擎、存储、加载、装配、向量检索）
 │   ├── errors/           # 错误体系
 │   └── index.ts          # 入口
 ├── tests/                # 单元测试
@@ -99,13 +118,14 @@ ouroboros/
 │   ├── DESIGN.md         # 设计文档
 │   └── CONFIGURE.md      # 配置说明
 ├── workspace/            # 运行时工作空间（自动生成，不入版本控制）
-│   ├── prompts/          # 动态提示词
+│   ├── prompts/          # 动态提示词（按分类子目录：system/agents/skills/tools/memory/schema/core）
 │   ├── tools/            # 自定义工具
 │   ├── skills/           # 自定义技能
 │   ├── agents/           # Agent 实例及其独立工作空间
 │   ├── logs/             # 日志（按日期分隔）
 │   ├── memory/           # 短期记忆（按日期分隔）
-│   └── tmp/              # 临时文件（任务完成后清理）
+│   ├── tmp/              # 临时文件（任务完成后清理）
+│   └── vectors/          # 向量索引（qmd）
 ├── config.example.json   # 配置模板
 └── ROADMAP.md            # 开发计划（不入版本控制）
 ```
@@ -116,6 +136,7 @@ ouroboros/
 |------|------|------|
 | [DESIGN](docs/DESIGN.md) | docs/ | 系统设计文档 |
 | [CONFIGURE](docs/CONFIGURE.md) | docs/ | 配置项说明 |
+| [PROTOCOL](docs/PROTOCOL.md) | docs/ | 标准协议（实体接口规范） |
 
 ## 开发
 

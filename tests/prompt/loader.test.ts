@@ -1,11 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import {
   loadByCategory,
   loadById,
   searchByKeyword,
+  searchBySemantic,
 } from "../../src/prompt/loader.js";
+import * as vectorModule from "../../src/prompt/vector.js";
 import { savePromptTemplate } from "../../src/prompt/store.js";
 import { initWorkspace } from "../../src/workspace/init.js";
 import type { PromptTemplate } from "../../src/prompt/types.js";
@@ -156,5 +158,71 @@ describe("searchByKeyword", () => {
   it("无匹配时返回空数组", async () => {
     const results = await searchByKeyword(TEST_WORKSPACE, "完全不相关的词汇xyz");
     expect(results).toEqual([]);
+  });
+});
+
+describe("searchBySemantic", () => {
+  beforeEach(async () => {
+    await initWorkspace(TEST_WORKSPACE);
+    await savePromptTemplate(TEST_WORKSPACE, greetingTemplate);
+    await savePromptTemplate(TEST_WORKSPACE, farewellTemplate);
+    await savePromptTemplate(TEST_WORKSPACE, systemTemplate);
+  });
+
+  afterEach(async () => {
+    await rm(TEST_WORKSPACE, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it("qmd 不可用时应回退到关键词搜索", async () => {
+    vi.spyOn(vectorModule, "isQmdAvailable").mockResolvedValue(false);
+
+    const results = await searchBySemantic(TEST_WORKSPACE, "用户问候");
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].template.id).toBe("skill:greeting");
+  });
+
+  it("qmd 可用时应调用 vectorSearch", async () => {
+    vi.spyOn(vectorModule, "isQmdAvailable").mockResolvedValue(true);
+    const mockVectorSearch = vi
+      .spyOn(vectorModule, "vectorSearch")
+      .mockResolvedValue([{ template: greetingTemplate, score: 0.9 }]);
+
+    const results = await searchBySemantic(TEST_WORKSPACE, "用户问候");
+
+    expect(mockVectorSearch).toHaveBeenCalledWith(TEST_WORKSPACE, "用户问候", {
+      mode: "query",
+      limit: undefined,
+      minScore: undefined,
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0].score).toBe(0.9);
+  });
+
+  it("vectorSearch 失败时应回退到关键词搜索", async () => {
+    vi.spyOn(vectorModule, "isQmdAvailable").mockResolvedValue(true);
+    vi.spyOn(vectorModule, "vectorSearch").mockRejectedValue(new Error("qmd error"));
+
+    const results = await searchBySemantic(TEST_WORKSPACE, "用户问候");
+    // 应该回退到关键词搜索，依然能返回结果
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].template.id).toBe("skill:greeting");
+  });
+
+  it("应该传递搜索选项给 vectorSearch", async () => {
+    vi.spyOn(vectorModule, "isQmdAvailable").mockResolvedValue(true);
+    const mockVectorSearch = vi.spyOn(vectorModule, "vectorSearch").mockResolvedValue([]);
+
+    await searchBySemantic(TEST_WORKSPACE, "test", {
+      limit: 5,
+      threshold: 0.3,
+      mode: "vector",
+    });
+
+    expect(mockVectorSearch).toHaveBeenCalledWith(TEST_WORKSPACE, "test", {
+      mode: "vector",
+      limit: 5,
+      minScore: 0.3,
+    });
   });
 });
