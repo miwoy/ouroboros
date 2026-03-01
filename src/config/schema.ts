@@ -6,7 +6,15 @@ import { z } from "zod/v4";
  */
 const modelProviderSchema = z.object({
   /** 提供商类型标识 */
-  type: z.enum(["openai", "anthropic", "openai-compatible"]),
+  type: z.enum([
+    "openai",
+    "anthropic",
+    "openai-compatible",
+    "google",
+    "mistral",
+    "groq",
+    "bedrock",
+  ]),
   /** API 密钥（可通过环境变量注入） */
   apiKey: z.string().min(1, "API 密钥不能为空"),
   /** API 基础 URL（可选，用于自定义端点或兼容 API） */

@@ -1,7 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createProviderRegistry } from "../../src/model/registry.js";
 import { ProviderNotFoundError } from "../../src/errors/index.js";
 import type { ModelProviderConfig } from "../../src/config/schema.js";
+
+// Mock pi-ai 以避免实际的网络调用和注册
+vi.mock("@mariozechner/pi-ai", () => ({
+  registerBuiltInApiProviders: vi.fn(),
+  stream: vi.fn(),
+  complete: vi.fn(),
+}));
 
 describe("createProviderRegistry", () => {
   const testProviders: Record<string, ModelProviderConfig> = {
@@ -65,6 +72,27 @@ describe("createProviderRegistry", () => {
       },
     });
     const provider = registry.get("ollama");
-    expect(provider.name).toBe("openai");
+    expect(provider.name).toBe("openai-compatible");
+  });
+
+  it("应该支持新增的 provider 类型", () => {
+    const registry = createProviderRegistry({
+      google: {
+        type: "google",
+        apiKey: "test-key",
+        defaultModel: "gemini-2.0-flash",
+      },
+      groq: {
+        type: "groq",
+        apiKey: "test-key",
+        defaultModel: "llama-3.3-70b-versatile",
+      },
+    });
+
+    const googleProvider = registry.get("google");
+    expect(googleProvider.name).toBe("google");
+
+    const groqProvider = registry.get("groq");
+    expect(groqProvider.name).toBe("groq");
   });
 });

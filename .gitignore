@@ -8,3 +8,4 @@ config.json
 !.env.example
 coverage/
 ROADMAP.md
+CLAUDE.md

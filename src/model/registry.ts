@@ -1,18 +1,7 @@
 import type { ModelProviderConfig } from "../config/schema.js";
 import { ProviderNotFoundError } from "../errors/index.js";
 import type { ModelProvider } from "./types.js";
-import { createOpenAIProvider } from "./providers/openai.js";
-import { createAnthropicProvider } from "./providers/anthropic.js";
-
-/** 提供商工厂函数类型 */
-type ProviderFactory = (config: ModelProviderConfig) => ModelProvider;
-
-/** 内置提供商工厂映射 */
-const builtinFactories: Readonly<Record<string, ProviderFactory>> = {
-  openai: createOpenAIProvider,
-  "openai-compatible": createOpenAIProvider,
-  anthropic: createAnthropicProvider,
-};
+import { createPiAiProvider } from "./providers/adapter.js";
 
 /**
  * 模型提供商注册表
@@ -47,12 +36,7 @@ export function createProviderRegistry(
       throw new ProviderNotFoundError(name);
     }
 
-    const factory = builtinFactories[config.type];
-    if (!factory) {
-      throw new ProviderNotFoundError(`类型 "${config.type}" 无对应工厂`);
-    }
-
-    const provider = factory(config);
+    const provider = createPiAiProvider(config);
     instances.set(name, provider);
     return provider;
   }

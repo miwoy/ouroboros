@@ -17,7 +17,7 @@ Ouroboros 是一个分层递归的 Agent 框架，核心理念是**自指循环*
 
 ### 核心特性
 
-- **多模型支持**: 统一接口封装 OpenAI、Anthropic 及兼容 API（Ollama、vLLM 等）
+- **多模型支持**: 基于 pi-ai 统一接口，支持 OpenAI、Anthropic、Google Gemini、Mistral、Groq、Bedrock 及兼容 API（Ollama、vLLM 等）
 - **ReAct 循环**: Thought → Action → Observation 逐步推理
 - **自指能力**: Agent 可创建工具、技能和子 Agent
 - **分层记忆**: Session（Hot/Cold）、短期记忆、长期记忆
@@ -91,7 +91,7 @@ ouroboros/
 ├── src/                  # 源代码
 │   ├── config/           # 配置系统（加载、校验、类型定义）
 │   ├── model/            # 模型抽象层（多提供商统一接口）
-│   │   └── providers/    # 提供商实现（OpenAI、Anthropic）
+│   │   └── providers/    # pi-ai 适配器（统一多模型接口）
 │   ├── errors/           # 错误体系
 │   └── index.ts          # 入口
 ├── tests/                # 单元测试

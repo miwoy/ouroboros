@@ -15,7 +15,11 @@
     "lint": "eslint src/",
     "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'"
   },
-  "keywords": ["agent", "llm", "ouroboros"],
+  "keywords": [
+    "agent",
+    "llm",
+    "ouroboros"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
@@ -29,5 +33,8 @@
     "typescript": "^5.9.3",
     "vitest": "^4.0.18",
     "zod": "^4.3.6"
+  },
+  "dependencies": {
+    "@mariozechner/pi-ai": "^0.55.3"
   }
 }

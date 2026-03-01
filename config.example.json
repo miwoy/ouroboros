@@ -24,6 +24,16 @@
         "type": "openai",
         "apiKey": "your-openai-api-key",
         "defaultModel": "gpt-4o"
+      },
+      "google": {
+        "type": "google",
+        "apiKey": "your-google-api-key",
+        "defaultModel": "gemini-2.0-flash"
+      },
+      "groq": {
+        "type": "groq",
+        "apiKey": "your-groq-api-key",
+        "defaultModel": "llama-3.3-70b-versatile"
       }
     }
   }
