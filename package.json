@@ -1,0 +1,32 @@
+{
+  "name": "ouroboros",
+  "version": "0.1.0",
+  "description": "自指循环 Agent 框架 — 模型 + 提示词 + 工具 + 程序编排",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/",
+    "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'"
+  },
+  "keywords": ["agent", "llm", "ouroboros"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
+    "@typescript-eslint/parser": "^8.56.1",
+    "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^10.0.2",
+    "prettier": "^3.8.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18",
+    "zod": "^4.3.6"
+  }
+}

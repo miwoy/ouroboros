@@ -1,0 +1,132 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { writeFile, mkdir, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { loadConfig } from "../../src/config/loader.js";
+import { ConfigError } from "../../src/errors/index.js";
+
+const TEST_DIR = join(process.cwd(), ".test-config-tmp");
+
+describe("loadConfig", () => {
+  beforeEach(async () => {
+    await mkdir(TEST_DIR, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(TEST_DIR, { recursive: true, force: true });
+    // 清除可能设置的环境变量
+    delete process.env.TEST_API_KEY;
+  });
+
+  /** 创建测试配置文件 */
+  async function writeTestConfig(content: unknown, filename = "config.json"): Promise<string> {
+    const filePath = join(TEST_DIR, filename);
+    await writeFile(filePath, JSON.stringify(content, null, 2));
+    return filePath;
+  }
+
+  it("应该成功加载有效配置文件", async () => {
+    const path = await writeTestConfig({
+      system: {},
+      model: {
+        defaultProvider: "test",
+        providers: { test: { type: "openai", apiKey: "sk-xxx" } },
+      },
+    });
+
+    const config = await loadConfig(path);
+    expect(config.model.defaultProvider).toBe("test");
+    expect(config.model.providers.test.apiKey).toBe("sk-xxx");
+  });
+
+  it("应该替换环境变量", async () => {
+    process.env.TEST_API_KEY = "sk-from-env";
+    const path = await writeTestConfig({
+      system: {},
+      model: {
+        defaultProvider: "test",
+        providers: { test: { type: "openai", apiKey: "${TEST_API_KEY}" } },
+      },
+    });
+
+    const config = await loadConfig(path);
+    expect(config.model.providers.test.apiKey).toBe("sk-from-env");
+  });
+
+  it("应该在环境变量未设置时抛出 ConfigError", async () => {
+    const path = await writeTestConfig({
+      system: {},
+      model: {
+        defaultProvider: "test",
+        providers: { test: { type: "openai", apiKey: "${NONEXISTENT_VAR}" } },
+      },
+    });
+
+    await expect(loadConfig(path)).rejects.toThrow(ConfigError);
+    await expect(loadConfig(path)).rejects.toThrow("NONEXISTENT_VAR");
+  });
+
+  it("应该在文件不存在时抛出 ConfigError", async () => {
+    await expect(loadConfig("/nonexistent/path/config.json")).rejects.toThrow(ConfigError);
+    await expect(loadConfig("/nonexistent/path/config.json")).rejects.toThrow("无法读取");
+  });
+
+  it("应该在 JSON 格式错误时抛出 ConfigError", async () => {
+    const filePath = join(TEST_DIR, "bad.json");
+    await writeFile(filePath, "{ invalid json }");
+    await expect(loadConfig(filePath)).rejects.toThrow(ConfigError);
+    await expect(loadConfig(filePath)).rejects.toThrow("JSON 格式错误");
+  });
+
+  it("应该在验证失败时抛出 ConfigError（含详细信息）", async () => {
+    const path = await writeTestConfig({
+      system: {},
+      model: {
+        defaultProvider: "",
+        providers: {},
+      },
+    });
+
+    await expect(loadConfig(path)).rejects.toThrow(ConfigError);
+  });
+
+  it("应该在 defaultProvider 引用不存在的提供商时抛出 ConfigError", async () => {
+    const path = await writeTestConfig({
+      system: {},
+      model: {
+        defaultProvider: "nonexistent",
+        providers: { test: { type: "openai", apiKey: "sk-xxx" } },
+      },
+    });
+
+    await expect(loadConfig(path)).rejects.toThrow(ConfigError);
+    await expect(loadConfig(path)).rejects.toThrow("nonexistent");
+  });
+
+  it("返回的配置应该是冻结的（不可变）", async () => {
+    const path = await writeTestConfig({
+      system: {},
+      model: {
+        defaultProvider: "test",
+        providers: { test: { type: "openai", apiKey: "sk-xxx" } },
+      },
+    });
+
+    const config = await loadConfig(path);
+    expect(Object.isFrozen(config)).toBe(true);
+  });
+
+  it("应该正确填充默认值", async () => {
+    const path = await writeTestConfig({
+      system: {},
+      model: {
+        defaultProvider: "test",
+        providers: { test: { type: "openai", apiKey: "sk-xxx" } },
+      },
+    });
+
+    const config = await loadConfig(path);
+    expect(config.system.logLevel).toBe("info");
+    expect(config.model.timeout).toBe(30000);
+    expect(config.model.maxRetries).toBe(3);
+  });
+});
