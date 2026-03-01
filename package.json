@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:phase1": "tsx src/integration/phase1.ts",
     "lint": "eslint src/",
     "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'"
   },
