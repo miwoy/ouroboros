@@ -4,6 +4,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import * as api from "../services/api";
+import type { ExecutionTree } from "../services/api";
 
 /** 工具调用展示信息 */
 export interface ToolCallDisplay {
@@ -26,6 +27,8 @@ export interface DisplayMessage {
   readonly thought?: string;
   /** 工具调用列表 */
   readonly toolCalls?: readonly ToolCallDisplay[];
+  /** 执行树快照（完成后附加） */
+  readonly executionTree?: ExecutionTree;
 }
 
 export function useChat() {
@@ -138,13 +141,37 @@ export function useChat() {
             setMessages((prev) =>
               prev.map((m) => (m.id === agentMsgId ? { ...m, streaming: false } : m)),
             );
+            const resolvedSessionId = sessionId || data.sessionId;
             if (!sessionId && data.sessionId) {
               setSessionId(data.sessionId);
             }
             setLoading(false);
+
+            // 异步拉取执行树快照，附加到 agent 消息
+            if (resolvedSessionId) {
+              api.getExecutionTree(resolvedSessionId).then((treeRes) => {
+                if (treeRes.success && treeRes.data) {
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === agentMsgId ? { ...m, executionTree: treeRes.data! } : m,
+                    ),
+                  );
+                }
+              }).catch(() => {
+                // 执行树获取失败不影响主流程
+              });
+            }
           },
           onError: (err) => {
             setError(err);
+            // 清除 agent 占位消息的 streaming 状态，避免 typing indicator 残留
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === agentMsgId && m.streaming
+                  ? { ...m, streaming: false, content: m.content || "" }
+                  : m,
+              ),
+            );
             setLoading(false);
           },
         },
@@ -170,20 +197,24 @@ export function useChat() {
       };
       setMessages((prev) => [...prev, userMsg]);
 
-      const res = await api.sendMessage(text, sessionId || undefined);
-      if (res.success && res.data) {
-        if (!sessionId) setSessionId(res.data.sessionId);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `agent-${Date.now()}`,
-            role: "agent",
-            content: res.data!.response,
-            timestamp: new Date().toISOString(),
-          },
-        ]);
-      } else {
-        setError(res.error?.message || "发送失败");
+      try {
+        const res = await api.sendMessage(text, sessionId || undefined);
+        if (res.success && res.data) {
+          if (!sessionId) setSessionId(res.data.sessionId);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `agent-${Date.now()}`,
+              role: "agent",
+              content: res.data!.response,
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        } else {
+          setError(res.error?.message || "发送失败");
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "请求失败");
       }
       setLoading(false);
     },

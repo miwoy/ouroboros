@@ -319,16 +319,16 @@ describe("API 路由处理器", () => {
 
       expect(body.success).toBe(true);
       expect(body.data).toHaveLength(1);
-      expect(body.data[0].id).toBe("agent:core");
+      expect(body.data[0].id).toBe("agent:main");
     });
 
     it("GET /api/agents/:agentId 已知 agent 应返回详情", async () => {
       await startServer();
-      const res = await fetch(`${baseUrl}/api/agents/agent:core`);
+      const res = await fetch(`${baseUrl}/api/agents/agent:main`);
       const body = await res.json();
 
       expect(body.success).toBe(true);
-      expect(body.data.id).toBe("agent:core");
+      expect(body.data.id).toBe("agent:main");
     });
 
     it("GET /api/agents/:agentId 未知 agent 应返回 404", async () => {
@@ -351,7 +351,7 @@ describe("API 路由处理器", () => {
       const { data: session } = await createRes.json();
 
       // 设置执行树
-      const tree = createExecutionTree("agent:core", "测试任务");
+      const tree = createExecutionTree("agent:main", "测试任务");
       server!.getSessionManager().setExecutionTree(session.sessionId, tree);
 
       const res = await fetch(`${baseUrl}/api/sessions/${session.sessionId}/execution-tree`);
@@ -360,7 +360,7 @@ describe("API 路由处理器", () => {
       expect(res.status).toBe(200);
       expect(body.success).toBe(true);
       expect(body.data).not.toBeNull();
-      expect(body.data.agentId).toBe("agent:core");
+      expect(body.data.agentId).toBe("agent:main");
       expect(body.data.rootNodeId).toBeTruthy();
     });
 

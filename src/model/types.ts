@@ -37,6 +37,9 @@ export interface ToolCall {
   readonly arguments: string;
 }
 
+/** Thinking 级别 */
+export type ThinkLevel = "low" | "medium" | "high";
+
 /** 模型调用请求参数 */
 export interface ModelRequest {
   /** 使用的模型 ID（覆盖提供商默认模型） */
@@ -51,6 +54,10 @@ export interface ModelRequest {
   readonly maxTokens?: number;
   /** 停止序列 */
   readonly stop?: readonly string[];
+  /** 是否启用 thinking/reasoning（覆盖全局配置） */
+  readonly think?: boolean;
+  /** thinking 级别 */
+  readonly thinkLevel?: ThinkLevel;
 }
 
 /** 停止原因 */

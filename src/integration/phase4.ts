@@ -205,7 +205,7 @@ export default async function(input, context) {
     stepTimeout: config.react.stepTimeout,
     parallelToolCalls: config.react.parallelToolCalls,
     compressionThreshold: config.react.compressionThreshold,
-    agentId: "agent:core",
+    agentId: "agent:main",
   };
   const deps: ReactDependencies = {
     callModel,

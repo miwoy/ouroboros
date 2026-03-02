@@ -35,7 +35,7 @@ function createMockContext(tools: OuroborosTool[] = []): ToolExecutionContext {
     workspacePath: "/mock/workspace",
     callModel: vi.fn() as CallModelFn,
     registry: createMockRegistry(tools),
-    caller: { entityId: "agent:core" },
+    caller: { entityId: "agent:main" },
   };
 }
 

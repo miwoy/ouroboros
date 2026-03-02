@@ -90,7 +90,7 @@ async function main(): Promise<void> {
       temperature: 0,
       maxTokens: 100,
     },
-    caller: { entityId: "agent:core" },
+    caller: { entityId: "agent:main" },
   };
   const callModelRes = await executor.execute(callModelReq);
   const callModelOk = callModelRes.success && typeof callModelRes.output?.content === "string";
@@ -111,7 +111,7 @@ async function main(): Promise<void> {
     requestId: nextReqId(),
     toolId: "tool:search-tool",
     input: { query: "数学计算", limit: 5 },
-    caller: { entityId: "agent:core" },
+    caller: { entityId: "agent:main" },
   };
   const searchRes1 = await executor.execute(searchReq1);
   const searchOutput1 = searchRes1.output as { tools: readonly { id: string }[]; total: number } | undefined;
@@ -182,7 +182,7 @@ async function main(): Promise<void> {
       code: generatedCode,
       tags: ["数学", "计算", "加法"],
     },
-    caller: { entityId: "agent:core" },
+    caller: { entityId: "agent:main" },
   };
   const createRes = await executor.execute(createReq);
   const createOk = createRes.success && typeof createRes.output?.toolId === "string";
@@ -204,7 +204,7 @@ async function main(): Promise<void> {
     requestId: nextReqId(),
     toolId: "tool:search-tool",
     input: { query: "数学计算", limit: 5 },
-    caller: { entityId: "agent:core" },
+    caller: { entityId: "agent:main" },
   };
   const searchRes2 = await executor.execute(searchReq2);
   const searchOutput2 = searchRes2.output as { tools: readonly { id: string }[]; total: number } | undefined;
@@ -226,7 +226,7 @@ async function main(): Promise<void> {
       requestId: nextReqId(),
       toolId: calcToolId,
       input: { a: 3, b: 7 },
-      caller: { entityId: "agent:core" },
+      caller: { entityId: "agent:main" },
     };
     const calcRes = await executor.execute(calcReq);
     const calcOk = calcRes.success && (calcRes.output as { result: number })?.result === 10;

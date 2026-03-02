@@ -48,7 +48,7 @@ function createMockContext(): ToolExecutionContext {
       updateStatus: vi.fn(),
       listByOrigin: vi.fn().mockReturnValue([]),
     } as unknown as ToolRegistry,
-    caller: { entityId: "agent:core" },
+    caller: { entityId: "agent:main" },
   };
 }
 

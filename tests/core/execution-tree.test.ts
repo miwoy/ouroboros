@@ -22,10 +22,10 @@ import { ExecutionTreeError } from "../../src/errors/index.js";
 describe("执行树管理", () => {
   describe("createExecutionTree", () => {
     it("应创建包含 root 节点的执行树", () => {
-      const tree = createExecutionTree("agent:core", "测试任务");
+      const tree = createExecutionTree("agent:main", "测试任务");
 
       expect(tree.id).toBeDefined();
-      expect(tree.agentId).toBe("agent:core");
+      expect(tree.agentId).toBe("agent:main");
       expect(tree.state).toBe(TreeState.Running);
       expect(tree.rootNodeId).toBeDefined();
       expect(tree.activeNodeId).toBe(tree.rootNodeId);
@@ -43,7 +43,7 @@ describe("执行树管理", () => {
 
   describe("addNode", () => {
     it("应在父节点下添加子节点", () => {
-      const tree = createExecutionTree("agent:core", "测试任务");
+      const tree = createExecutionTree("agent:main", "测试任务");
       const result = addNode(tree, tree.rootNodeId, {
         nodeType: NodeType.ToolCall,
         summary: "调用 tool:call-model",
@@ -64,7 +64,7 @@ describe("执行树管理", () => {
     });
 
     it("父节点不存在时应抛出 ExecutionTreeError", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       expect(() =>
         addNode(tree, "non-existent", {
           nodeType: NodeType.ToolCall,
@@ -74,7 +74,7 @@ describe("执行树管理", () => {
     });
 
     it("不应修改原始执行树（不可变性）", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       const originalRoot = tree.nodes[tree.rootNodeId];
       const result = addNode(tree, tree.rootNodeId, {
         nodeType: NodeType.ToolCall,
@@ -89,7 +89,7 @@ describe("执行树管理", () => {
 
   describe("updateNodeState", () => {
     it("应更新节点状态", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       const updated = updateNodeState(tree, tree.rootNodeId, TaskState.Completed, "完成");
 
       const node = updated.nodes[tree.rootNodeId];
@@ -99,14 +99,14 @@ describe("执行树管理", () => {
     });
 
     it("节点不存在时应抛出 ExecutionTreeError", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       expect(() => updateNodeState(tree, "non-existent", TaskState.Completed)).toThrow(
         ExecutionTreeError,
       );
     });
 
     it("终态节点不应允许状态变更", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       const completed = completeNode(tree, tree.rootNodeId, "完成");
       expect(() => updateNodeState(completed, tree.rootNodeId, TaskState.Working)).toThrow(
         ExecutionTreeError,
@@ -116,7 +116,7 @@ describe("执行树管理", () => {
 
   describe("completeNode", () => {
     it("应将节点标记为完成", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       const updated = completeNode(tree, tree.rootNodeId, "任务完成");
 
       const node = updated.nodes[tree.rootNodeId];
@@ -127,7 +127,7 @@ describe("执行树管理", () => {
 
   describe("failNode", () => {
     it("应将节点标记为失败", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       const updated = failNode(tree, tree.rootNodeId, "执行出错");
 
       const node = updated.nodes[tree.rootNodeId];
@@ -138,7 +138,7 @@ describe("执行树管理", () => {
 
   describe("setActiveNode", () => {
     it("应设置活跃节点", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       const { tree: tree2, nodeId } = addNode(tree, tree.rootNodeId, {
         nodeType: NodeType.ToolCall,
         summary: "子节点",
@@ -149,14 +149,14 @@ describe("执行树管理", () => {
     });
 
     it("节点不存在时应抛出 ExecutionTreeError", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       expect(() => setActiveNode(tree, "non-existent")).toThrow(ExecutionTreeError);
     });
   });
 
   describe("updateTreeState", () => {
     it("应更新执行树状态", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       const updated = updateTreeState(tree, TreeState.Completed);
       expect(updated.state).toBe(TreeState.Completed);
     });
@@ -164,7 +164,7 @@ describe("执行树管理", () => {
 
   describe("getNodePath", () => {
     it("应返回从根到目标节点的路径", () => {
-      let tree = createExecutionTree("agent:core", "测试");
+      let tree = createExecutionTree("agent:main", "测试");
       const { tree: tree2, nodeId: childId } = addNode(tree, tree.rootNodeId, {
         nodeType: NodeType.ToolCall,
         summary: "子节点",
@@ -182,7 +182,7 @@ describe("执行树管理", () => {
     });
 
     it("根节点路径应只有一个节点", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       const path = getNodePath(tree, tree.rootNodeId);
       expect(path.length).toBe(1);
     });
@@ -190,7 +190,7 @@ describe("执行树管理", () => {
 
   describe("getDescendantIds", () => {
     it("应返回所有后代节点 ID", () => {
-      let tree = createExecutionTree("agent:core", "测试");
+      let tree = createExecutionTree("agent:main", "测试");
       const { tree: tree2, nodeId: child1 } = addNode(tree, tree.rootNodeId, {
         nodeType: NodeType.ToolCall,
         summary: "子节点1",
@@ -212,7 +212,7 @@ describe("执行树管理", () => {
     });
 
     it("叶子节点应返回空数组", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       const { tree: tree2, nodeId } = addNode(tree, tree.rootNodeId, {
         nodeType: NodeType.ToolCall,
         summary: "叶子",
@@ -223,20 +223,20 @@ describe("执行树管理", () => {
     });
 
     it("不存在的节点应返回空数组", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       expect(getDescendantIds(tree, "non-existent")).toEqual([]);
     });
   });
 
   describe("序列化", () => {
     it("treeToJSON 应产出有效 JSON", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       const json = treeToJSON(tree);
       expect(() => JSON.parse(json)).not.toThrow();
     });
 
     it("treeFromJSON 应还原执行树", () => {
-      const original = createExecutionTree("agent:core", "测试任务");
+      const original = createExecutionTree("agent:main", "测试任务");
       const { tree: withChild } = addNode(original, original.rootNodeId, {
         nodeType: NodeType.ToolCall,
         summary: "子节点",

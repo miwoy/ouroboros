@@ -32,7 +32,7 @@ import {
 import { formatAgentResponse } from "./formatter.js";
 
 /** 默认 Agent ID */
-const DEFAULT_AGENT_ID = "agent:core";
+const DEFAULT_AGENT_ID = "agent:main";
 
 /**
  * 注册所有路由处理器
@@ -182,7 +182,7 @@ export function registerHandlers(
     const registered = await loadRegisteredAgents(deps.workspacePath);
     const coreAgent = {
       id: DEFAULT_AGENT_ID,
-      name: "Core Agent",
+      name: "Main Agent",
       description: "默认系统 Agent",
       status: "active",
       skills: [] as readonly string[],
@@ -197,7 +197,7 @@ export function registerHandlers(
         200,
         successResponse({
           id: DEFAULT_AGENT_ID,
-          name: "Core Agent",
+          name: "Main Agent",
           description: "默认系统 Agent",
           status: "active",
           skills: [] as readonly string[],
@@ -213,6 +213,57 @@ export function registerHandlers(
       return;
     }
     ctx.respond(404, notFoundError("Agent"));
+  });
+
+  // ─── 自我图式 / 技能 / 工具 ──────────────────────────────────
+
+  // 获取自我图式数据
+  router.get("/api/self-schema", async (ctx) => {
+    if (!deps.schemaProvider) {
+      ctx.respond(200, successResponse({ body: null, soul: null, hormones: null }));
+      return;
+    }
+    const body = deps.schemaProvider.getBodySchema();
+    const soul = deps.schemaProvider.getSoulSchema();
+    const hormoneManager = deps.schemaProvider.getHormoneManager();
+    const hormones = hormoneManager.getState();
+    ctx.respond(200, successResponse({ body, soul, hormones }));
+  });
+
+  // 获取已注册技能列表
+  router.get("/api/skills", async (ctx) => {
+    if (!deps.skillRegistry) {
+      ctx.respond(200, successResponse([]));
+      return;
+    }
+    const skills = deps.skillRegistry.list().map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      status: s.status,
+      origin: s.origin,
+      tags: s.tags,
+      requiredTools: s.requiredTools,
+    }));
+    ctx.respond(200, successResponse(skills));
+  });
+
+  // 获取已注册工具列表
+  router.get("/api/tools", async (ctx) => {
+    if (!deps.toolRegistry) {
+      ctx.respond(200, successResponse([]));
+      return;
+    }
+    const tools = deps.toolRegistry.list().map((t) => ({
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      status: t.status,
+      tags: t.tags,
+      entrypoint: t.entrypoint,
+      timeout: t.timeout,
+    }));
+    ctx.respond(200, successResponse(tools));
   });
 }
 
@@ -412,24 +463,30 @@ async function* createStreamEvents(
   deps: ApiDeps,
   sessionManager: SessionManager,
 ): AsyncIterable<SSEEvent> {
-  // 第一层：无模型提供商 → 占位符
-  if (!deps.providerRegistry || !deps.defaultProvider) {
-    yield { event: "thinking", data: JSON.stringify({ sessionId }) };
-    const text = `收到消息: "${message}"。请在 config.json 中配置模型提供商以启用 AI 对话。`;
-    yield { event: "text_delta", data: JSON.stringify({ text }) };
-    yield { event: "done", data: JSON.stringify({ sessionId, complete: true }) };
-    return;
-  }
+  try {
+    // 第一层：无模型提供商 → 占位符
+    if (!deps.providerRegistry || !deps.defaultProvider) {
+      yield { event: "thinking", data: JSON.stringify({ sessionId }) };
+      const text = `收到消息: "${message}"。请在 config.json 中配置模型提供商以启用 AI 对话。`;
+      yield { event: "text_delta", data: JSON.stringify({ text }) };
+      yield { event: "done", data: JSON.stringify({ sessionId, complete: true }) };
+      return;
+    }
 
-  // 第三层：有 provider + toolRegistry → ReAct SSE
-  const callModelFn = getCallModelFn(deps);
-  if (callModelFn && deps.toolRegistry) {
-    yield* createReactStreamEvents(sessionId, message, deps, sessionManager, callModelFn);
-    return;
-  }
+    // 第三层：有 provider + toolRegistry → ReAct SSE
+    const callModelFn = getCallModelFn(deps);
+    if (callModelFn && deps.toolRegistry) {
+      yield* createReactStreamEvents(sessionId, message, deps, sessionManager, callModelFn);
+      return;
+    }
 
-  // 第二层：有 provider 无 toolRegistry → 直连流式
-  yield* createDirectStreamEvents(sessionId, message, deps, sessionManager);
+    // 第二层：有 provider 无 toolRegistry → 直连流式
+    yield* createDirectStreamEvents(sessionId, message, deps, sessionManager);
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : "未知错误";
+    deps.logger.error("api", `SSE 流异常: ${errMsg}`);
+    yield { event: "error", data: JSON.stringify({ message: errMsg }) };
+  }
 }
 
 /**

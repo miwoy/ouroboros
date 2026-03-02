@@ -24,7 +24,7 @@ import { ExecutionTreeError } from "../../src/errors/index.js";
 describe("异常处理", () => {
   describe("rollbackToNode", () => {
     it("应将后代节点标记为 cancelled 并回退活跃节点", () => {
-      let tree = createExecutionTree("agent:core", "测试");
+      let tree = createExecutionTree("agent:main", "测试");
       const rootId = tree.rootNodeId;
       const { tree: t2, nodeId: child1 } = addNode(tree, rootId, {
         nodeType: NodeType.ToolCall,
@@ -45,12 +45,12 @@ describe("异常处理", () => {
     });
 
     it("不存在的节点应抛出 ExecutionTreeError", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       expect(() => rollbackToNode(tree, "non-existent", "test")).toThrow(ExecutionTreeError);
     });
 
     it("已完成的后代节点不应被回滚", () => {
-      let tree = createExecutionTree("agent:core", "测试");
+      let tree = createExecutionTree("agent:main", "测试");
       const { tree: t2, nodeId: child1 } = addNode(tree, tree.rootNodeId, {
         nodeType: NodeType.ToolCall,
         summary: "已完成步骤",
@@ -72,7 +72,7 @@ describe("异常处理", () => {
 
   describe("terminateSubtree", () => {
     it("应递归取消所有非终态子节点", () => {
-      let tree = createExecutionTree("agent:core", "测试");
+      let tree = createExecutionTree("agent:main", "测试");
       const { tree: t2, nodeId: child1 } = addNode(tree, tree.rootNodeId, {
         nodeType: NodeType.ToolCall,
         summary: "子节点1",
@@ -90,14 +90,14 @@ describe("异常处理", () => {
     });
 
     it("不存在的节点应抛出 ExecutionTreeError", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       expect(() => terminateSubtree(tree, "non-existent", "test")).toThrow(ExecutionTreeError);
     });
   });
 
   describe("terminateTree", () => {
     it("应终止整棵树并将树状态设为 cancelled", () => {
-      let tree = createExecutionTree("agent:core", "测试");
+      let tree = createExecutionTree("agent:main", "测试");
       const { tree: t2 } = addNode(tree, tree.rootNodeId, {
         nodeType: NodeType.ToolCall,
         summary: "子节点",
@@ -115,7 +115,7 @@ describe("异常处理", () => {
 
   describe("detectPossibleLoop", () => {
     it("连续相同工具调用 ≥3 次应检测到循环", () => {
-      let tree = createExecutionTree("agent:core", "测试");
+      let tree = createExecutionTree("agent:main", "测试");
       for (let i = 0; i < 3; i++) {
         const result = addNode(tree, tree.rootNodeId, {
           nodeType: NodeType.ToolCall,
@@ -130,7 +130,7 @@ describe("异常处理", () => {
     });
 
     it("不同工具调用不应检测到循环", () => {
-      let tree = createExecutionTree("agent:core", "测试");
+      let tree = createExecutionTree("agent:main", "测试");
       const tools = ["tool:call-model 推理", "tool:search-tool 搜索", "tool:create-tool 创建"];
       for (const summary of tools) {
         const result = addNode(tree, tree.rootNodeId, {
@@ -144,7 +144,7 @@ describe("异常处理", () => {
     });
 
     it("少于 3 个工具调用不应检测到循环", () => {
-      let tree = createExecutionTree("agent:core", "测试");
+      let tree = createExecutionTree("agent:main", "测试");
       for (let i = 0; i < 2; i++) {
         const result = addNode(tree, tree.rootNodeId, {
           nodeType: NodeType.ToolCall,
@@ -157,7 +157,7 @@ describe("异常处理", () => {
     });
 
     it("窗口大小参数应限制检查范围", () => {
-      let tree = createExecutionTree("agent:core", "测试");
+      let tree = createExecutionTree("agent:main", "测试");
       // 先加 3 个不同的
       for (let i = 0; i < 3; i++) {
         const result = addNode(tree, tree.rootNodeId, {
@@ -202,7 +202,7 @@ describe("异常处理", () => {
 
   describe("applyInspectorAction", () => {
     it("rollback 应回滚到目标节点", () => {
-      let tree = createExecutionTree("agent:core", "测试");
+      let tree = createExecutionTree("agent:main", "测试");
       const { tree: t2, nodeId: child } = addNode(tree, tree.rootNodeId, {
         nodeType: NodeType.ToolCall,
         summary: "子节点",
@@ -222,7 +222,7 @@ describe("异常处理", () => {
     });
 
     it("terminate 无 targetNodeId 应终止整棵树", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       const action: InspectorAction = {
         treeId: tree.id,
         action: "terminate",
@@ -235,7 +235,7 @@ describe("异常处理", () => {
     });
 
     it("pause 应暂停执行树", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       const action: InspectorAction = {
         treeId: tree.id,
         action: "pause",
@@ -248,7 +248,7 @@ describe("异常处理", () => {
     });
 
     it("resume 应恢复执行树", () => {
-      let tree = createExecutionTree("agent:core", "测试");
+      let tree = createExecutionTree("agent:main", "测试");
       tree = { ...tree, state: TreeState.Paused };
 
       const action: InspectorAction = {
@@ -263,7 +263,7 @@ describe("异常处理", () => {
     });
 
     it("rollback 无 targetNodeId 应抛出错误", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       const action: InspectorAction = {
         treeId: tree.id,
         action: "rollback",
@@ -275,7 +275,7 @@ describe("异常处理", () => {
     });
 
     it("inject-prompt 不应修改树", () => {
-      const tree = createExecutionTree("agent:core", "测试");
+      const tree = createExecutionTree("agent:main", "测试");
       const action: InspectorAction = {
         treeId: tree.id,
         action: "inject-prompt",

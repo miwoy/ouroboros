@@ -173,11 +173,22 @@ export function streamMessage(
     signal: controller.signal,
   })
     .then(async (res) => {
+      // 检查 HTTP 状态码
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        callbacks.onError?.(`HTTP ${res.status}: ${text || res.statusText}`);
+        return;
+      }
+
       const reader = res.body?.getReader();
-      if (!reader) return;
+      if (!reader) {
+        callbacks.onError?.("响应流不可用");
+        return;
+      }
 
       const decoder = new TextDecoder();
       let buffer = "";
+      let receivedDone = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -193,34 +204,46 @@ export function streamMessage(
             const event = line.slice(7).trim();
             const nextLine = lines[i + 1];
             if (nextLine?.startsWith("data: ")) {
-              const data = JSON.parse(nextLine.slice(6));
+              let data: Record<string, unknown>;
+              try {
+                data = JSON.parse(nextLine.slice(6));
+              } catch {
+                continue; // JSON 解析失败，跳过此事件
+              }
               i++; // 跳过已处理的 data 行
               switch (event) {
                 case "thinking":
                   callbacks.onThinking?.();
                   break;
                 case "text_delta":
-                  callbacks.onTextDelta?.(data.text);
+                  callbacks.onTextDelta?.(data.text as string);
                   break;
                 case "react_step":
-                  callbacks.onReactStep?.(data);
+                  callbacks.onReactStep?.(data as { stepIndex: number; thought: string });
                   break;
                 case "tool_call":
-                  callbacks.onToolCall?.(data);
+                  callbacks.onToolCall?.(data as { toolCallId: string; toolName: string; input: Record<string, unknown> });
                   break;
                 case "tool_result":
-                  callbacks.onToolResult?.(data);
+                  callbacks.onToolResult?.(data as { toolCallId: string; output?: Record<string, unknown>; success: boolean; error?: string });
                   break;
                 case "done":
-                  callbacks.onDone?.(data);
+                  receivedDone = true;
+                  callbacks.onDone?.(data as { sessionId: string });
                   break;
                 case "error":
-                  callbacks.onError?.(data.message);
+                  receivedDone = true;
+                  callbacks.onError?.(data.message as string);
                   break;
               }
             }
           }
         }
+      }
+
+      // 流结束但未收到 done/error 事件 — 后端可能异常终止
+      if (!receivedDone) {
+        callbacks.onError?.("连接意外断开，未收到完成信号");
       }
     })
     .catch((err) => {
@@ -303,4 +326,60 @@ export async function listAgents(): Promise<ApiResponse<AgentInfo[]>> {
 
 export async function getAgent(agentId: string): Promise<ApiResponse<AgentInfo>> {
   return request(`/api/agents/${agentId}`);
+}
+
+// ─── 自我图式 / 技能 / 工具 ──────────────────────────────────────
+
+/** 自我图式数据 */
+export interface SelfSchemaData {
+  readonly body: {
+    readonly platform: string;
+    readonly nodeVersion: string;
+    readonly workspacePath: string;
+    readonly memory: { readonly totalGB: number; readonly availableGB: number };
+    readonly cpuCores: number;
+  } | null;
+  readonly soul: {
+    readonly worldModel: { readonly coreDirective: string; readonly protocolVersion: string };
+    readonly selfAwareness: { readonly identity: string; readonly purpose: string };
+  } | null;
+  readonly hormones: {
+    readonly focusLevel: number;
+    readonly cautionLevel: number;
+    readonly creativityLevel: number;
+  } | null;
+}
+
+/** 技能摘要信息 */
+export interface SkillInfo {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly status: string;
+  readonly origin: string;
+  readonly tags: readonly string[];
+  readonly requiredTools: readonly string[];
+}
+
+/** 工具摘要信息 */
+export interface ToolInfo {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly status: string;
+  readonly tags: readonly string[];
+  readonly entrypoint: string;
+  readonly timeout?: number;
+}
+
+export async function getSelfSchema(): Promise<ApiResponse<SelfSchemaData>> {
+  return request("/api/self-schema");
+}
+
+export async function getSkills(): Promise<ApiResponse<SkillInfo[]>> {
+  return request("/api/skills");
+}
+
+export async function getTools(): Promise<ApiResponse<ToolInfo[]>> {
+  return request("/api/tools");
 }

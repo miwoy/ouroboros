@@ -123,6 +123,10 @@ const agentConfigSchema = z.object({
   defaultMaxTurns: z.number().int().positive().default(50),
   /** 知识库默认最大 token 数 */
   knowledgeMaxTokens: z.number().int().positive().default(8000),
+  /** 启用模型 thinking/reasoning 能力（默认关闭） */
+  think: z.boolean().default(false),
+  /** thinking 级别: low | medium | high（默认 medium） */
+  thinkLevel: z.enum(["low", "medium", "high"]).default("medium"),
 });
 
 /**
@@ -242,6 +246,8 @@ export const configSchema = z.object({
   agents: agentConfigSchema.default({
     defaultMaxTurns: 50,
     knowledgeMaxTokens: 8000,
+    think: false,
+    thinkLevel: "medium",
   }),
   superAgents: superAgentConfigSchema.default({
     defaultMaxDuration: 600,

@@ -21,19 +21,19 @@ test.describe("Agent 管理面板", () => {
     // 等待加载完成
     await expect(page.locator(".agent-card").first()).toBeVisible({ timeout: 5_000 });
 
-    // 至少有 agent:core
+    // 至少有 agent:main
     const cards = page.locator(".agent-card");
     await expect(cards).toHaveCount(1);
 
-    // 检查 agent:core 卡片内容
-    await expect(page.locator(".agent-name")).toHaveText("Core Agent");
-    await expect(page.locator(".agent-id")).toHaveText("agent:core");
+    // 检查 agent:main 卡片内容
+    await expect(page.locator(".agent-name")).toHaveText("Main Agent");
+    await expect(page.locator(".agent-id")).toHaveText("agent:main");
     await expect(page.locator(".agent-status")).toContainText("active");
   });
 
   test("Agent 卡片应有头像", async ({ page }) => {
     await expect(page.locator(".agent-card").first()).toBeVisible({ timeout: 5_000 });
     const avatar = page.locator(".agent-avatar");
-    await expect(avatar).toHaveText("C"); // Core Agent 的首字母
+    await expect(avatar).toHaveText("C"); // Main Agent 的首字母
   });
 });

@@ -31,7 +31,7 @@ function createMockContext(existingIds: string[] = []): ToolExecutionContext {
     workspacePath: "/mock/workspace",
     callModel: vi.fn() as CallModelFn,
     registry: createMockRegistry(existingIds),
-    caller: { entityId: "agent:core" },
+    caller: { entityId: "agent:main" },
   };
 }
 

@@ -19,6 +19,7 @@ import { createMemoryManager } from "./memory/manager.js";
 import { createInspector } from "./inspector/inspector.js";
 import { createReflector } from "./reflection/reflector.js";
 import { createPersistenceManager } from "./persistence/manager.js";
+import { createSkillRegistry } from "./skill/registry.js";
 
 async function main(): Promise<void> {
   // 1. 加载配置
@@ -69,6 +70,10 @@ async function main(): Promise<void> {
   // 7. 创建工具注册表
   const toolRegistry = await createToolRegistry(config.system.workspacePath);
   logger.info("main", `工具注册表已加载: ${toolRegistry.list().length} 个工具`);
+
+  // 8. 创建技能注册表
+  const skillRegistry = await createSkillRegistry(config.system.workspacePath);
+  logger.info("main", `技能注册表已加载: ${skillRegistry.list().length} 个技能`);
 
   // 10. 创建审查程序
   const inspector = createInspector(logger);
@@ -121,6 +126,7 @@ async function main(): Promise<void> {
     inspector,
     reflector,
     callModel: callModelFn,
+    skillRegistry,
   });
 
   await server.start();

@@ -39,6 +39,12 @@ function createTestConfig(overrides?: Partial<Config["model"]>): Config {
       providers: {},
       ...overrides,
     },
+    agents: {
+      defaultMaxTurns: 50,
+      knowledgeMaxTokens: 8000,
+      think: false,
+      thinkLevel: "medium",
+    },
   };
 }
 
@@ -137,9 +143,7 @@ describe("createCallModel", () => {
     config = createTestConfig({ timeout: 50, maxRetries: 0 });
     const callModel = createCallModel(config, registry);
 
-    await expect(
-      callModel({ messages: [{ role: "user", content: "你好" }] }),
-    ).rejects.toThrow();
+    await expect(callModel({ messages: [{ role: "user", content: "你好" }] })).rejects.toThrow();
   });
 
   it("应该支持通过外部 signal 取消", async () => {
@@ -163,10 +167,7 @@ describe("createCallModel", () => {
     // 立即取消
     controller.abort(new Error("user cancel"));
     await expect(
-      callModel(
-        { messages: [{ role: "user", content: "你好" }] },
-        { signal: controller.signal },
-      ),
+      callModel({ messages: [{ role: "user", content: "你好" }] }, { signal: controller.signal }),
     ).rejects.toThrow();
   });
 

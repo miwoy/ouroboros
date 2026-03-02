@@ -178,7 +178,7 @@ describe("toolCallRequestSchema", () => {
       requestId: "req-001",
       toolId: "tool:call-model",
       input: { messages: [{ role: "user", content: "hello" }] },
-      caller: { entityId: "agent:core" },
+      caller: { entityId: "agent:main" },
     });
     expect(result.success).toBe(true);
   });
@@ -187,7 +187,7 @@ describe("toolCallRequestSchema", () => {
     const result = toolCallRequestSchema.safeParse({
       toolId: "tool:call-model",
       input: {},
-      caller: { entityId: "agent:core" },
+      caller: { entityId: "agent:main" },
     });
     expect(result.success).toBe(false);
   });

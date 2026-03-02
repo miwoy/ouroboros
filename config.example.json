@@ -62,7 +62,9 @@
   },
   "agents": {
     "defaultMaxTurns": 50,
-    "knowledgeMaxTokens": 8000
+    "knowledgeMaxTokens": 8000,
+    "think": false,
+    "thinkLevel": "medium"
   },
   "superAgents": {
     "defaultMaxDuration": 600,

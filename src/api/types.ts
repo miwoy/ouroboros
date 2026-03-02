@@ -13,6 +13,7 @@ import type { MemoryManager } from "../memory/types.js";
 import type { Inspector } from "../inspector/types.js";
 import type { Reflector } from "../reflection/types.js";
 import type { Config } from "../config/schema.js";
+import type { SkillRegistry } from "../skill/types.js";
 
 // ─── 统一响应格式 ──────────────────────────────────────────────
 
@@ -176,6 +177,8 @@ export interface ApiDeps {
   readonly inspector?: Inspector;
   /** 反思器 */
   readonly reflector?: Reflector;
+  /** 技能注册表 */
+  readonly skillRegistry?: SkillRegistry;
 }
 
 // ─── 路由 ──────────────────────────────────────────────

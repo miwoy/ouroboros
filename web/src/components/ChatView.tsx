@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import type { DisplayMessage, ToolCallDisplay } from "../hooks/useChat";
+import { ExecutionTreeView } from "./ExecutionTreeView";
 import "./ChatView.css";
 
 interface ChatViewProps {
@@ -97,6 +98,7 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
   const isUser = message.role === "user";
   const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
   const showThought = message.thought && !message.content;
+  const [treeExpanded, setTreeExpanded] = useState(false);
 
   return (
     <div className={`message ${isUser ? "message-user" : "message-agent"}`}>
@@ -121,6 +123,21 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
             {message.toolCalls!.map((tc) => (
               <ToolCallCard key={tc.toolCallId} toolCall={tc} />
             ))}
+          </div>
+        )}
+        {message.executionTree && (
+          <div className="execution-tree-inline">
+            <button
+              className="tree-toggle-btn"
+              onClick={() => setTreeExpanded(!treeExpanded)}
+            >
+              {treeExpanded ? "\u25BC" : "\u25B6"} 执行树
+            </button>
+            {treeExpanded && (
+              <div className="tree-inline-body">
+                <ExecutionTreeView tree={message.executionTree} />
+              </div>
+            )}
           </div>
         )}
         <div className="markdown-body">

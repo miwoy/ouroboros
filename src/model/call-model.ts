@@ -30,12 +30,23 @@ export function createCallModel(
 ): (request: ModelRequest, options?: CallModelOptions) => Promise<ModelResponse> {
   const { defaultProvider, timeout, maxRetries, retryBaseDelay } = config.model;
 
+  // 全局 think 配置
+  const globalThink = config.agents.think;
+  const globalThinkLevel = config.agents.thinkLevel;
+
   return async function callModel(
     request: ModelRequest,
     options?: CallModelOptions,
   ): Promise<ModelResponse> {
     const providerName = options?.provider ?? defaultProvider;
     const provider = registry.get(providerName);
+
+    // 注入全局 think 默认值（request 中显式设置时优先）
+    const finalRequest: ModelRequest = {
+      ...request,
+      think: request.think ?? globalThink,
+      thinkLevel: request.thinkLevel ?? globalThinkLevel,
+    };
 
     // 创建超时控制
     const controller = new AbortController();
@@ -46,9 +57,13 @@ export function createCallModel(
       if (externalSignal.aborted) {
         controller.abort(externalSignal.reason);
       } else {
-        externalSignal.addEventListener("abort", () => {
-          controller.abort(externalSignal.reason);
-        }, { once: true });
+        externalSignal.addEventListener(
+          "abort",
+          () => {
+            controller.abort(externalSignal.reason);
+          },
+          { once: true },
+        );
       }
     }
 
@@ -61,9 +76,9 @@ export function createCallModel(
       const result = await withRetry(
         async () => {
           if (options?.stream && options.onStream) {
-            return provider.stream(request, options.onStream, controller.signal);
+            return provider.stream(finalRequest, options.onStream, controller.signal);
           }
-          return provider.complete(request, controller.signal);
+          return provider.complete(finalRequest, controller.signal);
         },
         {
           maxRetries,

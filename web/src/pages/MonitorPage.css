@@ -66,108 +66,246 @@
 .text-success { color: var(--color-success); }
 .text-danger { color: var(--color-danger); }
 
-.monitor-section {
-  margin-bottom: 24px;
-}
-.monitor-section h3 {
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 12px;
-}
+/* ─── Tabs ─── */
 
-.log-container {
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 12px;
-  font-family: monospace;
-  font-size: 12px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.log-entry {
+.monitor-tabs {
   display: flex;
-  gap: 12px;
-  padding: 4px 0;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 20px;
 }
 
-.log-time {
-  color: var(--color-text-muted);
-  flex-shrink: 0;
-}
-
-.log-level {
-  font-weight: 600;
-  flex-shrink: 0;
-  width: 48px;
-}
-.level-info { color: var(--color-primary); }
-.level-warn { color: var(--color-warning); }
-.level-error { color: var(--color-danger); }
-
-.log-message {
+.monitor-tab {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
   color: var(--color-text-secondary);
-}
-
-/* ─── 执行树控制栏 ─── */
-
-.tree-controls {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.tree-session-select {
-  flex: 1;
-  padding: 6px 10px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-primary);
-  font-size: 13px;
-  outline: none;
-}
-.tree-session-select:focus {
-  border-color: var(--color-primary);
-}
-
-.tree-live-btn,
-.tree-refresh-btn {
-  padding: 6px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
 }
-.tree-live-btn:hover:not(:disabled),
-.tree-refresh-btn:hover {
-  background: var(--color-border);
+.monitor-tab:hover {
+  color: var(--color-text);
 }
-.tree-live-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.tree-live-btn-active {
-  background: var(--color-danger);
-  border-color: var(--color-danger);
-  color: #fff;
-}
-.tree-live-btn-active:hover:not(:disabled) {
-  background: #c9362c;
+.monitor-tab-active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
 }
 
-.tree-placeholder {
-  padding: 24px;
+.monitor-tab-content {
+  min-height: 200px;
+}
+
+.tab-placeholder {
+  padding: 40px;
   text-align: center;
   color: var(--color-text-muted);
   font-size: 13px;
+}
+
+/* ─── Self Schema ─── */
+
+.self-schema-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.schema-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--color-text);
+}
+
+.schema-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.schema-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.schema-key {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.schema-val {
+  color: var(--color-text);
+}
+.schema-mono {
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.schema-empty {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* Hormones */
+.hormones-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hormone-gauge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hormone-label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  width: 160px;
+  flex-shrink: 0;
+}
+
+.hormone-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hormone-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.hormone-value {
+  font-size: 13px;
+  font-weight: 600;
+  width: 32px;
+  text-align: right;
+  color: var(--color-text);
+}
+
+/* ─── Entity cards (Skills / Tools) ─── */
+
+.entity-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.entity-card {
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+  padding: 16px;
+}
+
+.entity-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.entity-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.entity-badge {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.badge-system {
+  background: rgba(88, 166, 255, 0.15);
+  color: var(--color-primary);
+}
+.badge-user {
+  background: rgba(63, 185, 80, 0.15);
+  color: var(--color-success);
+}
+.badge-generated {
+  background: rgba(210, 153, 34, 0.15);
+  color: var(--color-warning);
+}
+
+.entity-status {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.status-active {
+  background: rgba(63, 185, 80, 0.15);
+  color: var(--color-success);
+}
+.status-disabled, .status-deprecated {
+  background: rgba(139, 148, 158, 0.15);
+  color: var(--color-text-muted);
+}
+
+.entity-id {
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
+
+.entity-desc {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.entity-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.entity-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.entity-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+.entity-meta code {
+  font-family: monospace;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.entity-deps {
+  font-size: 12px;
+  color: var(--color-text-muted);
 }

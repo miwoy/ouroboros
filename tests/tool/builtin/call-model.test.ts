@@ -19,7 +19,7 @@ function createMockContext(overrides?: Partial<ToolExecutionContext>): ToolExecu
     workspacePath: "/mock/workspace",
     callModel: mockCallModel,
     registry: {} as ToolRegistry,
-    caller: { entityId: "agent:core" },
+    caller: { entityId: "agent:main" },
     ...overrides,
   };
 }

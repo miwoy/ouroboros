@@ -74,7 +74,11 @@ const DEFAULT_MODELS: Readonly<Record<string, string>> = {
 /**
  * 根据配置创建 pi-ai Model 对象
  */
-function createPiModel(config: ModelProviderConfig, modelOverride?: string): PiModel<PiApi> {
+function createPiModel(
+  config: ModelProviderConfig,
+  modelOverride?: string,
+  reasoning = false,
+): PiModel<PiApi> {
   const api = API_TYPE_MAP[config.type];
   if (!api) {
     throw new ModelError(`不支持的提供商类型: ${config.type}`);
@@ -89,7 +93,7 @@ function createPiModel(config: ModelProviderConfig, modelOverride?: string): PiM
     api,
     provider: config.type,
     baseUrl,
-    reasoning: false,
+    reasoning,
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 128000,
@@ -260,6 +264,13 @@ function toStreamOptions(
   }
   // 禁用 pi-ai 内部重试，由 Ouroboros retry.ts 处理
   options.maxRetryDelayMs = 0;
+
+  // Thinking/Reasoning 支持
+  if (request.think) {
+    const level = request.thinkLevel ?? "medium";
+    options.reasoning = level;
+  }
+
   return options;
 }
 
@@ -274,7 +285,7 @@ export function createPiAiProvider(config: ModelProviderConfig): ModelProvider {
     name: config.type,
 
     async complete(request: ModelRequest, signal?: AbortSignal): Promise<ModelResponse> {
-      const model = createPiModel(config, request.model);
+      const model = createPiModel(config, request.model, request.think ?? false);
       const context = toContext(request);
       const options = toStreamOptions(config, request, signal);
 
@@ -299,7 +310,7 @@ export function createPiAiProvider(config: ModelProviderConfig): ModelProvider {
       callback: StreamCallback,
       signal?: AbortSignal,
     ): Promise<ModelResponse> {
-      const model = createPiModel(config, request.model);
+      const model = createPiModel(config, request.model, request.think ?? false);
       const context = toContext(request);
       const options = toStreamOptions(config, request, signal);
 

@@ -319,7 +319,7 @@ async function main(): Promise<void> {
       requestId: "r-calc",
       toolId: "tool:calc",
       input: { a: 17, b: 25 },
-      caller: { entityId: "agent:core" },
+      caller: { entityId: "agent:main" },
     });
     assert(calcResult.success === true, "自定义工具执行成功");
     assert((calcResult.output as any)?.result === 42, "calc(17,25) = 42");
@@ -512,10 +512,10 @@ async function main(): Promise<void> {
     });
     const reflectOutput = await reflector.reflect({
       taskDescription: "全系统集成测试",
-      agentId: "agent:core",
+      agentId: "agent:main",
       executionTree: {
         id: "tree-reflect",
-        agentId: "agent:core",
+        agentId: "agent:main",
         rootNodeId: "root",
         nodes: { root: makeNode("root", NodeType.Root, "root") },
         activeNodeId: "root",
@@ -545,7 +545,7 @@ async function main(): Promise<void> {
     // ════════════════════════════════════════════════════════════
     section("[10/16] Execution Tree — 执行树");
 
-    let tree = createExecutionTree("agent:core", "全系统测试任务");
+    let tree = createExecutionTree("agent:main", "全系统测试任务");
     assert(tree.state === TreeState.Running, "Tree: 初始状态 running");
     assert(!!tree.rootNodeId, "Tree: rootNodeId 存在");
 
@@ -571,7 +571,7 @@ async function main(): Promise<void> {
 
     // JSON 序列化
     const treeJson = treeToJSON(tree);
-    assert(treeJson.includes("agent:core"), "Tree: toJSON 包含 agentId");
+    assert(treeJson.includes("agent:main"), "Tree: toJSON 包含 agentId");
 
     // ════════════════════════════════════════════════════════════
     // [11] Persistence — 持久化与恢复
@@ -585,7 +585,7 @@ async function main(): Promise<void> {
       taskDescription: "全系统测试",
       agents: [
         {
-          agentId: "agent:core",
+          agentId: "agent:main",
           name: "Core",
           executionTree: tree,
           hotSessionSnapshot: ["step1 完成"],
@@ -593,7 +593,7 @@ async function main(): Promise<void> {
           status: "running",
         },
       ],
-      rootAgentIds: ["agent:core"],
+      rootAgentIds: ["agent:main"],
     });
     assert(snapshot.schemaVersion === SNAPSHOT_SCHEMA_VERSION, "Snapshot: 版本匹配");
     assert(!!snapshot.snapshotId, "Snapshot: ID 生成");
@@ -709,11 +709,11 @@ async function main(): Promise<void> {
       updatedAt: now,
       responsibilityPrompt: "你是测试团队的编排者，负责协调多个 Agent 完成任务。",
       agents: [
-        { roleName: "分析师", responsibility: "数据分析", agentId: "agent:core", dependsOn: [] },
+        { roleName: "分析师", responsibility: "数据分析", agentId: "agent:main", dependsOn: [] },
         {
           roleName: "写手",
           responsibility: "文档编写",
-          agentId: "agent:core",
+          agentId: "agent:main",
           dependsOn: ["分析师"],
         },
       ],
@@ -842,7 +842,7 @@ async function main(): Promise<void> {
       // Agent 列表
       const agentsRes = await fetch(`${baseUrl}/api/agents`);
       const agentsBody = await json(agentsRes);
-      assert(agentsBody.data[0].id === "agent:core", "API: 默认 Agent = agent:core");
+      assert(agentsBody.data[0].id === "agent:main", "API: 默认 Agent = agent:main");
 
       // 执行树端点
       const treeRes = await fetch(`${baseUrl}/api/sessions/${sessionId}/execution-tree`);
@@ -890,7 +890,7 @@ async function main(): Promise<void> {
       requestId: "r-write",
       toolId: "tool:write",
       input: { path: join(workDir, "tmp", "e2e-result.txt"), content: "集成测试结果: PASS" },
-      caller: { entityId: "agent:core" },
+      caller: { entityId: "agent:main" },
     });
     // tool:write 是内置工具，可能需要不同参数格式，验证 executor 不抛异常即可
     const e2eFilePath = join(workDir, "tmp", "e2e-result.txt");
@@ -914,7 +914,7 @@ async function main(): Promise<void> {
     assert(memMgr.hot.getEntries().length >= 1, "E2E: Hot memory 记忆写入");
 
     // 4. 执行树 → 快照保存
-    let e2eTree = createExecutionTree("agent:core", "全系统测试");
+    let e2eTree = createExecutionTree("agent:main", "全系统测试");
     const e2eStep = addNode(e2eTree, e2eTree.rootNodeId, {
       nodeType: NodeType.ToolCall,
       summary: "tool:calc 17+25 = 42",
@@ -927,7 +927,7 @@ async function main(): Promise<void> {
       taskDescription: "全系统集成测试",
       agents: [
         {
-          agentId: "agent:core",
+          agentId: "agent:main",
           name: "Core",
           executionTree: e2eTree,
           hotSessionSnapshot: memMgr.hot.getEntries().map((e) => e.content),
@@ -935,7 +935,7 @@ async function main(): Promise<void> {
           status: "completed",
         },
       ],
-      rootAgentIds: ["agent:core"],
+      rootAgentIds: ["agent:main"],
     });
     const e2ePm = createPersistenceManager({
       logger: noopLogger,

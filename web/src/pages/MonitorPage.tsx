@@ -1,34 +1,41 @@
 /**
  * 系统监控面板
+ *
+ * 三个 Tab：Self Schema | Skills | Tools
+ * 保留顶部系统指标面板。
  */
 
 import { useEffect, useState } from "react";
 import * as api from "../services/api";
-import type { HealthData, SessionInfo } from "../services/api";
-import { useExecutionTree } from "../hooks/useExecutionTree";
-import { ExecutionTreeView } from "../components/ExecutionTreeView";
+import type { HealthData, SelfSchemaData, SkillInfo, ToolInfo } from "../services/api";
 import "./MonitorPage.css";
+
+type TabId = "self-schema" | "skills" | "tools";
 
 export function MonitorPage() {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sessions, setSessions] = useState<SessionInfo[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState<string>("");
-  const { tree, loading: treeLoading, error: treeError, streaming, loadTree, subscribe, unsubscribe } = useExecutionTree();
+  const [activeTab, setActiveTab] = useState<TabId>("self-schema");
+
+  // 自我图式
+  const [schema, setSchema] = useState<SelfSchemaData | null>(null);
+  // 技能列表
+  const [skills, setSkills] = useState<SkillInfo[]>([]);
+  // 工具列表
+  const [tools, setTools] = useState<ToolInfo[]>([]);
 
   useEffect(() => {
     loadHealth();
-    loadSessions();
     const timer = setInterval(loadHealth, 5000);
     return () => clearInterval(timer);
   }, []);
 
-  // 选择会话时加载执行树快照
+  // 切换 tab 时加载对应数据
   useEffect(() => {
-    if (selectedSessionId) {
-      loadTree(selectedSessionId);
-    }
-  }, [selectedSessionId, loadTree]);
+    if (activeTab === "self-schema") loadSelfSchema();
+    else if (activeTab === "skills") loadSkills();
+    else if (activeTab === "tools") loadTools();
+  }, [activeTab]);
 
   async function loadHealth() {
     try {
@@ -44,23 +51,25 @@ export function MonitorPage() {
     }
   }
 
-  async function loadSessions() {
+  async function loadSelfSchema() {
     try {
-      const res = await api.listSessions();
-      if (res.success && res.data) {
-        setSessions(res.data);
-      }
-    } catch {
-      // 静默处理，不影响主页面
-    }
+      const res = await api.getSelfSchema();
+      if (res.success && res.data) setSchema(res.data);
+    } catch { /* 静默 */ }
   }
 
-  function handleLiveToggle() {
-    if (streaming) {
-      unsubscribe();
-    } else if (selectedSessionId) {
-      subscribe(selectedSessionId);
-    }
+  async function loadSkills() {
+    try {
+      const res = await api.getSkills();
+      if (res.success && res.data) setSkills(res.data);
+    } catch { /* 静默 */ }
+  }
+
+  async function loadTools() {
+    try {
+      const res = await api.getTools();
+      if (res.success && res.data) setTools(res.data);
+    } catch { /* 静默 */ }
   }
 
   function formatUptime(seconds: number): string {
@@ -72,12 +81,18 @@ export function MonitorPage() {
     return `${s}s`;
   }
 
+  const tabs: readonly { readonly id: TabId; readonly label: string }[] = [
+    { id: "self-schema", label: "Self Schema" },
+    { id: "skills", label: "Skills" },
+    { id: "tools", label: "Tools" },
+  ];
+
   return (
     <div className="monitor-page">
       <div className="monitor-header">
         <h2>System Monitor</h2>
         <p className="monitor-subtitle">
-          Real-time system status, health, and performance metrics.
+          Self schema, registered skills, tools, and system health.
         </p>
       </div>
 
@@ -108,68 +123,186 @@ export function MonitorPage() {
         </div>
       </div>
 
-      <div className="monitor-section">
-        <h3>Connection Log</h3>
-        <div className="log-container">
-          <div className="log-entry">
-            <span className="log-time">{new Date().toLocaleTimeString()}</span>
-            <span className={`log-level ${health ? "level-info" : "level-error"}`}>
-              {health ? "INFO" : "ERROR"}
-            </span>
-            <span className="log-message">
-              {health ? "Health check passed" : error || "Checking..."}
-            </span>
+      {/* Tab 栏 */}
+      <div className="monitor-tabs">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            className={`monitor-tab ${activeTab === tab.id ? "monitor-tab-active" : ""}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab 内容 */}
+      <div className="monitor-tab-content">
+        {activeTab === "self-schema" && <SelfSchemaTab schema={schema} />}
+        {activeTab === "skills" && <SkillsTab skills={skills} />}
+        {activeTab === "tools" && <ToolsTab tools={tools} />}
+      </div>
+    </div>
+  );
+}
+
+// ─── Self Schema Tab ──────────────────────────────────
+
+function SelfSchemaTab({ schema }: { readonly schema: SelfSchemaData | null }) {
+  if (!schema) {
+    return <div className="tab-placeholder">加载中...</div>;
+  }
+
+  return (
+    <div className="self-schema-tab">
+      {/* 身体图式 */}
+      <div className="schema-section">
+        <h4>身体图式 (Body Schema)</h4>
+        {schema.body ? (
+          <div className="schema-grid">
+            <div className="schema-item">
+              <span className="schema-key">平台</span>
+              <span className="schema-val">{schema.body.platform}</span>
+            </div>
+            <div className="schema-item">
+              <span className="schema-key">Node 版本</span>
+              <span className="schema-val">{schema.body.nodeVersion}</span>
+            </div>
+            <div className="schema-item">
+              <span className="schema-key">内存</span>
+              <span className="schema-val">{schema.body.availableGB}GB / {schema.body.totalGB}GB</span>
+            </div>
+            <div className="schema-item">
+              <span className="schema-key">CPU 核心</span>
+              <span className="schema-val">{schema.body.cpuCores}</span>
+            </div>
+            <div className="schema-item">
+              <span className="schema-key">工作空间</span>
+              <span className="schema-val schema-mono">{schema.body.workspacePath}</span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <p className="schema-empty">未配置</p>
+        )}
       </div>
 
-      <div className="monitor-section">
-        <h3>Execution Tree</h3>
-        <div className="tree-controls">
-          <select
-            className="tree-session-select"
-            value={selectedSessionId}
-            onChange={(e) => {
-              unsubscribe();
-              setSelectedSessionId(e.target.value);
-            }}
-          >
-            <option value="">-- Select Session --</option>
-            {sessions.map((s) => (
-              <option key={s.sessionId} value={s.sessionId}>
-                {s.description} ({s.sessionId.slice(0, 8)})
-              </option>
-            ))}
-          </select>
-          <button
-            className={`tree-live-btn ${streaming ? "tree-live-btn-active" : ""}`}
-            onClick={handleLiveToggle}
-            disabled={!selectedSessionId}
-          >
-            {streaming ? "Stop" : "Live"}
-          </button>
-          <button
-            className="tree-refresh-btn"
-            onClick={() => { loadSessions(); if (selectedSessionId) loadTree(selectedSessionId); }}
-          >
-            Refresh
-          </button>
-        </div>
-
-        {treeError && <div className="monitor-error" style={{ marginTop: 8 }}>{treeError}</div>}
-
-        {treeLoading && <div className="tree-placeholder">Loading...</div>}
-
-        {!treeLoading && !tree && selectedSessionId && (
-          <div className="tree-placeholder">No execution tree for this session</div>
+      {/* 灵魂图式 */}
+      <div className="schema-section">
+        <h4>灵魂图式 (Soul Schema)</h4>
+        {schema.soul ? (
+          <div className="schema-grid">
+            <div className="schema-item">
+              <span className="schema-key">核心指令</span>
+              <span className="schema-val">{schema.soul.worldModel.coreDirective}</span>
+            </div>
+            <div className="schema-item">
+              <span className="schema-key">协议版本</span>
+              <span className="schema-val">{schema.soul.worldModel.protocolVersion}</span>
+            </div>
+            <div className="schema-item">
+              <span className="schema-key">身份</span>
+              <span className="schema-val">{schema.soul.selfAwareness.identity}</span>
+            </div>
+            <div className="schema-item">
+              <span className="schema-key">目的</span>
+              <span className="schema-val">{schema.soul.selfAwareness.purpose}</span>
+            </div>
+          </div>
+        ) : (
+          <p className="schema-empty">未配置</p>
         )}
-
-        {!treeLoading && !selectedSessionId && (
-          <div className="tree-placeholder">Select a session to view its execution tree</div>
-        )}
-
-        {tree && <ExecutionTreeView tree={tree} streaming={streaming} />}
       </div>
+
+      {/* 激素系统 */}
+      <div className="schema-section">
+        <h4>激素系统 (Hormones)</h4>
+        {schema.hormones ? (
+          <div className="hormones-grid">
+            <HormoneGauge label="专注度 (Focus)" value={schema.hormones.focusLevel} />
+            <HormoneGauge label="谨慎度 (Caution)" value={schema.hormones.cautionLevel} />
+            <HormoneGauge label="创造力 (Creativity)" value={schema.hormones.creativityLevel} />
+          </div>
+        ) : (
+          <p className="schema-empty">未配置</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HormoneGauge({ label, value }: { readonly label: string; readonly value: number }) {
+  const color = value > 70 ? "var(--color-success)" : value > 30 ? "var(--color-primary)" : "var(--color-warning)";
+  return (
+    <div className="hormone-gauge">
+      <div className="hormone-label">{label}</div>
+      <div className="hormone-bar">
+        <div className="hormone-fill" style={{ width: `${value}%`, background: color }} />
+      </div>
+      <div className="hormone-value">{value}</div>
+    </div>
+  );
+}
+
+// ─── Skills Tab ──────────────────────────────────
+
+function SkillsTab({ skills }: { readonly skills: readonly SkillInfo[] }) {
+  if (skills.length === 0) {
+    return <div className="tab-placeholder">暂无已注册技能</div>;
+  }
+  return (
+    <div className="entity-card-list">
+      {skills.map((s) => (
+        <div key={s.id} className="entity-card">
+          <div className="entity-card-header">
+            <span className="entity-name">{s.name}</span>
+            <span className={`entity-badge badge-${s.origin}`}>{s.origin}</span>
+            <span className={`entity-status status-${s.status}`}>{s.status}</span>
+          </div>
+          <div className="entity-id">{s.id}</div>
+          <div className="entity-desc">{s.description}</div>
+          {s.tags.length > 0 && (
+            <div className="entity-tags">
+              {s.tags.map((t) => <span key={t} className="entity-tag">{t}</span>)}
+            </div>
+          )}
+          {s.requiredTools.length > 0 && (
+            <div className="entity-deps">
+              依赖: {s.requiredTools.join(", ")}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Tools Tab ──────────────────────────────────
+
+function ToolsTab({ tools }: { readonly tools: readonly ToolInfo[] }) {
+  if (tools.length === 0) {
+    return <div className="tab-placeholder">暂无已注册工具</div>;
+  }
+  return (
+    <div className="entity-card-list">
+      {tools.map((t) => (
+        <div key={t.id} className="entity-card">
+          <div className="entity-card-header">
+            <span className="entity-name">{t.name}</span>
+            <span className={`entity-status status-${t.status}`}>{t.status}</span>
+          </div>
+          <div className="entity-id">{t.id}</div>
+          <div className="entity-desc">{t.description}</div>
+          <div className="entity-meta">
+            <span>入口: <code>{t.entrypoint}</code></span>
+            {t.timeout && <span>超时: {t.timeout}ms</span>}
+          </div>
+          {t.tags.length > 0 && (
+            <div className="entity-tags">
+              {t.tags.map((tag) => <span key={tag} className="entity-tag">{tag}</span>)}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

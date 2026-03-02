@@ -134,7 +134,7 @@ async function main() {
       const res = await fetch(`${baseUrl}/api/agents`);
       const body = await json(res);
       assert(body.data.length >= 1, "Agent 列表至少包含 1 个");
-      assert(body.data[0].id === "agent:core", "默认 Agent 为 agent:core");
+      assert(body.data[0].id === "agent:main", "默认 Agent 为 agent:main");
     }
 
     // [9] 删除会话

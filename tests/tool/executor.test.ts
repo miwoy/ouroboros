@@ -105,7 +105,7 @@ describe("createToolExecutor", () => {
       requestId: "req-001",
       toolId: "tool:call-model",
       input: { messages: [{ role: "user", content: "你好" }] },
-      caller: { entityId: "agent:core" },
+      caller: { entityId: "agent:main" },
     });
 
     expect(response.requestId).toBe("req-001");
@@ -119,7 +119,7 @@ describe("createToolExecutor", () => {
       requestId: "req-002",
       toolId: "tool:nonexistent",
       input: {},
-      caller: { entityId: "agent:core" },
+      caller: { entityId: "agent:main" },
     });
 
     expect(response.success).toBe(false);
@@ -142,7 +142,7 @@ describe("createToolExecutor", () => {
       requestId: "req-003",
       toolId: "tool:deprecated",
       input: { messages: [] },
-      caller: { entityId: "agent:core" },
+      caller: { entityId: "agent:main" },
     });
 
     expect(response.success).toBe(false);
@@ -154,7 +154,7 @@ describe("createToolExecutor", () => {
       requestId: "req-004",
       toolId: "tool:call-model",
       input: {}, // 缺少 messages
-      caller: { entityId: "agent:core" },
+      caller: { entityId: "agent:main" },
     });
 
     expect(response.success).toBe(false);
@@ -166,7 +166,7 @@ describe("createToolExecutor", () => {
       requestId: "req-005",
       toolId: "tool:call-model",
       input: { messages: [{ role: "user", content: "test" }] },
-      caller: { entityId: "agent:core" },
+      caller: { entityId: "agent:main" },
     });
 
     expect(response.duration).toBeGreaterThanOrEqual(0);
@@ -191,7 +191,7 @@ describe("executor 错误处理", () => {
       requestId: "req-006",
       toolId: "tool:unknown-entry",
       input: { messages: [{ role: "user", content: "test" }] },
-      caller: { entityId: "agent:core" },
+      caller: { entityId: "agent:main" },
     });
 
     expect(response.success).toBe(false);
@@ -213,7 +213,7 @@ describe("executor 错误处理", () => {
       requestId: "req-007",
       toolId: "tool:unknown-builtin",
       input: { messages: [{ role: "user", content: "test" }] },
-      caller: { entityId: "agent:core" },
+      caller: { entityId: "agent:main" },
     });
 
     expect(response.success).toBe(false);
@@ -236,7 +236,7 @@ describe("executor 错误处理", () => {
       requestId: "req-008",
       toolId: "tool:missing-script",
       input: { messages: [{ role: "user", content: "test" }] },
-      caller: { entityId: "agent:core" },
+      caller: { entityId: "agent:main" },
     });
 
     expect(response.success).toBe(false);
@@ -258,7 +258,7 @@ describe("executor 错误处理", () => {
       requestId: "req-009",
       toolId: "tool:archived",
       input: { messages: [{ role: "user", content: "test" }] },
-      caller: { entityId: "agent:core" },
+      caller: { entityId: "agent:main" },
     });
 
     expect(response.success).toBe(false);

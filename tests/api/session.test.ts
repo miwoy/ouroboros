@@ -30,10 +30,10 @@ describe("createSessionManager", () => {
   describe("createSession", () => {
     it("应创建新会话并返回会话信息", () => {
       const manager = createSessionManager();
-      const session = manager.createSession("agent:core");
+      const session = manager.createSession("agent:main");
 
       expect(session.sessionId).toBeTruthy();
-      expect(session.agentId).toBe("agent:core");
+      expect(session.agentId).toBe("agent:main");
       expect(session.messageCount).toBe(0);
       expect(session.createdAt).toBeTruthy();
       expect(session.updatedAt).toBeTruthy();
@@ -41,14 +41,14 @@ describe("createSessionManager", () => {
 
     it("应支持自定义描述", () => {
       const manager = createSessionManager();
-      const session = manager.createSession("agent:core", "测试会话");
+      const session = manager.createSession("agent:main", "测试会话");
 
       expect(session.description).toBe("测试会话");
     });
 
     it("无描述时应生成默认描述", () => {
       const manager = createSessionManager();
-      const session = manager.createSession("agent:core");
+      const session = manager.createSession("agent:main");
 
       expect(session.description).toContain("会话");
     });
@@ -57,7 +57,7 @@ describe("createSessionManager", () => {
   describe("getSession", () => {
     it("应返回已存在的会话", () => {
       const manager = createSessionManager();
-      const created = manager.createSession("agent:core");
+      const created = manager.createSession("agent:main");
       const fetched = manager.getSession(created.sessionId);
 
       expect(fetched).not.toBeNull();
@@ -73,8 +73,8 @@ describe("createSessionManager", () => {
   describe("listSessions", () => {
     it("应列出所有会话", () => {
       const manager = createSessionManager();
-      manager.createSession("agent:core", "会话1");
-      manager.createSession("agent:core", "会话2");
+      manager.createSession("agent:main", "会话1");
+      manager.createSession("agent:main", "会话2");
 
       const sessions = manager.listSessions();
       expect(sessions).toHaveLength(2);
@@ -89,7 +89,7 @@ describe("createSessionManager", () => {
   describe("addMessage", () => {
     it("应添加消息到会话", () => {
       const manager = createSessionManager();
-      const session = manager.createSession("agent:core");
+      const session = manager.createSession("agent:main");
 
       const msg = manager.addMessage(session.sessionId, "user", "你好");
       expect(msg).not.toBeNull();
@@ -100,7 +100,7 @@ describe("createSessionManager", () => {
 
     it("应更新消息计数", () => {
       const manager = createSessionManager();
-      const session = manager.createSession("agent:core");
+      const session = manager.createSession("agent:main");
 
       manager.addMessage(session.sessionId, "user", "消息1");
       manager.addMessage(session.sessionId, "agent", "消息2");
@@ -116,7 +116,7 @@ describe("createSessionManager", () => {
 
     it("应支持元数据", () => {
       const manager = createSessionManager();
-      const session = manager.createSession("agent:core");
+      const session = manager.createSession("agent:main");
 
       const msg = manager.addMessage(session.sessionId, "user", "hello", { source: "api" });
       expect(msg!.metadata).toEqual({ source: "api" });
@@ -126,7 +126,7 @@ describe("createSessionManager", () => {
   describe("getMessages", () => {
     it("应返回分页消息", () => {
       const manager = createSessionManager();
-      const session = manager.createSession("agent:core");
+      const session = manager.createSession("agent:main");
 
       for (let i = 0; i < 10; i++) {
         manager.addMessage(session.sessionId, "user", `消息${i}`);
@@ -139,7 +139,7 @@ describe("createSessionManager", () => {
 
     it("应支持翻页", () => {
       const manager = createSessionManager();
-      const session = manager.createSession("agent:core");
+      const session = manager.createSession("agent:main");
 
       for (let i = 0; i < 10; i++) {
         manager.addMessage(session.sessionId, "user", `消息${i}`);
@@ -161,7 +161,7 @@ describe("createSessionManager", () => {
   describe("deleteSession", () => {
     it("应成功删除会话", () => {
       const manager = createSessionManager();
-      const session = manager.createSession("agent:core");
+      const session = manager.createSession("agent:main");
 
       expect(manager.deleteSession(session.sessionId)).toBe(true);
       expect(manager.getSession(session.sessionId)).toBeNull();
@@ -176,20 +176,20 @@ describe("createSessionManager", () => {
   describe("executionTree", () => {
     it("setExecutionTree 应设置执行树", () => {
       const manager = createSessionManager();
-      const session = manager.createSession("agent:core");
-      const tree = createExecutionTree("agent:core", "测试任务");
+      const session = manager.createSession("agent:main");
+      const tree = createExecutionTree("agent:main", "测试任务");
 
       expect(manager.setExecutionTree(session.sessionId, tree)).toBe(true);
       const fetched = manager.getExecutionTree(session.sessionId);
       expect(fetched).not.toBeNull();
-      expect(fetched!.agentId).toBe("agent:core");
+      expect(fetched!.agentId).toBe("agent:main");
     });
 
     it("setExecutionTree 应覆盖已有的执行树", () => {
       const manager = createSessionManager();
-      const session = manager.createSession("agent:core");
-      const tree1 = createExecutionTree("agent:core", "任务1");
-      const tree2 = createExecutionTree("agent:core", "任务2");
+      const session = manager.createSession("agent:main");
+      const tree1 = createExecutionTree("agent:main", "任务1");
+      const tree2 = createExecutionTree("agent:main", "任务2");
 
       manager.setExecutionTree(session.sessionId, tree1);
       manager.setExecutionTree(session.sessionId, tree2);
@@ -200,13 +200,13 @@ describe("createSessionManager", () => {
 
     it("setExecutionTree 会话不存在时应返回 false", () => {
       const manager = createSessionManager();
-      const tree = createExecutionTree("agent:core", "测试任务");
+      const tree = createExecutionTree("agent:main", "测试任务");
       expect(manager.setExecutionTree("nonexistent", tree)).toBe(false);
     });
 
     it("getExecutionTree 无执行树时应返回 null", () => {
       const manager = createSessionManager();
-      const session = manager.createSession("agent:core");
+      const session = manager.createSession("agent:main");
       expect(manager.getExecutionTree(session.sessionId)).toBeNull();
     });
 
@@ -217,13 +217,13 @@ describe("createSessionManager", () => {
 
     it("toSessionInfo 应包含 hasExecutionTree 字段", () => {
       const manager = createSessionManager();
-      const session = manager.createSession("agent:core");
+      const session = manager.createSession("agent:main");
 
       // 初始无执行树
       expect(session.hasExecutionTree).toBe(false);
 
       // 设置后有执行树
-      const tree = createExecutionTree("agent:core", "测试任务");
+      const tree = createExecutionTree("agent:main", "测试任务");
       manager.setExecutionTree(session.sessionId, tree);
       const updated = manager.getSession(session.sessionId);
       expect(updated!.hasExecutionTree).toBe(true);
@@ -245,7 +245,7 @@ describe("createSessionManager", () => {
       // 写入一个持久化文件
       const sessionData = {
         sessionId: "test-session-1",
-        agentId: "agent:core",
+        agentId: "agent:main",
         description: "持久化测试",
         messages: [
           { id: "msg-1", sessionId: "test-session-1", role: "user", content: "你好", timestamp: "2026-01-01T00:00:00Z" },
@@ -269,7 +269,7 @@ describe("createSessionManager", () => {
       const manager = createSessionManager(workspacePath);
       await manager.init();
 
-      const session = manager.createSession("agent:core", "写盘测试");
+      const session = manager.createSession("agent:main", "写盘测试");
 
       // 等待异步写盘完成
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -283,7 +283,7 @@ describe("createSessionManager", () => {
       const manager = createSessionManager(workspacePath);
       await manager.init();
 
-      const session = manager.createSession("agent:core");
+      const session = manager.createSession("agent:main");
 
       // 快速添加多条消息
       manager.addMessage(session.sessionId, "user", "消息1");
@@ -306,7 +306,7 @@ describe("createSessionManager", () => {
       const manager = createSessionManager(workspacePath);
       await manager.init();
 
-      const session = manager.createSession("agent:core");
+      const session = manager.createSession("agent:main");
 
       // 等待初始写盘
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -334,7 +334,7 @@ describe("createSessionManager", () => {
       // 写入正常文件
       const goodData = {
         sessionId: "good-session",
-        agentId: "agent:core",
+        agentId: "agent:main",
         description: "正常会话",
         messages: [],
         createdAt: "2026-01-01T00:00:00Z",
@@ -355,7 +355,7 @@ describe("createSessionManager", () => {
       const manager = createSessionManager();
       await manager.init(); // 不应报错
 
-      manager.createSession("agent:core");
+      manager.createSession("agent:main");
       // 不应有任何文件操作
     });
   });
