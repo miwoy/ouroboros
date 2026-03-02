@@ -685,6 +685,17 @@ npm run dev
 
 开发模式下，Vite 会自动代理 `/api` 请求到后端 `http://127.0.0.1:3000`。
 
+### E2E 测试
+
+```bash
+cd web
+npx playwright install chromium  # 首次需安装浏览器
+npm run test:e2e                 # 运行 E2E 测试（自动启动后端 + 前端）
+npm run test:e2e:ui              # 交互式 UI 模式
+```
+
+E2E 测试覆盖 6 个关键用户流程：导航切换、Chat 对话、Agent 管理、Monitor 监控（含执行树）、会话管理、设置面板。
+
 ### 构建
 
 ```bash
