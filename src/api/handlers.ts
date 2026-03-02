@@ -2,14 +2,19 @@
  * API 路由处理器
  *
  * 定义所有 REST API 端点的处理逻辑。
+ * 支持三层模式：占位符 → 直连模型 → ReAct 循环。
  */
 
 import type { Router } from "./router.js";
 import type { SessionManager } from "./session.js";
 import type { ApiDeps, SendMessageRequest, CreateSessionRequest, SSEEvent } from "./types.js";
-import type { TreeState } from "../core/types.js";
+import type { TreeState, ReactStep, ExecutionTree } from "../core/types.js";
 import type { Message } from "../model/types.js";
+import type { CallModelFn } from "../tool/types.js";
 import { treeToJSON } from "../core/execution-tree.js";
+import { runReactLoop } from "../core/loop.js";
+import { createToolExecutor } from "../tool/executor.js";
+import { filterSafeTools } from "./safe-tools.js";
 import {
   successResponse,
   notFoundError,
@@ -135,7 +140,7 @@ export function registerHandlers(
       return;
     }
 
-    // 非流式：模拟 Agent 处理（实际应集成 ReAct 循环）
+    // 非流式
     try {
       const response = await processMessage(sessionId, body.message, sessionManager, deps);
       ctx.respond(200, successResponse(response));
@@ -163,7 +168,6 @@ export function registerHandlers(
 
   // 列出 Agent
   router.get("/api/agents", async (ctx) => {
-    // 返回系统默认 Agent（实际应从 SolutionRegistry 获取）
     const agents = [
       {
         id: "agent:core",
@@ -214,7 +218,16 @@ function buildModelMessages(sessionManager: SessionManager, sessionId: string): 
 }
 
 /**
- * 处理非流式消息
+ * 构建 callModel 函数（从 provider 包装）
+ */
+function buildCallModelFn(deps: ApiDeps): CallModelFn | null {
+  if (!deps.providerRegistry || !deps.defaultProvider) return null;
+  const provider = deps.providerRegistry.get(deps.defaultProvider);
+  return (request, options) => provider.complete(request, options?.signal);
+}
+
+/**
+ * 处理非流式消息（三层逻辑）
  */
 async function processMessage(
   sessionId: string,
@@ -226,7 +239,7 @@ async function processMessage(
   readonly response: string;
   readonly formatted: string;
 }> {
-  // 无模型提供商时回退到占位符
+  // 第一层：无模型提供商 → 占位符
   if (!deps.providerRegistry || !deps.defaultProvider) {
     const responseText = `收到消息: "${message}"。请在 config.json 中配置模型提供商以启用 AI 对话。`;
     sessionManager.addMessage(sessionId, "agent", responseText);
@@ -237,6 +250,42 @@ async function processMessage(
     };
   }
 
+  // 第三层：有 provider + toolRegistry → ReAct 循环
+  const callModelFn = buildCallModelFn(deps);
+  if (callModelFn && deps.toolRegistry) {
+    const safeTools = filterSafeTools(deps.toolRegistry.list());
+    const toolExecutor = createToolExecutor(deps.toolRegistry, {
+      workspacePath: deps.workspacePath,
+      callModel: callModelFn,
+    });
+
+    const reactConfig = {
+      maxIterations: deps.reactConfig?.maxIterations ?? 20,
+      stepTimeout: deps.reactConfig?.stepTimeout ?? 60000,
+      parallelToolCalls: deps.reactConfig?.parallelToolCalls ?? true,
+      compressionThreshold: deps.reactConfig?.compressionThreshold ?? 10,
+      agentId: "agent:core",
+    };
+
+    const result = await runReactLoop(message, "", safeTools, reactConfig, {
+      callModel: callModelFn,
+      toolExecutor,
+      toolRegistry: deps.toolRegistry,
+      logger: deps.logger,
+      workspacePath: deps.workspacePath,
+    });
+
+    sessionManager.setExecutionTree(sessionId, result.executionTree);
+    sessionManager.addMessage(sessionId, "agent", result.answer);
+
+    return {
+      sessionId,
+      response: result.answer,
+      formatted: formatAgentResponse(result.answer, [...result.steps]),
+    };
+  }
+
+  // 第二层：有 provider 无 toolRegistry → 直连模型
   const provider = deps.providerRegistry.get(deps.defaultProvider);
   const messages = buildModelMessages(sessionManager, sessionId);
   const response = await provider.complete({ messages });
@@ -252,10 +301,7 @@ async function processMessage(
 }
 
 /**
- * 创建 SSE 流式事件
- *
- * 有模型提供商时调用真实模型流式输出，否则回退到占位符。
- * 使用事件队列桥接回调式 stream API → async generator。
+ * 创建 SSE 流式事件（三层逻辑）
  */
 async function* createStreamEvents(
   sessionId: string,
@@ -263,7 +309,7 @@ async function* createStreamEvents(
   deps: ApiDeps,
   sessionManager: SessionManager,
 ): AsyncIterable<SSEEvent> {
-  // 无模型提供商时回退到占位符
+  // 第一层：无模型提供商 → 占位符
   if (!deps.providerRegistry || !deps.defaultProvider) {
     yield { event: "thinking", data: JSON.stringify({ sessionId }) };
     const text = `收到消息: "${message}"。请在 config.json 中配置模型提供商以启用 AI 对话。`;
@@ -272,12 +318,161 @@ async function* createStreamEvents(
     return;
   }
 
+  // 第三层：有 provider + toolRegistry → ReAct SSE
+  const callModelFn = buildCallModelFn(deps);
+  if (callModelFn && deps.toolRegistry) {
+    yield* createReactStreamEvents(sessionId, message, deps, sessionManager, callModelFn);
+    return;
+  }
+
+  // 第二层：有 provider 无 toolRegistry → 直连流式
+  yield* createDirectStreamEvents(sessionId, message, deps, sessionManager);
+}
+
+/**
+ * ReAct 循环 SSE 流式事件
+ *
+ * 事件流：thinking → react_step/tool_call/tool_result → text_delta → done
+ */
+async function* createReactStreamEvents(
+  sessionId: string,
+  message: string,
+  deps: ApiDeps,
+  sessionManager: SessionManager,
+  callModelFn: CallModelFn,
+): AsyncIterable<SSEEvent> {
   yield { event: "thinking", data: JSON.stringify({ sessionId }) };
 
-  const provider = deps.providerRegistry.get(deps.defaultProvider);
+  // 事件队列：桥接 onStep 回调 → async generator
+  const eventQueue: Array<SSEEvent | null> = [];
+  let notifier: (() => void) | null = null;
+
+  function pushEvent(event: SSEEvent | null): void {
+    eventQueue.push(event);
+    if (notifier) {
+      notifier();
+      notifier = null;
+    }
+  }
+
+  function waitForEvent(): Promise<void> {
+    return new Promise((resolve) => {
+      notifier = resolve;
+    });
+  }
+
+  const safeTools = filterSafeTools(deps.toolRegistry!.list());
+  const toolExecutor = createToolExecutor(deps.toolRegistry!, {
+    workspacePath: deps.workspacePath,
+    callModel: callModelFn,
+  });
+
+  const reactConfig = {
+    maxIterations: deps.reactConfig?.maxIterations ?? 20,
+    stepTimeout: deps.reactConfig?.stepTimeout ?? 60000,
+    parallelToolCalls: deps.reactConfig?.parallelToolCalls ?? true,
+    compressionThreshold: deps.reactConfig?.compressionThreshold ?? 10,
+    agentId: "agent:core",
+  };
+
+  // 启动 ReAct 循环（后台执行）
+  const reactPromise = runReactLoop(message, "", safeTools, reactConfig, {
+    callModel: callModelFn,
+    toolExecutor,
+    toolRegistry: deps.toolRegistry!,
+    logger: deps.logger,
+    workspacePath: deps.workspacePath,
+    onStep: (step: ReactStep, tree: ExecutionTree) => {
+      // 推送 react_step 事件
+      pushEvent({
+        event: "react_step",
+        data: JSON.stringify({
+          stepIndex: step.stepIndex,
+          thought: step.thought,
+        }),
+      });
+
+      // 推送 tool_call + tool_result 事件
+      for (const tc of step.toolCalls) {
+        pushEvent({
+          event: "tool_call",
+          data: JSON.stringify({
+            toolCallId: tc.requestId,
+            toolName: tc.toolId,
+            input: tc.input,
+          }),
+        });
+        pushEvent({
+          event: "tool_result",
+          data: JSON.stringify({
+            toolCallId: tc.requestId,
+            output: tc.output,
+            success: tc.success,
+            error: tc.error,
+          }),
+        });
+      }
+
+      // 更新执行树
+      sessionManager.setExecutionTree(sessionId, tree);
+    },
+  })
+    .then((result) => {
+      // 推送最终答案
+      pushEvent({
+        event: "text_delta",
+        data: JSON.stringify({ text: result.answer }),
+      });
+
+      sessionManager.setExecutionTree(sessionId, result.executionTree);
+      sessionManager.addMessage(sessionId, "agent", result.answer);
+
+      pushEvent({
+        event: "done",
+        data: JSON.stringify({
+          sessionId,
+          complete: true,
+          stopReason: result.stopReason,
+        }),
+      });
+      pushEvent(null);
+    })
+    .catch((err: Error) => {
+      deps.logger.error("api", `ReAct 循环失败: ${err.message}`);
+      pushEvent({
+        event: "error",
+        data: JSON.stringify({ message: err.message }),
+      });
+      pushEvent(null);
+    });
+
+  // 从队列消费事件
+  while (true) {
+    while (eventQueue.length === 0) {
+      await waitForEvent();
+    }
+    const event = eventQueue.shift()!;
+    if (event === null) break;
+    yield event;
+  }
+
+  await reactPromise;
+}
+
+/**
+ * 直连模型流式 SSE（向后兼容，无 ReAct 循环时使用）
+ */
+async function* createDirectStreamEvents(
+  sessionId: string,
+  _message: string,
+  deps: ApiDeps,
+  sessionManager: SessionManager,
+): AsyncIterable<SSEEvent> {
+  yield { event: "thinking", data: JSON.stringify({ sessionId }) };
+
+  const provider = deps.providerRegistry!.get(deps.defaultProvider!);
   const messages = buildModelMessages(sessionManager, sessionId);
 
-  // 事件队列：桥接回调式 stream → async generator
   const eventQueue: Array<SSEEvent | null> = [];
   let notifier: (() => void) | null = null;
 
@@ -297,7 +492,6 @@ async function* createStreamEvents(
 
   let fullContent = "";
 
-  // 启动模型流式调用（后台执行）
   const streamPromise = provider
     .stream({ messages }, (event) => {
       if (event.type === "text_delta") {
@@ -314,7 +508,7 @@ async function* createStreamEvents(
         event: "done",
         data: JSON.stringify({ sessionId, complete: true }),
       });
-      pushEvent(null); // 终止信号
+      pushEvent(null);
     })
     .catch((err: Error) => {
       deps.logger.error("api", `流式调用失败: ${err.message}`);
@@ -325,7 +519,6 @@ async function* createStreamEvents(
       pushEvent(null);
     });
 
-  // 从队列消费事件
   while (true) {
     while (eventQueue.length === 0) {
       await waitForEvent();

@@ -32,7 +32,7 @@ export function createApiServer(deps: ApiDeps): ApiServer {
   const config: ApiConfig = { ...DEFAULT_API_CONFIG, ...deps.config };
   const router = createRouter();
   const rateLimiter = createRateLimiter(config.rateLimit);
-  const sessionManager = createSessionManager();
+  const sessionManager = createSessionManager(deps.workspacePath);
 
   // 注册路由
   registerHandlers(router, sessionManager, deps);
@@ -55,6 +55,9 @@ export function createApiServer(deps: ApiDeps): ApiServer {
   });
 
   async function start(): Promise<void> {
+    // 加载持久化会话
+    await sessionManager.init();
+
     return new Promise((resolve) => {
       server.listen(config.port, config.host, () => {
         deps.logger.info("api", `API 服务器已启动: http://${config.host}:${config.port}`);

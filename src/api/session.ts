@@ -2,10 +2,13 @@
  * 会话管理
  *
  * 内存中维护聊天会话，管理消息历史。
+ * 支持持久化到 workspace/sessions/*.json，重启后恢复。
  * 每个会话绑定一个 Agent，支持多轮对话。
  */
 
 import { randomUUID } from "node:crypto";
+import { readFile, writeFile, readdir, unlink, mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import type { ChatMessage, SessionInfo } from "./types.js";
 import type { ExecutionTree } from "../core/types.js";
 
@@ -20,11 +23,133 @@ interface Session {
   executionTree: ExecutionTree | null;
 }
 
+/** 持久化文件格式 */
+interface PersistedSession {
+  readonly sessionId: string;
+  readonly agentId: string;
+  readonly description: string;
+  readonly messages: readonly ChatMessage[];
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+/** 防抖定时器集合 */
+const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** 防抖间隔（毫秒） */
+const DEBOUNCE_MS = 500;
+
 /**
  * 创建会话管理器
+ *
+ * @param workspacePath - 可选 workspace 路径，提供后启用持久化
  */
-export function createSessionManager() {
+export function createSessionManager(workspacePath?: string) {
   const sessions = new Map<string, Session>();
+
+  /** 获取 sessions 目录路径 */
+  function getSessionsDir(): string | null {
+    return workspacePath ? join(workspacePath, "sessions") : null;
+  }
+
+  /** 获取会话文件路径 */
+  function getSessionFilePath(sessionId: string): string | null {
+    const dir = getSessionsDir();
+    return dir ? join(dir, `${sessionId}.json`) : null;
+  }
+
+  /**
+   * 持久化会话到磁盘（fire-and-forget）
+   */
+  function persistSession(session: Session): void {
+    const filePath = getSessionFilePath(session.sessionId);
+    if (!filePath) return;
+
+    const data: PersistedSession = {
+      sessionId: session.sessionId,
+      agentId: session.agentId,
+      description: session.description,
+      messages: session.messages,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+    };
+
+    writeFile(filePath, JSON.stringify(data, null, 2), "utf-8").catch(() => {
+      // 写盘失败静默处理，不影响内存中的会话
+    });
+  }
+
+  /**
+   * 防抖持久化（500ms 内多次调用只写最后一次）
+   */
+  function debouncedPersist(session: Session): void {
+    const existing = debounceTimers.get(session.sessionId);
+    if (existing) clearTimeout(existing);
+
+    debounceTimers.set(
+      session.sessionId,
+      setTimeout(() => {
+        debounceTimers.delete(session.sessionId);
+        persistSession(session);
+      }, DEBOUNCE_MS),
+    );
+  }
+
+  /**
+   * 删除持久化文件
+   */
+  function deletePersistedSession(sessionId: string): void {
+    const filePath = getSessionFilePath(sessionId);
+    if (!filePath) return;
+
+    unlink(filePath).catch(() => {
+      // 文件不存在时忽略
+    });
+  }
+
+  /**
+   * 初始化：从磁盘加载已持久化的会话
+   */
+  async function init(): Promise<void> {
+    const dir = getSessionsDir();
+    if (!dir) return;
+
+    // 确保 sessions 目录存在
+    await mkdir(dir, { recursive: true });
+
+    let files: string[];
+    try {
+      files = await readdir(dir);
+    } catch {
+      return;
+    }
+
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+
+      try {
+        const raw = await readFile(join(dir, file), "utf-8");
+        const data = JSON.parse(raw) as PersistedSession;
+
+        // 校验必要字段
+        if (!data.sessionId || !data.agentId || !Array.isArray(data.messages)) continue;
+
+        const session: Session = {
+          sessionId: data.sessionId,
+          agentId: data.agentId,
+          description: data.description || `会话 ${data.sessionId.slice(0, 8)}`,
+          messages: [...data.messages],
+          createdAt: data.createdAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || new Date().toISOString(),
+          executionTree: null,
+        };
+
+        sessions.set(session.sessionId, session);
+      } catch {
+        // 损坏的文件跳过
+      }
+    }
+  }
 
   /**
    * 创建新会话
@@ -44,6 +169,7 @@ export function createSessionManager() {
     };
 
     sessions.set(sessionId, session);
+    persistSession(session);
     return toSessionInfo(session);
   }
 
@@ -85,6 +211,7 @@ export function createSessionManager() {
 
     session.messages.push(message);
     session.updatedAt = new Date().toISOString();
+    debouncedPersist(session);
 
     return message;
   }
@@ -130,10 +257,21 @@ export function createSessionManager() {
    * 删除会话
    */
   function deleteSession(sessionId: string): boolean {
-    return sessions.delete(sessionId);
+    const deleted = sessions.delete(sessionId);
+    if (deleted) {
+      // 清除防抖定时器
+      const timer = debounceTimers.get(sessionId);
+      if (timer) {
+        clearTimeout(timer);
+        debounceTimers.delete(sessionId);
+      }
+      deletePersistedSession(sessionId);
+    }
+    return deleted;
   }
 
   return {
+    init,
     createSession,
     getSession,
     listSessions,

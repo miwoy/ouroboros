@@ -86,6 +86,9 @@ export interface HealthData {
 export interface StreamCallbacks {
   onThinking?: () => void;
   onTextDelta?: (text: string) => void;
+  onReactStep?: (data: { stepIndex: number; thought: string }) => void;
+  onToolCall?: (data: { toolCallId: string; toolName: string; input: Record<string, unknown> }) => void;
+  onToolResult?: (data: { toolCallId: string; output?: Record<string, unknown>; success: boolean; error?: string }) => void;
   onDone?: (data: { sessionId: string }) => void;
   onError?: (error: string) => void;
 }
@@ -198,6 +201,15 @@ export function streamMessage(
                   break;
                 case "text_delta":
                   callbacks.onTextDelta?.(data.text);
+                  break;
+                case "react_step":
+                  callbacks.onReactStep?.(data);
+                  break;
+                case "tool_call":
+                  callbacks.onToolCall?.(data);
+                  break;
+                case "tool_result":
+                  callbacks.onToolResult?.(data);
                   break;
                 case "done":
                   callbacks.onDone?.(data);

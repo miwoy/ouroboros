@@ -2,9 +2,29 @@
  * 会话管理器测试
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { createSessionManager } from "../../src/api/session.js";
 import { createExecutionTree } from "../../src/core/execution-tree.js";
+import { writeFile, mkdir, readdir, readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
+
+/** 创建临时 workspace */
+async function createTempWorkspace(): Promise<string> {
+  const dir = join(tmpdir(), `ouroboros-test-${randomUUID()}`);
+  await mkdir(dir, { recursive: true });
+  return dir;
+}
+
+/** 清理临时 workspace */
+async function cleanupWorkspace(dir: string): Promise<void> {
+  try {
+    await rm(dir, { recursive: true, force: true });
+  } catch {
+    // 忽略
+  }
+}
 
 describe("createSessionManager", () => {
   describe("createSession", () => {
@@ -207,6 +227,136 @@ describe("createSessionManager", () => {
       manager.setExecutionTree(session.sessionId, tree);
       const updated = manager.getSession(session.sessionId);
       expect(updated!.hasExecutionTree).toBe(true);
+    });
+  });
+
+  describe("持久化", () => {
+    let workspacePath: string;
+
+    afterEach(async () => {
+      if (workspacePath) await cleanupWorkspace(workspacePath);
+    });
+
+    it("init() 应加载持久化文件", async () => {
+      workspacePath = await createTempWorkspace();
+      const sessionsDir = join(workspacePath, "sessions");
+      await mkdir(sessionsDir, { recursive: true });
+
+      // 写入一个持久化文件
+      const sessionData = {
+        sessionId: "test-session-1",
+        agentId: "agent:core",
+        description: "持久化测试",
+        messages: [
+          { id: "msg-1", sessionId: "test-session-1", role: "user", content: "你好", timestamp: "2026-01-01T00:00:00Z" },
+        ],
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      };
+      await writeFile(join(sessionsDir, "test-session-1.json"), JSON.stringify(sessionData));
+
+      const manager = createSessionManager(workspacePath);
+      await manager.init();
+
+      const session = manager.getSession("test-session-1");
+      expect(session).not.toBeNull();
+      expect(session!.description).toBe("持久化测试");
+      expect(session!.messageCount).toBe(1);
+    });
+
+    it("createSession 应触发写盘", async () => {
+      workspacePath = await createTempWorkspace();
+      const manager = createSessionManager(workspacePath);
+      await manager.init();
+
+      const session = manager.createSession("agent:core", "写盘测试");
+
+      // 等待异步写盘完成
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const files = await readdir(join(workspacePath, "sessions"));
+      expect(files).toContain(`${session.sessionId}.json`);
+    });
+
+    it("addMessage 应防抖写盘", async () => {
+      workspacePath = await createTempWorkspace();
+      const manager = createSessionManager(workspacePath);
+      await manager.init();
+
+      const session = manager.createSession("agent:core");
+
+      // 快速添加多条消息
+      manager.addMessage(session.sessionId, "user", "消息1");
+      manager.addMessage(session.sessionId, "user", "消息2");
+      manager.addMessage(session.sessionId, "user", "消息3");
+
+      // 等待防抖完成
+      await new Promise((resolve) => setTimeout(resolve, 700));
+
+      const filePath = join(workspacePath, "sessions", `${session.sessionId}.json`);
+      const raw = await readFile(filePath, "utf-8");
+      const data = JSON.parse(raw);
+
+      // 应包含所有 3 条消息
+      expect(data.messages).toHaveLength(3);
+    });
+
+    it("deleteSession 应删除文件", async () => {
+      workspacePath = await createTempWorkspace();
+      const manager = createSessionManager(workspacePath);
+      await manager.init();
+
+      const session = manager.createSession("agent:core");
+
+      // 等待初始写盘
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      manager.deleteSession(session.sessionId);
+
+      // 等待删除完成
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const files = await readdir(join(workspacePath, "sessions"));
+      expect(files).not.toContain(`${session.sessionId}.json`);
+    });
+
+    it("损坏的文件应跳过", async () => {
+      workspacePath = await createTempWorkspace();
+      const sessionsDir = join(workspacePath, "sessions");
+      await mkdir(sessionsDir, { recursive: true });
+
+      // 写入损坏的 JSON
+      await writeFile(join(sessionsDir, "bad.json"), "not valid json{{{");
+
+      // 写入缺少必要字段的 JSON
+      await writeFile(join(sessionsDir, "incomplete.json"), JSON.stringify({ foo: "bar" }));
+
+      // 写入正常文件
+      const goodData = {
+        sessionId: "good-session",
+        agentId: "agent:core",
+        description: "正常会话",
+        messages: [],
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      };
+      await writeFile(join(sessionsDir, "good-session.json"), JSON.stringify(goodData));
+
+      const manager = createSessionManager(workspacePath);
+      await manager.init();
+
+      // 只加载了正常文件
+      const sessions = manager.listSessions();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].sessionId).toBe("good-session");
+    });
+
+    it("无 workspacePath 时不持久化", async () => {
+      const manager = createSessionManager();
+      await manager.init(); // 不应报错
+
+      manager.createSession("agent:core");
+      // 不应有任何文件操作
     });
   });
 });

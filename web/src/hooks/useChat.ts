@@ -5,12 +5,27 @@
 import { useState, useCallback, useRef } from "react";
 import * as api from "../services/api";
 
+/** 工具调用展示信息 */
+export interface ToolCallDisplay {
+  readonly toolCallId: string;
+  readonly toolName: string;
+  readonly input: Record<string, unknown>;
+  readonly output?: Record<string, unknown>;
+  readonly success?: boolean;
+  readonly error?: string;
+  readonly status: "pending" | "done";
+}
+
 export interface DisplayMessage {
   readonly id: string;
   readonly role: "user" | "agent" | "system";
   readonly content: string;
   readonly timestamp: string;
   readonly streaming?: boolean;
+  /** 模型思考内容（ReAct 步骤） */
+  readonly thought?: string;
+  /** 工具调用列表 */
+  readonly toolCalls?: readonly ToolCallDisplay[];
 }
 
 export function useChat() {
@@ -72,6 +87,7 @@ export function useChat() {
         content: "",
         timestamp: new Date().toISOString(),
         streaming: true,
+        toolCalls: [],
       };
       setMessages((prev) => [...prev, agentMsg]);
       setLoading(true);
@@ -82,6 +98,40 @@ export function useChat() {
           onTextDelta: (delta) => {
             setMessages((prev) =>
               prev.map((m) => (m.id === agentMsgId ? { ...m, content: m.content + delta } : m)),
+            );
+          },
+          onReactStep: (data) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === agentMsgId ? { ...m, thought: data.thought } : m,
+              ),
+            );
+          },
+          onToolCall: (data) => {
+            setMessages((prev) =>
+              prev.map((m) => {
+                if (m.id !== agentMsgId) return m;
+                const newToolCall: ToolCallDisplay = {
+                  toolCallId: data.toolCallId,
+                  toolName: data.toolName,
+                  input: data.input,
+                  status: "pending",
+                };
+                return { ...m, toolCalls: [...(m.toolCalls || []), newToolCall] };
+              }),
+            );
+          },
+          onToolResult: (data) => {
+            setMessages((prev) =>
+              prev.map((m) => {
+                if (m.id !== agentMsgId) return m;
+                const updatedCalls = (m.toolCalls || []).map((tc) =>
+                  tc.toolCallId === data.toolCallId
+                    ? { ...tc, output: data.output, success: data.success, error: data.error, status: "done" as const }
+                    : tc,
+                );
+                return { ...m, toolCalls: updatedCalls };
+              }),
             );
           },
           onDone: (data) => {

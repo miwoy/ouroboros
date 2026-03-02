@@ -5,9 +5,15 @@
  */
 
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { rm } from "node:fs/promises";
 import { createApiServer } from "../../src/api/server.js";
 import type { ApiDeps } from "../../src/api/types.js";
 import type { Logger } from "../../src/logger/types.js";
+import type { ToolRegistry, OuroborosTool } from "../../src/tool/types.js";
+import { EntityType, EntityStatus } from "../../src/tool/types.js";
 import { createExecutionTree } from "../../src/core/execution-tree.js";
 
 function createMockLogger(): Logger {
@@ -19,10 +25,15 @@ function createMockLogger(): Logger {
   };
 }
 
+/** 每次测试使用独立临时目录，避免持久化文件干扰 */
+function uniqueWorkspacePath(): string {
+  return join(tmpdir(), `ouroboros-handler-test-${randomUUID()}`);
+}
+
 function createDeps(): ApiDeps {
   return {
     logger: createMockLogger(),
-    workspacePath: "/tmp/test-workspace",
+    workspacePath: uniqueWorkspacePath(),
     config: {
       port: 0,
       host: "127.0.0.1",
@@ -32,12 +43,87 @@ function createDeps(): ApiDeps {
   };
 }
 
+function createMockTool(id: string): OuroborosTool {
+  return {
+    id,
+    type: EntityType.Tool,
+    name: id.replace("tool:", ""),
+    description: `${id} 工具`,
+    version: "1.0.0",
+    status: EntityStatus.Active,
+    permissions: {},
+    origin: "system",
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    entrypoint: `builtin:${id}`,
+    inputSchema: { type: "object" },
+    outputSchema: { type: "object" },
+  };
+}
+
+function createMockToolRegistry(tools: OuroborosTool[]): ToolRegistry {
+  const map = new Map(tools.map((t) => [t.id, t]));
+  return {
+    get: (id) => map.get(id),
+    has: (id) => map.has(id),
+    list: () => [...map.values()],
+    listCustom: () => [],
+    register: vi.fn(),
+    updateStatus: vi.fn(),
+  };
+}
+
+function createDepsWithReact(): ApiDeps {
+  const mockProvider = {
+    name: "test",
+    complete: vi.fn().mockResolvedValue({
+      content: "ReAct 回答",
+      toolCalls: [],
+      stopReason: "end_turn",
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      model: "test",
+    }),
+    stream: vi.fn(),
+  };
+
+  const providerRegistry = {
+    get: () => mockProvider,
+    has: () => true,
+    names: () => ["test"],
+  };
+
+  return {
+    logger: createMockLogger(),
+    workspacePath: uniqueWorkspacePath(),
+    config: {
+      port: 0,
+      host: "127.0.0.1",
+      rateLimit: { windowMs: 60000, maxRequests: 100 },
+      corsOrigin: "*",
+    },
+    providerRegistry: providerRegistry as any,
+    defaultProvider: "test",
+    toolRegistry: createMockToolRegistry([
+      createMockTool("tool:read"),
+      createMockTool("tool:web-search"),
+    ]),
+    reactConfig: {
+      maxIterations: 5,
+      stepTimeout: 30000,
+      parallelToolCalls: true,
+      compressionThreshold: 50,
+    },
+  };
+}
+
 describe("API 路由处理器", () => {
   let server: ReturnType<typeof createApiServer> | null = null;
   let baseUrl: string;
+  let currentWorkspacePath: string | null = null;
 
   async function startServer() {
     const deps = createDeps();
+    currentWorkspacePath = deps.workspacePath;
     server = createApiServer(deps);
     await server.start();
     const addr = server.getHttpServer().address();
@@ -49,6 +135,10 @@ describe("API 路由处理器", () => {
     if (server) {
       await server.stop();
       server = null;
+    }
+    if (currentWorkspacePath) {
+      await rm(currentWorkspacePath, { recursive: true, force: true }).catch(() => {});
+      currentWorkspacePath = null;
     }
   });
 
@@ -301,7 +391,7 @@ describe("API 路由处理器", () => {
   });
 
   describe("SSE 流式", () => {
-    it("POST /api/chat/message?stream=true 应返回 SSE 流", async () => {
+    it("POST /api/chat/message?stream=true 应返回 SSE 流（占位符模式）", async () => {
       await startServer();
 
       const res = await fetch(`${baseUrl}/api/chat/message`, {
@@ -317,6 +407,52 @@ describe("API 路由处理器", () => {
       expect(text).toContain("event: thinking");
       expect(text).toContain("event: text_delta");
       expect(text).toContain("event: done");
+    });
+  });
+
+  describe("ReAct SSE 流式", () => {
+    async function startReactServer() {
+      const deps = createDepsWithReact();
+      currentWorkspacePath = deps.workspacePath;
+      server = createApiServer(deps);
+      await server.start();
+      const addr = server.getHttpServer().address();
+      if (!addr || typeof addr === "string") throw new Error("无效地址");
+      baseUrl = `http://127.0.0.1:${addr.port}`;
+    }
+
+    it("ReAct SSE 应包含 react_step 和 text_delta 和 done 事件", async () => {
+      await startReactServer();
+
+      const res = await fetch(`${baseUrl}/api/chat/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "你好", stream: true }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("text/event-stream");
+
+      const text = await res.text();
+      expect(text).toContain("event: thinking");
+      expect(text).toContain("event: react_step");
+      expect(text).toContain("event: text_delta");
+      expect(text).toContain("event: done");
+    });
+
+    it("ReAct 非流式应返回 ReAct 回答", async () => {
+      await startReactServer();
+
+      const res = await fetch(`${baseUrl}/api/chat/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "你好", stream: false }),
+      });
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(body.data.response).toBe("ReAct 回答");
     });
   });
 });

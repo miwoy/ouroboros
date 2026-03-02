@@ -152,4 +152,6 @@ export interface ReactDependencies {
   readonly toolRegistry: ToolRegistry;
   readonly logger: Logger;
   readonly workspacePath: string;
+  /** 每步完成回调（SSE 实时推送用） */
+  readonly onStep?: (step: ReactStep, tree: ExecutionTree) => void;
 }

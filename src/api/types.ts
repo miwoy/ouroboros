@@ -6,6 +6,7 @@
 
 import type { Logger } from "../logger/types.js";
 import type { ProviderRegistry } from "../model/registry.js";
+import type { ToolRegistry } from "../tool/types.js";
 
 // ─── 统一响应格式 ──────────────────────────────────────────────
 
@@ -95,6 +96,8 @@ export interface TaskInfo {
 export type SSEEventType =
   | "text_delta"
   | "tool_call"
+  | "tool_result"
+  | "react_step"
   | "thinking"
   | "done"
   | "error"
@@ -149,6 +152,15 @@ export interface ApiDeps {
   readonly providerRegistry?: ProviderRegistry;
   /** 默认提供商名称 */
   readonly defaultProvider?: string;
+  /** 工具注册表（可选，有则启用 ReAct 循环） */
+  readonly toolRegistry?: ToolRegistry;
+  /** ReAct 循环配置 */
+  readonly reactConfig?: {
+    readonly maxIterations: number;
+    readonly stepTimeout: number;
+    readonly parallelToolCalls: boolean;
+    readonly compressionThreshold: number;
+  };
 }
 
 // ─── 路由 ──────────────────────────────────────────────

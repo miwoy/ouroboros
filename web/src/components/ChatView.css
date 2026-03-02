@@ -182,6 +182,87 @@
   opacity: 0.8;
 }
 
+/* Thought */
+.message-thought {
+  font-style: italic;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+/* Tool calls */
+.tool-calls-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.tool-call-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color var(--transition);
+}
+.tool-call-card:hover {
+  border-color: var(--color-text-muted);
+}
+
+.tool-call-pending {
+  border-left: 3px solid var(--color-primary);
+  animation: tool-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes tool-pulse {
+  0%, 100% { border-left-color: var(--color-primary); }
+  50% { border-left-color: transparent; }
+}
+
+.tool-call-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.tool-call-name {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.tool-call-status {
+  font-size: 14px;
+}
+
+.tool-call-details {
+  padding: 0 10px 8px;
+  font-size: 12px;
+}
+
+.tool-call-section {
+  margin-top: 4px;
+}
+
+.tool-call-details pre {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  max-height: 200px;
+  overflow: auto;
+  font-size: 11px;
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.tool-call-error-text {
+  color: var(--color-danger);
+}
+
 @media (max-width: 768px) {
   .message { padding: 10px 16px; }
   .chat-input-bar { padding: 10px 16px 16px; }

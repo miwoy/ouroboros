@@ -6,7 +6,7 @@ import { useRef, useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import type { DisplayMessage } from "../hooks/useChat";
+import type { DisplayMessage, ToolCallDisplay } from "../hooks/useChat";
 import "./ChatView.css";
 
 interface ChatViewProps {
@@ -38,7 +38,7 @@ export function ChatView({ messages, loading, error, onSend, onStop }: ChatViewP
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleSubmit(e);
     }
@@ -95,6 +95,8 @@ export function ChatView({ messages, loading, error, onSend, onStop }: ChatViewP
 
 function MessageBubble({ message }: { message: DisplayMessage }) {
   const isUser = message.role === "user";
+  const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
+  const showThought = message.thought && !message.content;
 
   return (
     <div className={`message ${isUser ? "message-user" : "message-agent"}`}>
@@ -109,6 +111,18 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
             })}
           </span>
         </div>
+        {showThought && (
+          <div className="message-thought">
+            {message.thought}
+          </div>
+        )}
+        {hasToolCalls && (
+          <div className="tool-calls-container">
+            {message.toolCalls!.map((tc) => (
+              <ToolCallCard key={tc.toolCallId} toolCall={tc} />
+            ))}
+          </div>
+        )}
         <div className="markdown-body">
           {message.content ? (
             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
@@ -123,6 +137,45 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
           ) : null}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ToolCallCard({ toolCall }: { readonly toolCall: ToolCallDisplay }) {
+  const [expanded, setExpanded] = useState(false);
+  const isPending = toolCall.status === "pending";
+  const isSuccess = toolCall.success === true;
+
+  const statusIcon = isPending ? "\u23F3" : isSuccess ? "\u2705" : "\u274C";
+
+  return (
+    <div
+      className={`tool-call-card ${isPending ? "tool-call-pending" : ""}`}
+      onClick={() => setExpanded(!expanded)}
+    >
+      <div className="tool-call-header">
+        <span className="tool-call-name">{toolCall.toolName}</span>
+        <span className="tool-call-status">{statusIcon}</span>
+      </div>
+      {expanded && (
+        <div className="tool-call-details">
+          <div className="tool-call-section">
+            <strong>Input:</strong>
+            <pre>{JSON.stringify(toolCall.input, null, 2)}</pre>
+          </div>
+          {toolCall.output && (
+            <div className="tool-call-section">
+              <strong>Output:</strong>
+              <pre>{JSON.stringify(toolCall.output, null, 2)}</pre>
+            </div>
+          )}
+          {toolCall.error && (
+            <div className="tool-call-section tool-call-error-text">
+              <strong>Error:</strong> {toolCall.error}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

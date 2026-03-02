@@ -125,6 +125,7 @@ export async function runReactLoop(
           toolCalls: [],
           duration: Date.now() - stepStartTime,
         });
+        deps.onStep?.(steps[steps.length - 1]!, tree);
         iteration++;
         break;
       }
@@ -182,6 +183,7 @@ export async function runReactLoop(
           toolCalls: toolCallResults.results,
           duration: Date.now() - stepStartTime,
         });
+        deps.onStep?.(steps[steps.length - 1]!, tree);
 
         logger.info("react-loop", `步骤 ${iteration + 1} 完成`, {
           toolCallCount: toolCallResults.results.length,

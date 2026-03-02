@@ -360,6 +360,100 @@ describe("ReAct 核心循环", () => {
     });
   });
 
+  describe("onStep 回调", () => {
+    it("直接回答时应调用 onStep 一次", async () => {
+      const onStep = vi.fn();
+      const callModel = vi.fn().mockResolvedValue({
+        content: "回答",
+        toolCalls: [],
+        stopReason: "end_turn",
+        usage: defaultUsage(),
+        model: "test",
+      } satisfies ModelResponse);
+
+      const deps: ReactDependencies = {
+        callModel: callModel as CallModelFn,
+        toolExecutor: createMockExecutor(new Map()),
+        toolRegistry: createMockRegistry([]),
+        logger: createMockLogger(),
+        workspacePath: "/workspace",
+        onStep,
+      };
+
+      await runReactLoop("任务", "", [], defaultConfig, deps);
+
+      expect(onStep).toHaveBeenCalledTimes(1);
+      const [step, tree] = onStep.mock.calls[0];
+      expect(step.stepIndex).toBe(0);
+      expect(step.toolCalls).toHaveLength(0);
+      expect(tree).toBeDefined();
+      expect(tree.rootNodeId).toBeTruthy();
+    });
+
+    it("工具调用时应调用 onStep 传递步骤和执行树", async () => {
+      const onStep = vi.fn();
+      const tool = createMockTool("tool:t", "测试");
+
+      const callModel = vi
+        .fn()
+        .mockResolvedValueOnce({
+          content: "调用工具",
+          toolCalls: [{ id: "tc-1", name: "tool:t", arguments: "{}" }],
+          stopReason: "tool_use",
+          usage: defaultUsage(),
+          model: "test",
+        } satisfies ModelResponse)
+        .mockResolvedValueOnce({
+          content: "完成",
+          toolCalls: [],
+          stopReason: "end_turn",
+          usage: defaultUsage(),
+          model: "test",
+        } satisfies ModelResponse);
+
+      const deps: ReactDependencies = {
+        callModel: callModel as CallModelFn,
+        toolExecutor: createMockExecutor(new Map()),
+        toolRegistry: createMockRegistry([tool]),
+        logger: createMockLogger(),
+        workspacePath: "/workspace",
+        onStep,
+      };
+
+      await runReactLoop("任务", "", [tool], defaultConfig, deps);
+
+      // 两步：工具调用 + 最终回答
+      expect(onStep).toHaveBeenCalledTimes(2);
+
+      // 第一步应包含工具调用
+      const [step1] = onStep.mock.calls[0];
+      expect(step1.toolCalls).toHaveLength(1);
+      expect(step1.toolCalls[0].toolId).toBe("tool:t");
+    });
+
+    it("不提供 onStep 时应正常运行", async () => {
+      const callModel = vi.fn().mockResolvedValue({
+        content: "回答",
+        toolCalls: [],
+        stopReason: "end_turn",
+        usage: defaultUsage(),
+        model: "test",
+      } satisfies ModelResponse);
+
+      const deps: ReactDependencies = {
+        callModel: callModel as CallModelFn,
+        toolExecutor: createMockExecutor(new Map()),
+        toolRegistry: createMockRegistry([]),
+        logger: createMockLogger(),
+        workspacePath: "/workspace",
+        // 不提供 onStep
+      };
+
+      const result = await runReactLoop("任务", "", [], defaultConfig, deps);
+      expect(result.stopReason).toBe("completed");
+    });
+  });
+
   describe("Usage 累加", () => {
     it("应累加所有迭代的 token 用量", async () => {
       const usage: TokenUsage = { promptTokens: 10, completionTokens: 5, totalTokens: 15 };

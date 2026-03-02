@@ -12,6 +12,7 @@ import { createHttpClient, type HttpClient } from "./http/index.js";
 import { createApiServer, type ApiServer } from "./api/server.js";
 import type { ApiConfig } from "./api/types.js";
 import { createProviderRegistry } from "./model/registry.js";
+import { createToolRegistry } from "./tool/registry.js";
 
 async function main(): Promise<void> {
   // 1. 加载配置
@@ -50,12 +51,18 @@ async function main(): Promise<void> {
   const providerRegistry = createProviderRegistry(config.model.providers);
   logger.info("main", `模型提供商已加载: ${providerRegistry.names().join(", ")}`);
 
+  // 7. 创建工具注册表
+  const toolRegistry = await createToolRegistry(config.system.workspacePath);
+  logger.info("main", `工具注册表已加载: ${toolRegistry.list().length} 个工具`);
+
   const server: ApiServer = createApiServer({
     logger,
     workspacePath: config.system.workspacePath,
     config: apiConfig,
     providerRegistry,
     defaultProvider: config.model.defaultProvider,
+    toolRegistry,
+    reactConfig: config.react,
   });
 
   await server.start();
