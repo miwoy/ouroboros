@@ -137,6 +137,13 @@ ouroboros/
 │   │   ├── executor.ts   # 技能执行器（模板渲染 + ReAct 循环）
 │   │   └── builtin/      # 内置技能
 │   │       └── definitions.ts  # createSolution 等内置技能定义
+│   ├── solution/         # Agent (Solution) 系统
+│   │   ├── types.ts      # 类型定义（SolutionDefinition, Agent, Task）
+│   │   ├── registry.ts   # Solution 注册表（持久化 + agent.md 追加）
+│   │   ├── knowledge.ts  # 知识库管理（文件加载 + token 限制）
+│   │   ├── builder.ts    # Agent 构建器（工作空间创建 + 初始化）
+│   │   ├── executor.ts   # Agent 执行器（ReAct 循环集成）
+│   │   └── index.ts      # 公共导出
 │   ├── memory/           # 记忆系统
 │   │   ├── types.ts      # 类型定义（HotMemory, ColdMemory, ShortTermMemory, LongTermMemory）
 │   │   ├── session.ts    # Session 记忆（Hot: 内存常驻, Cold: 临时文件缓存）
@@ -314,6 +321,49 @@ const result = await runReactLoop(
 console.log(result.answer);      // 最终回答
 console.log(result.steps);       // 每个步骤的工具调用
 console.log(result.executionTree); // 执行树
+```
+
+## Agent (Solution) 系统
+
+Agent 是以特定身份提供服务的智能体，包含身份定义、知识库、技能组，通过 ReAct 循环自主执行任务。
+
+### 核心概念
+
+- **SolutionDefinition**：Agent 定义（身份提示词 + 知识库 + 技能组 + 交互模式）
+- **SolutionRegistry**：Agent 注册表（内存 + solutions/registry.json 持久化）
+- **KnowledgeBase**：知识库管理（静态文件 + token 预算控制）
+- **AgentExecutor**：任务执行器（构建上下文 → 筛选工具 → ReAct 循环）
+
+### 使用示例
+
+```typescript
+import {
+  createSolutionRegistry, buildAgent, createAgentExecutor
+} from "ouroboros";
+
+// 1. 注册 Agent 定义
+const registry = await createSolutionRegistry(workspacePath);
+await registry.register({
+  id: "solution:code-reviewer",
+  identityPrompt: "你是一位代码审查专家",
+  skills: ["skill:read-file"],
+  interaction: { multiTurn: true, humanInLoop: false, inputModes: ["text"], outputModes: ["text"] },
+  // ...其他 EntityCard 字段
+});
+
+// 2. 构建 Agent 实例（创建工作空间目录、配置文件）
+const agent = await buildAgent(definition, workspacePath);
+
+// 3. 通过 run-agent 工具执行任务
+const executor = createAgentExecutor(deps);
+const response = await executor.execute({
+  agentId: "solution:code-reviewer",
+  task: "审查 src/index.ts 的代码质量",
+});
+
+console.log(response.result);           // Agent 的回答
+console.log(response.task.state);        // "completed"
+console.log(response.executionTree);     // 执行树
 ```
 
 ## 记忆系统

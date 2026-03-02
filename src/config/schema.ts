@@ -97,6 +97,17 @@ const memoryConfigSchema = z.object({
 });
 
 /**
+ * Agent 系统配置 Schema
+ * 控制 Agent (Solution) 系统的行为参数
+ */
+const agentConfigSchema = z.object({
+  /** 默认最大交互轮次 */
+  defaultMaxTurns: z.number().int().positive().default(50),
+  /** 知识库默认最大 token 数 */
+  knowledgeMaxTokens: z.number().int().positive().default(8000),
+});
+
+/**
  * 顶层配置 Schema
  * Ouroboros 完整配置结构
  */
@@ -118,6 +129,10 @@ export const configSchema = z.object({
     longTerm: true,
     hotSessionMaxTokens: 4000,
   }),
+  agents: agentConfigSchema.default({
+    defaultMaxTurns: 50,
+    knowledgeMaxTokens: 8000,
+  }),
 });
 
 /** 模型提供商配置类型 */
@@ -137,6 +152,9 @@ export type ReactConfig = z.infer<typeof reactConfigSchema>;
 
 /** 记忆系统配置类型 */
 export type MemorySchemaConfig = z.infer<typeof memoryConfigSchema>;
+
+/** Agent 系统配置类型 */
+export type AgentSchemaConfig = z.infer<typeof agentConfigSchema>;
 
 /** 顶层配置类型 */
 export type Config = z.infer<typeof configSchema>;
