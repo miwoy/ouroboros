@@ -15,6 +15,18 @@
   gap: 24px;
 }
 
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-logo-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
 .header-logo {
   font-size: 18px;
   font-weight: 700;

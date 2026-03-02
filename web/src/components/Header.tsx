@@ -18,7 +18,10 @@ export function Header({ currentView, onViewChange, onNewChat, connected }: Head
   return (
     <header className="header">
       <div className="header-left">
-        <h1 className="header-logo">Ouroboros</h1>
+        <div className="header-brand">
+          <img src="/logo.png" alt="Ouroboros" className="header-logo-img" />
+          <h1 className="header-logo">Ouroboros</h1>
+        </div>
         <nav className="header-nav">
           <button
             className={`nav-btn ${currentView === "chat" ? "active" : ""}`}
