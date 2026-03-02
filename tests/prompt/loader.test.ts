@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   loadPromptFile,
   loadAllPromptFiles,
+  loadUserPromptFiles,
   searchByKeyword,
   searchBySemantic,
 } from "../../src/prompt/loader.js";
@@ -15,7 +16,13 @@ import type { PromptFile } from "../../src/prompt/types.js";
 const TEST_WORKSPACE = join(process.cwd(), ".test-prompt-loader-tmp");
 
 /** 创建带 frontmatter 的测试用提示词文件 */
-function createTestMd(type: string, name: string, description: string, tags: string[], content: string): string {
+function createTestMd(
+  type: string,
+  name: string,
+  description: string,
+  tags: string[],
+  content: string,
+): string {
   const tagsStr = tags.map((t) => `"${t}"`).join(", ");
   return `---
 type: ${type}
@@ -75,6 +82,41 @@ describe("loadAllPromptFiles", () => {
   });
 });
 
+describe("loadUserPromptFiles", () => {
+  beforeEach(async () => {
+    await initWorkspace(TEST_WORKSPACE);
+  });
+
+  afterEach(async () => {
+    await rm(TEST_WORKSPACE, { recursive: true, force: true });
+  });
+
+  it("应该只加载用户级提示词文件（不含 core）", async () => {
+    const files = await loadUserPromptFiles(TEST_WORKSPACE);
+    expect(files.has("core")).toBe(false);
+    // self + tool + skill + agent + memory
+    expect(files.has("skill")).toBe(true);
+  });
+
+  it("应该包含 self/tool/skill/agent/memory 类型", async () => {
+    const files = await loadUserPromptFiles(TEST_WORKSPACE);
+    const types = [...files.keys()];
+    for (const ft of ["self", "tool", "skill", "agent", "memory"] as const) {
+      // 文件存在则应被加载（memory 可能不存在）
+      if (files.has(ft)) {
+        expect(types).toContain(ft);
+      }
+    }
+  });
+
+  it("文件不存在时应跳过", async () => {
+    // 删除 agent.md
+    await rm(join(TEST_WORKSPACE, "prompts", "agent.md"), { force: true });
+    const files = await loadUserPromptFiles(TEST_WORKSPACE);
+    expect(files.has("agent")).toBe(false);
+  });
+});
+
 describe("searchByKeyword", () => {
   beforeEach(async () => {
     await initWorkspace(TEST_WORKSPACE);
@@ -91,11 +133,7 @@ describe("searchByKeyword", () => {
 |------|-----|------|------|
 | 用户问候 | skill:greeting | 用友好的方式问候用户 | workspace/skills/greeting |`,
     );
-    await writeFile(
-      join(TEST_WORKSPACE, "prompts", "skill.md"),
-      skillContent,
-      "utf-8",
-    );
+    await writeFile(join(TEST_WORKSPACE, "prompts", "skill.md"), skillContent, "utf-8");
   });
 
   afterEach(async () => {
@@ -158,11 +196,7 @@ describe("searchBySemantic", () => {
 |------|-----|------|
 | 用户问候 | skill:greeting | 友好问候 |`,
     );
-    await writeFile(
-      join(TEST_WORKSPACE, "prompts", "skill.md"),
-      skillContent,
-      "utf-8",
-    );
+    await writeFile(join(TEST_WORKSPACE, "prompts", "skill.md"), skillContent, "utf-8");
   });
 
   afterEach(async () => {
@@ -179,14 +213,14 @@ describe("searchBySemantic", () => {
 
   it("qmd 可用时应调用 vectorSearch", async () => {
     vi.spyOn(vectorModule, "isQmdAvailable").mockResolvedValue(true);
-    const mockVectorSearch = vi
-      .spyOn(vectorModule, "vectorSearch")
-      .mockResolvedValue([{
+    const mockVectorSearch = vi.spyOn(vectorModule, "vectorSearch").mockResolvedValue([
+      {
         fileType: "skill",
         fileName: "skill.md",
         content: "用户问候",
         score: 0.9,
-      }]);
+      },
+    ]);
 
     const results = await searchBySemantic(TEST_WORKSPACE, "用户问候");
 

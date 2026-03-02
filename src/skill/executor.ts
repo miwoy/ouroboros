@@ -15,6 +15,7 @@ import type { OuroborosTool, CallModelFn, ToolRegistry } from "../tool/types.js"
 import type { ToolExecutor } from "../tool/executor.js";
 import type { Logger } from "../logger/types.js";
 import { runReactLoop, type ReactLoopConfig } from "../core/index.js";
+import type { SchemaProvider } from "../schema/schema-provider.js";
 import {
   EntityStatus,
   type SkillDefinition,
@@ -38,6 +39,8 @@ export interface SkillExecutorDeps {
   readonly logger: Logger;
   readonly workspacePath: string;
   readonly reactConfig?: Partial<ReactLoopConfig>;
+  /** 自我图式提供者（用于注入运行环境信息） */
+  readonly schemaProvider?: SchemaProvider;
 }
 
 /**
@@ -99,7 +102,7 @@ export function createSkillExecutor(deps: SkillExecutorDeps): SkillExecutor {
           agentId: request.caller.entityId,
         };
 
-        const contextPrompt = buildContextPrompt(skill);
+        const contextPrompt = buildContextPrompt(skill, deps.schemaProvider);
 
         const result = await runReactLoop(task, contextPrompt, tools, reactConfig, {
           callModel: deps.callModel,
@@ -169,9 +172,18 @@ function buildTask(renderedTemplate: string, context?: string): string {
   return renderedTemplate;
 }
 
-/** 构建上下文提示词（技能身份描述） */
-function buildContextPrompt(skill: SkillDefinition): string {
+/** 构建上下文提示词（运行环境 + 技能身份描述） */
+function buildContextPrompt(skill: SkillDefinition, schemaProvider?: SchemaProvider): string {
   const parts: string[] = [];
+
+  // 注入身体图式（资源感知）
+  if (schemaProvider) {
+    const vars = schemaProvider.getVariables();
+    parts.push(
+      `## 运行环境\n- 平台: ${vars.platform}\n- 可用内存: ${vars.availableMemory}\n- 工作目录: ${vars.workspacePath}\n`,
+    );
+  }
+
   parts.push(`你正在执行技能「${skill.name}」。`);
   parts.push(`技能描述：${skill.description}`);
 

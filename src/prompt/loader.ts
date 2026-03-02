@@ -25,6 +25,31 @@ export async function loadPromptFile(
   return readPromptFile(filePath);
 }
 
+/** 用户级提示词文件类型（不含 core） */
+const USER_PROMPT_TYPES: readonly PromptFileType[] = ["self", "tool", "skill", "agent", "memory"];
+
+/**
+ * 加载用户级提示词文件（不含 core）
+ *
+ * core.md 由 runReactLoop 内部通过 loadCorePrompt() 加载，
+ * API 层只需拼装用户级部分。
+ *
+ * @param workspacePath - workspace 根目录
+ * @returns 用户级提示词文件（按类型索引）
+ */
+export async function loadUserPromptFiles(
+  workspacePath: string,
+): Promise<ReadonlyMap<PromptFileType, PromptFile>> {
+  const result = new Map<PromptFileType, PromptFile>();
+  for (const fileType of USER_PROMPT_TYPES) {
+    const file = await loadPromptFile(workspacePath, fileType);
+    if (file) {
+      result.set(fileType, file);
+    }
+  }
+  return result;
+}
+
 /**
  * 加载所有提示词文件
  *

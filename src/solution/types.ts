@@ -198,9 +198,13 @@ export interface AgentExecutorDeps {
   readonly callModel: CallModelFn;
   readonly toolRegistry: ToolRegistry;
   readonly toolExecutor: {
-    readonly execute: (request: import("../tool/types.js").ToolCallRequest) => Promise<import("../tool/types.js").ToolCallResponse>;
+    readonly execute: (
+      request: import("../tool/types.js").ToolCallRequest,
+    ) => Promise<import("../tool/types.js").ToolCallResponse>;
   };
   readonly skillRegistry: SkillRegistry;
   readonly logger: Logger;
   readonly workspacePath: string;
+  /** 自我图式提供者（用于注入运行环境信息） */
+  readonly schemaProvider?: import("../schema/schema-provider.js").SchemaProvider;
 }

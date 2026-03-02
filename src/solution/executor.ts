@@ -16,6 +16,7 @@ import type {
   AgentTask,
   AgentExecutorDeps,
 } from "./types.js";
+import type { SchemaProvider } from "../schema/schema-provider.js";
 import type { OuroborosTool } from "../tool/types.js";
 import { runReactLoop } from "../core/loop.js";
 import { loadAgent, buildAgent } from "./builder.js";
@@ -53,7 +54,7 @@ export function createAgentExecutor(deps: AgentExecutorDeps): AgentExecutor {
       }
 
       // 2. 构建 Agent 上下文提示词
-      const contextPrompt = await buildAgentContextPrompt(agent);
+      const contextPrompt = await buildAgentContextPrompt(agent, deps.schemaProvider);
 
       // 3. 筛选可用工具
       const availableTools = filterAgentTools(agent, toolRegistry.list());
@@ -139,9 +140,20 @@ export function createAgentExecutor(deps: AgentExecutorDeps): AgentExecutor {
 
 // ─── 内部函数 ──────────────────────────────────────────────────
 
-/** 构建 Agent 上下文提示词（身份 + 知识库） */
-async function buildAgentContextPrompt(agent: Agent): Promise<string> {
+/** 构建 Agent 上下文提示词（运行环境 + 身份 + 知识库） */
+async function buildAgentContextPrompt(
+  agent: Agent,
+  schemaProvider?: SchemaProvider,
+): Promise<string> {
   const parts: string[] = [];
+
+  // 注入身体图式（资源感知）
+  if (schemaProvider) {
+    const vars = schemaProvider.getVariables();
+    parts.push(
+      `## 运行环境\n- 平台: ${vars.platform}\n- 可用内存: ${vars.availableMemory}\n- 工作目录: ${vars.workspacePath}\n`,
+    );
+  }
 
   // 身份提示词
   parts.push("## 身份定义\n");

@@ -18,7 +18,7 @@ import { treeToJSON } from "../core/execution-tree.js";
 import { runReactLoop } from "../core/loop.js";
 import { createToolExecutor, type ToolExecutor } from "../tool/executor.js";
 import { filterSafeTools } from "./safe-tools.js";
-import { loadAllPromptFiles } from "../prompt/loader.js";
+import { loadUserPromptFiles, searchBySemantic } from "../prompt/loader.js";
 import { renderTemplate } from "../prompt/template.js";
 import { assemblePrompt } from "../prompt/assembler.js";
 import { DEFAULT_INSPECTOR_CONFIG } from "../inspector/inspector.js";
@@ -278,8 +278,9 @@ async function buildModelMessages(
   sessionManager: SessionManager,
   sessionId: string,
   deps: ApiDeps,
+  message?: string,
 ): Promise<readonly Message[]> {
-  const systemPrompt = (await buildContextPrompt(deps)) || FALLBACK_SYSTEM_PROMPT;
+  const systemPrompt = (await buildContextPrompt(deps, message)) || FALLBACK_SYSTEM_PROMPT;
   const { messages } = sessionManager.getMessages(sessionId, 1, 200);
   const modelMessages: Message[] = [{ role: "system", content: systemPrompt }];
   for (const m of messages) {
@@ -294,22 +295,25 @@ async function buildModelMessages(
 /**
  * 构建用户级上下文提示词（self + tool + skill + agent + memory）
  * core.md 由 runReactLoop 内部加载，这里只拼装用户级部分。
+ *
+ * @param deps - API 依赖
+ * @param message - 用户消息（用于短期记忆语义搜索）
  */
-async function buildContextPrompt(deps: ApiDeps): Promise<string> {
-  if (!deps.schemaProvider) return "";
-
-  const promptFiles = await loadAllPromptFiles(deps.workspacePath);
+async function buildContextPrompt(deps: ApiDeps, message?: string): Promise<string> {
+  const promptFiles = await loadUserPromptFiles(deps.workspacePath);
   const parts: RenderedPrompt[] = [];
 
-  // self.md — 用 schemaProvider 变量渲染
-  const selfFile = promptFiles.get("self");
-  if (selfFile) {
-    const vars = deps.schemaProvider.getVariables();
-    const rendered = renderTemplate(selfFile.content, vars as unknown as Record<string, string>);
-    parts.push({ fileType: "self", content: rendered });
+  // self.md — 需要 schemaProvider 渲染模板变量
+  if (deps.schemaProvider) {
+    const selfFile = promptFiles.get("self");
+    if (selfFile) {
+      const vars = deps.schemaProvider.getVariables();
+      const rendered = renderTemplate(selfFile.content, vars as unknown as Record<string, string>);
+      parts.push({ fileType: "self", content: rendered });
+    }
   }
 
-  // tool.md, skill.md, agent.md — 无模板变量，直接使用
+  // tool.md, skill.md, agent.md — 无模板变量，无条件加载
   for (const ft of ["tool", "skill", "agent"] as const) {
     const file = promptFiles.get(ft as PromptFileType);
     if (file) {
@@ -328,6 +332,23 @@ async function buildContextPrompt(deps: ApiDeps): Promise<string> {
     const hotText = deps.memoryManager.hot.toPromptText();
     if (hotText) {
       parts.push({ fileType: "memory", content: hotText });
+    }
+  }
+
+  // 短期记忆 — 基于用户消息语义搜索相关记忆片段
+  if (message) {
+    try {
+      const memories = await searchBySemantic(deps.workspacePath, message, {
+        limit: 3,
+        threshold: 0.3,
+      });
+      for (const mem of memories) {
+        if (mem.content) {
+          parts.push({ fileType: "memory", content: `[记忆片段] ${mem.fileName}\n${mem.content}` });
+        }
+      }
+    } catch {
+      // 语义搜索失败不影响主流程
     }
   }
 
@@ -416,7 +437,7 @@ async function processMessage(
   if (callModelFn && deps.toolRegistry) {
     const { safeTools, toolExecutor, reactConfig } = prepareReactDeps(deps, callModelFn);
 
-    const contextPrompt = await buildContextPrompt(deps);
+    const contextPrompt = await buildContextPrompt(deps, message);
     const result = await runReactLoop(message, contextPrompt, safeTools, reactConfig, {
       callModel: callModelFn,
       toolExecutor,
@@ -441,7 +462,7 @@ async function processMessage(
 
   // 第二层：有 provider 无 toolRegistry → 直连模型
   const provider = deps.providerRegistry.get(deps.defaultProvider);
-  const messages = await buildModelMessages(sessionManager, sessionId, deps);
+  const messages = await buildModelMessages(sessionManager, sessionId, deps, message);
   const response = await provider.complete({ messages });
 
   sessionManager.addMessage(sessionId, "agent", response.content);
@@ -509,7 +530,7 @@ async function* createReactStreamEvents(
     await deps.schemaProvider.refresh();
   }
 
-  const contextPrompt = await buildContextPrompt(deps);
+  const contextPrompt = await buildContextPrompt(deps, message);
   const loopStartTime = Date.now();
 
   // 启动 ReAct 循环（后台执行）
@@ -586,14 +607,14 @@ async function* createReactStreamEvents(
  */
 async function* createDirectStreamEvents(
   sessionId: string,
-  _message: string,
+  message: string,
   deps: ApiDeps,
   sessionManager: SessionManager,
 ): AsyncIterable<SSEEvent> {
   yield { event: "thinking", data: JSON.stringify({ sessionId }) };
 
   const provider = deps.providerRegistry!.get(deps.defaultProvider!);
-  const messages = await buildModelMessages(sessionManager, sessionId, deps);
+  const messages = await buildModelMessages(sessionManager, sessionId, deps, message);
   const { pushEvent, waitForEvent, drainQueue } = createEventQueue();
 
   let fullContent = "";
