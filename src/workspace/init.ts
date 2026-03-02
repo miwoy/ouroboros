@@ -37,6 +37,7 @@ const WORKSPACE_DIRS = [
   "skills", // 自定义技能
   "agents", // Agent 实例及工作空间
   "solutions", // Solution 注册表
+  "super-agents", // Super Agent 协作实例
   "logs", // 日志（按日期分隔，格式 yyyy-MM-dd.log）
   "tmp", // 临时文件（任务完成后清理）
   "vectors", // 向量索引（qmd）

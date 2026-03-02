@@ -20,6 +20,8 @@ describe("initWorkspace", () => {
       "tools/scripts",
       "skills",
       "agents",
+      "solutions",
+      "super-agents",
       "logs",
       "tmp",
       "vectors",

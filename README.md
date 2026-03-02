@@ -160,6 +160,12 @@ ouroboros/
 │   ├── logger/           # 日志系统
 │   │   ├── types.ts      # 类型定义（LogLevel, Logger 接口）
 │   │   └── logger.ts     # 文件日志实现（JSONL 格式）
+│   ├── super-agent/      # Super Agent 协作系统
+│   │   ├── types.ts      # 类型定义（SuperAgentDefinition, AgentRole, CollaborationSpec）
+│   │   ├── registry.ts   # Super Agent 注册表（持久化 + 状态管理）
+│   │   ├── builder.ts    # Super Agent 构建器（工作空间 + config + metadata）
+│   │   ├── executor.ts   # 协作执行器（串行/并行/编排模式）
+│   │   └── index.ts      # 公共导出
 │   ├── workspace/        # workspace 初始化
 │   ├── errors/           # 错误体系
 │   └── index.ts          # 入口
@@ -179,6 +185,8 @@ ouroboros/
 │   ├── tools/            # 自定义工具
 │   ├── skills/           # 自定义技能
 │   ├── agents/           # Agent 实例及其独立工作空间
+│   ├── solutions/        # Solution 注册表
+│   ├── super-agents/     # Super Agent 协作实例
 │   ├── logs/             # 日志（按日期分隔）
 │   ├── tmp/              # 临时文件（任务完成后清理）
 │   └── vectors/          # 向量索引（qmd，XDG_CACHE_HOME 隔离）
@@ -404,6 +412,58 @@ const summary = await memoryManager.longTerm.compressFromShortTerm("2026-03-02",
 
 // 任务结束时清理
 await memoryManager.cleanup();
+```
+
+## Super Agent 协作系统
+
+Super Agent 是多 Agent 协作的编排体，用于实现垂直领域的完整解决方案。
+
+### 协作模式
+
+| 模式 | 说明 |
+|------|------|
+| **sequential** | 按依赖拓扑排序串行执行，前置 Agent 输出作为后续输入 |
+| **parallel** | 无依赖 Agent 并行执行（按层级分组），有依赖的等待 |
+| **orchestrated** | 由指定编排 Agent 动态分配任务和调度执行 |
+
+### 使用示例
+
+```typescript
+import {
+  createSuperAgentRegistry, buildSuperAgent, createSuperAgentExecutor
+} from "ouroboros";
+
+// 1. 注册 Super Agent 定义
+const registry = await createSuperAgentRegistry(workspacePath);
+await registry.register({
+  id: "super-agent:blog-writer",
+  responsibilityPrompt: "负责博客文章制作的协作",
+  agents: [
+    { roleName: "researcher", responsibility: "调研信息", agentId: "solution:researcher" },
+    { roleName: "writer", responsibility: "撰写内容", agentId: "solution:writer", dependsOn: ["researcher"] },
+    { roleName: "reviewer", responsibility: "审查内容", agentId: "solution:reviewer", dependsOn: ["writer"] },
+  ],
+  collaboration: {
+    mode: "sequential",
+    conflictResolution: { strategy: "orchestrator-decides", timeout: 60 },
+    constraints: { maxParallelAgents: 3 },
+  },
+  // ...其他 EntityCard 字段
+});
+
+// 2. 构建 Super Agent 实例
+const instance = await buildSuperAgent(definition, workspacePath);
+
+// 3. 执行协作任务
+const executor = createSuperAgentExecutor(deps);
+const response = await executor.execute({
+  superAgentId: "super-agent:blog-writer",
+  task: "写一篇关于人工智能的博客",
+});
+
+console.log(response.result);       // 汇总结果
+console.log(response.roleResults);  // 各角色结果
+console.log(response.success);      // 是否全部成功
 ```
 
 ## 日志系统

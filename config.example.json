@@ -62,5 +62,9 @@
   "agents": {
     "defaultMaxTurns": 50,
     "knowledgeMaxTokens": 8000
+  },
+  "superAgents": {
+    "defaultMaxDuration": 600,
+    "maxParallelAgents": 5
   }
 }

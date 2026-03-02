@@ -9,3 +9,4 @@ export * from "./logger/index.js";
 export * from "./skill/index.js";
 export * from "./memory/index.js";
 export * from "./solution/index.js";
+export * from "./super-agent/index.js";

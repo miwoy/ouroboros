@@ -108,6 +108,17 @@ const agentConfigSchema = z.object({
 });
 
 /**
+ * Super Agent 系统配置 Schema
+ * 控制 Super Agent 协作系统的行为参数
+ */
+const superAgentConfigSchema = z.object({
+  /** 默认总执行时间上限（秒） */
+  defaultMaxDuration: z.number().int().positive().default(600),
+  /** 最大并行 Agent 数 */
+  maxParallelAgents: z.number().int().positive().default(5),
+});
+
+/**
  * 顶层配置 Schema
  * Ouroboros 完整配置结构
  */
@@ -133,6 +144,10 @@ export const configSchema = z.object({
     defaultMaxTurns: 50,
     knowledgeMaxTokens: 8000,
   }),
+  superAgents: superAgentConfigSchema.default({
+    defaultMaxDuration: 600,
+    maxParallelAgents: 5,
+  }),
 });
 
 /** 模型提供商配置类型 */
@@ -155,6 +170,9 @@ export type MemorySchemaConfig = z.infer<typeof memoryConfigSchema>;
 
 /** Agent 系统配置类型 */
 export type AgentSchemaConfig = z.infer<typeof agentConfigSchema>;
+
+/** Super Agent 系统配置类型 */
+export type SuperAgentSchemaConfig = z.infer<typeof superAgentConfigSchema>;
 
 /** 顶层配置类型 */
 export type Config = z.infer<typeof configSchema>;
