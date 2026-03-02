@@ -13,6 +13,7 @@
 import type { Message, ModelResponse, ToolCall, TokenUsage } from "../model/types.js";
 import type { OuroborosTool, ToolCallRequest } from "../tool/types.js";
 import { toModelToolDefinitions } from "../tool/converter.js";
+import { loadCorePrompt } from "../prompt/store.js";
 import {
   createExecutionTree,
   addNode,
@@ -36,8 +37,11 @@ import {
 /**
  * 运行 ReAct 核心循环
  *
+ * 内部自动加载 core.md 作为核心系统提示词，调用方只需传入用户级提示词（self/agent/skill/tool/memory）。
+ * 最终的 system 消息 = core.md + "---" + contextPrompt。
+ *
  * @param task - 用户任务描述
- * @param systemPrompt - 系统提示词
+ * @param contextPrompt - 用户级提示词（self + agent + skill + tool + memory 拼装结果，可为空字符串）
  * @param tools - 可用工具列表
  * @param config - ReAct 配置
  * @param deps - 依赖注入
@@ -45,7 +49,7 @@ import {
  */
 export async function runReactLoop(
   task: string,
-  systemPrompt: string,
+  contextPrompt: string,
   tools: readonly OuroborosTool[],
   config: ReactLoopConfig,
   deps: ReactDependencies,
@@ -57,16 +61,20 @@ export async function runReactLoop(
   let tree = createExecutionTree(config.agentId, task);
   logger.info("react-loop", "ReAct 循环开始", { task, agentId: config.agentId });
 
-  // 2. 构建初始消息
+  // 2. 加载核心系统提示词 + 拼接用户上下文
+  const corePrompt = await loadCorePrompt();
+  const systemPrompt = contextPrompt ? `${corePrompt}\n\n---\n\n${contextPrompt}` : corePrompt;
+
+  // 3. 构建初始消息
   const messages: Message[] = [
     { role: "system", content: systemPrompt },
     { role: "user", content: task },
   ];
 
-  // 3. 转换工具定义
+  // 4. 转换工具定义
   const toolDefinitions = toModelToolDefinitions(tools);
 
-  // 4. 循环状态
+  // 5. 循环状态
   const steps: ReactStep[] = [];
   let totalUsage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
   let answer = "";

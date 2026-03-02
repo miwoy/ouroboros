@@ -83,6 +83,20 @@ export function getCorePath(): string {
 }
 
 /**
+ * 加载核心系统提示词内容
+ *
+ * core.md 是系统内置的不可修改提示词，直接从源码引用。
+ * 返回 markdown 正文内容。
+ *
+ * @returns core.md 的内容
+ */
+export async function loadCorePrompt(): Promise<string> {
+  const corePath = getCorePath();
+  const raw = await readFile(corePath, "utf-8");
+  return raw;
+}
+
+/**
  * 获取 workspace 中提示词文件的路径
  *
  * @param workspacePath - workspace 根目录

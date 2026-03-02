@@ -5,7 +5,7 @@
  * 1. 加载配置 + 初始化 workspace
  * 2. 创建工具注册表 + 执行器 + Logger
  * 3. 注册测试工具（get-date、write-file）
- * 4. 装配系统提示词（core + self）
+ * 4. 装配用户级提示词（self 等，core.md 由 runReactLoop 内部加载）
  * 5. 运行 ReAct 循环：
  *    任务: "查询今天的日期，然后把日期写入 workspace/tmp/today.txt 文件中"
  *    工具: [get-date, write-file, call-model, search-tool, create-tool]
@@ -176,30 +176,26 @@ export default async function(input, context) {
     passed: registry.has("tool:get-date") && registry.has("tool:write-file"),
   });
 
-  // ── 4. 装配系统提示词 ───────────────────────────────────────────
-  console.log("[5/11] 装配系统提示词...");
-  let systemPrompt: string;
+  // ── 4. 装配用户级提示词（core.md 由 runReactLoop 内部自动加载）───
+  console.log("[5/11] 装配用户级提示词...");
+  let contextPrompt = "";
   try {
     const promptFiles = await Promise.all([
-      loadPromptFile(config.system.workspacePath, "core").catch(() => null),
       loadPromptFile(config.system.workspacePath, "self").catch(() => null),
     ]);
     const validFiles = promptFiles.filter((f) => f !== null);
     if (validFiles.length > 0) {
-      // 将 PromptFile 转换为 RenderedPrompt
       const renderedParts: RenderedPrompt[] = validFiles.map((f) => ({
         fileType: f.metadata.type,
         content: f.content,
       }));
       const assembled = assemblePrompt(renderedParts);
-      systemPrompt = assembled.systemPrompt;
-    } else {
-      systemPrompt = "你是 Ouroboros，一个智能体框架核心。通过工具调用完成用户任务。";
+      contextPrompt = assembled.systemPrompt;
     }
   } catch {
-    systemPrompt = "你是 Ouroboros，一个智能体框架核心。通过工具调用完成用户任务。";
+    // 用户级提示词加载失败时使用空字符串，core.md 仍由 runReactLoop 保证
   }
-  console.log(`  系统提示词长度: ${systemPrompt.length} 字符`);
+  console.log(`  用户级提示词长度: ${contextPrompt.length} 字符`);
 
   // ── 5. 运行 ReAct 循环 ──────────────────────────────────────────
   console.log("[6/11] 运行 ReAct 循环...");
@@ -222,7 +218,7 @@ export default async function(input, context) {
   const task =
     "查询今天的日期，然后把日期写入 workspace/tmp/today.txt 文件中。使用 tool:get-date 获取日期，使用 tool:write-file 写入文件（path 使用 'tmp/today.txt'）。";
 
-  const result = await runReactLoop(task, systemPrompt, allTools, reactConfig, deps);
+  const result = await runReactLoop(task, contextPrompt, allTools, reactConfig, deps);
 
   console.log(`  停止原因: ${result.stopReason}`);
   console.log(`  总迭代: ${result.totalIterations}`);
