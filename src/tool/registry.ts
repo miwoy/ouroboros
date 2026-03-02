@@ -19,6 +19,7 @@ import {
   type ToolRegistryData,
 } from "./types.js";
 import { getBuiltinToolDefinitions } from "./builtin/definitions.js";
+import { getSecondaryToolDefinitions } from "./builtin/secondary-definitions.js";
 
 /**
  * 创建工具注册表
@@ -33,8 +34,13 @@ import { getBuiltinToolDefinitions } from "./builtin/definitions.js";
 export async function createToolRegistry(workspacePath: string): Promise<ToolRegistry> {
   const tools = new Map<string, OuroborosTool>();
 
-  // 注册内置工具
+  // 注册一级内置工具
   for (const tool of getBuiltinToolDefinitions()) {
+    tools.set(tool.id, tool);
+  }
+
+  // 注册二级内置工具
+  for (const tool of getSecondaryToolDefinitions()) {
     tools.set(tool.id, tool);
   }
 

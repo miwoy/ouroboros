@@ -1,8 +1,4 @@
-export {
-  EntityType,
-  EntityStatus,
-  ToolErrorCode,
-} from "./types.js";
+export { EntityType, EntityStatus, ToolErrorCode } from "./types.js";
 
 export type {
   Permissions,
@@ -23,6 +19,15 @@ export {
   runAgentInputSchema,
   searchToolInputSchema,
   createToolInputSchema,
+  bashInputSchema,
+  readInputSchema,
+  writeInputSchema,
+  editInputSchema,
+  findInputSchema,
+  webSearchInputSchema,
+  webFetchInputSchema,
+  searchSkillInputSchema,
+  createSkillInputSchema,
   toolCallRequestSchema,
   validateToolInput,
   jsonSchemaSchema,

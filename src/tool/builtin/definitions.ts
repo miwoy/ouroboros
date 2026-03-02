@@ -164,7 +164,10 @@ export const CREATE_TOOL_TOOL: OuroborosTool = {
       description: { type: "string", description: "工具功能描述" },
       inputSchema: { type: "object", description: "输入参数 JSON Schema" },
       outputSchema: { type: "object", description: "输出结果 JSON Schema" },
-      code: { type: "string", description: "工具实现代码（ES Module，export default async function）" },
+      code: {
+        type: "string",
+        description: "工具实现代码（ES Module，export default async function）",
+      },
       tags: { type: "array", description: "语义标签", items: { type: "string" } },
     },
     required: ["name", "description", "inputSchema", "outputSchema", "code"],
@@ -179,7 +182,10 @@ export const CREATE_TOOL_TOOL: OuroborosTool = {
   },
 };
 
-/** 获取所有内置工具定义 */
-export function getBuiltinToolDefinitions(): readonly OuroborosTool[] {
+/** 获取一级内置工具定义 */
+export function getPrimaryToolDefinitions(): readonly OuroborosTool[] {
   return [CALL_MODEL_TOOL, RUN_AGENT_TOOL, SEARCH_TOOL_TOOL, CREATE_TOOL_TOOL];
 }
+
+/** 获取所有内置工具定义（一级 + 二级） */
+export { getPrimaryToolDefinitions as getBuiltinToolDefinitions };

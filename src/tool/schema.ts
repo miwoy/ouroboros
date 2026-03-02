@@ -34,13 +34,15 @@ export const permissionsSchema = z.object({
 
 /** tool:call-model 输入校验 */
 export const callModelInputSchema = z.object({
-  messages: z.array(
-    z.object({
-      role: z.enum(["system", "user", "assistant", "tool"]),
-      content: z.string(),
-      toolCallId: z.string().optional(),
-    }),
-  ).min(1, "消息列表不能为空"),
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["system", "user", "assistant", "tool"]),
+        content: z.string(),
+        toolCallId: z.string().optional(),
+      }),
+    )
+    .min(1, "消息列表不能为空"),
   model: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().int().positive().optional(),
@@ -70,6 +72,80 @@ export const createToolInputSchema = z.object({
   tags: z.array(z.string()).optional(),
 });
 
+// ─── 二级工具输入 Schema ──────────────────────────────────────────
+
+/** tool:bash 输入校验 */
+export const bashInputSchema = z.object({
+  command: z.string().min(1, "command 不能为空"),
+  cwd: z.string().optional(),
+  timeout: z.number().int().positive().max(300000).optional(),
+});
+
+/** tool:read 输入校验 */
+export const readInputSchema = z.object({
+  path: z.string().min(1, "path 不能为空"),
+  offset: z.number().int().min(0).optional(),
+  limit: z.number().int().positive().optional(),
+});
+
+/** tool:write 输入校验 */
+export const writeInputSchema = z.object({
+  path: z.string().min(1, "path 不能为空"),
+  content: z.string(),
+});
+
+/** tool:edit 输入校验 */
+export const editInputSchema = z.object({
+  path: z.string().min(1, "path 不能为空"),
+  oldString: z.string().min(1, "oldString 不能为空"),
+  newString: z.string(),
+  replaceAll: z.boolean().optional(),
+});
+
+/** tool:find 输入校验 */
+export const findInputSchema = z.object({
+  pattern: z.string().min(1, "pattern 不能为空"),
+  path: z.string().optional(),
+  limit: z.number().int().positive().max(1000).optional(),
+});
+
+/** tool:web-search 输入校验 */
+export const webSearchInputSchema = z.object({
+  query: z.string().min(1, "query 不能为空"),
+  limit: z.number().int().positive().max(20).optional(),
+});
+
+/** tool:web-fetch 输入校验 */
+export const webFetchInputSchema = z.object({
+  url: z.string().url("无效的 URL"),
+  timeout: z.number().int().positive().max(60000).optional(),
+});
+
+/** tool:search-skill 输入校验 */
+export const searchSkillInputSchema = z.object({
+  query: z.string().min(1, "query 不能为空"),
+  limit: z.number().int().positive().max(50).optional(),
+});
+
+/** tool:create-skill 输入校验 */
+export const createSkillInputSchema = z.object({
+  name: z.string().min(1, "name 不能为空").max(100),
+  description: z.string().min(1, "description 不能为空").max(500),
+  promptTemplate: z.string().min(1, "promptTemplate 不能为空"),
+  requiredTools: z.array(z.string()).optional(),
+  variables: z
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string(),
+        required: z.boolean().optional(),
+        defaultValue: z.string().optional(),
+      }),
+    )
+    .optional(),
+  tags: z.array(z.string()).optional(),
+});
+
 // ─── 工具调用请求校验 ──────────────────────────────────────────────
 
 export const toolCallRequestSchema = z.object({
@@ -96,7 +172,10 @@ export const toolCallRequestSchema = z.object({
  */
 export function validateToolInput(
   input: Readonly<Record<string, unknown>>,
-  schema: { readonly required?: readonly string[]; readonly properties?: Readonly<Record<string, unknown>> },
+  schema: {
+    readonly required?: readonly string[];
+    readonly properties?: Readonly<Record<string, unknown>>;
+  },
 ): readonly string[] {
   const errors: string[] = [];
 

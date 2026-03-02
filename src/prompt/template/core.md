@@ -51,6 +51,20 @@
 | 工具检索 | tool:search-tool | 在工具库中检索匹配的工具 |
 | 工具创建 | tool:create-tool | 未匹配到合适工具时主动创建 |
 
+## 二级工具
+
+| 名称 | ID | 描述 |
+|------|-----|------|
+| 命令执行 | tool:bash | 在子进程中执行 shell 命令，支持超时控制 |
+| 文件读取 | tool:read | 读取指定文件内容，支持行范围限制 |
+| 文件写入 | tool:write | 将内容写入指定路径的文件，自动创建父目录 |
+| 文件编辑 | tool:edit | 对文件内容进行精确字符串替换 |
+| 文件查找 | tool:find | 使用 glob 模式在 workspace 中查找文件 |
+| 搜索引擎 | tool:web-search | 使用搜索引擎检索互联网信息 |
+| URL 抓取 | tool:web-fetch | 获取指定 URL 的网页内容 |
+| 技能检索 | tool:search-skill | 在技能库中搜索匹配的技能 |
+| 技能创建 | tool:create-skill | 创建新的自定义技能 |
+
 ## 内置技能
 
 | 名称 | ID | 描述 |

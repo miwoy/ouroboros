@@ -26,6 +26,15 @@ import { handleCallModel } from "./builtin/call-model.js";
 import { handleRunAgent } from "./builtin/run-agent.js";
 import { handleSearchTool } from "./builtin/search-tool.js";
 import { handleCreateTool } from "./builtin/create-tool.js";
+import { handleBash } from "./builtin/bash.js";
+import { handleRead } from "./builtin/read.js";
+import { handleWrite } from "./builtin/write.js";
+import { handleEdit } from "./builtin/edit.js";
+import { handleFind } from "./builtin/find.js";
+import { handleWebSearch } from "./builtin/web-search.js";
+import { handleWebFetch } from "./builtin/web-fetch.js";
+import { handleSearchSkill } from "./builtin/search-skill.js";
+import { handleCreateSkill } from "./builtin/create-skill.js";
 import {
   EntityStatus,
   ToolErrorCode,
@@ -44,10 +53,21 @@ export interface ToolExecutor {
 
 /** 内置工具 handler 映射 */
 const BUILTIN_HANDLERS: Readonly<Record<string, ToolHandler>> = {
+  // 一级工具
   "builtin:call-model": handleCallModel,
   "builtin:run-agent": handleRunAgent,
   "builtin:search-tool": handleSearchTool,
   "builtin:create-tool": handleCreateTool,
+  // 二级工具
+  "builtin:bash": handleBash,
+  "builtin:read": handleRead,
+  "builtin:write": handleWrite,
+  "builtin:edit": handleEdit,
+  "builtin:find": handleFind,
+  "builtin:web-search": handleWebSearch,
+  "builtin:web-fetch": handleWebFetch,
+  "builtin:search-skill": handleSearchSkill,
+  "builtin:create-skill": handleCreateSkill,
 };
 
 /**
@@ -188,11 +208,7 @@ async function resolveHandler(entrypoint: string, workspacePath: string): Promis
 /**
  * 构建错误响应
  */
-function buildErrorResponse(
-  requestId: string,
-  err: unknown,
-  duration: number,
-): ToolCallResponse {
+function buildErrorResponse(requestId: string, err: unknown, duration: number): ToolCallResponse {
   if (err instanceof ToolNotFoundError) {
     return {
       requestId,

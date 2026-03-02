@@ -116,11 +116,21 @@ ouroboros/
 │   │   ├── executor.ts   # 工具执行器（分发 + 超时 + 错误处理）
 │   │   ├── converter.ts  # OuroborosTool → 模型层 ToolDefinition 转换
 │   │   └── builtin/      # 内置工具实现
-│   │       ├── definitions.ts  # 4 个内置工具的 OuroborosTool 定义
+│   │       ├── definitions.ts  # 一级工具的 OuroborosTool 定义
+│   │       ├── secondary-definitions.ts  # 二级工具的 OuroborosTool 定义
 │   │       ├── call-model.ts   # tool:call-model — 模型调用
 │   │       ├── run-agent.ts    # tool:run-agent — Agent 调用（stub）
 │   │       ├── search-tool.ts  # tool:search-tool — 工具检索
-│   │       └── create-tool.ts  # tool:create-tool — 工具创建
+│   │       ├── create-tool.ts  # tool:create-tool — 工具创建
+│   │       ├── bash.ts         # tool:bash — 命令执行
+│   │       ├── read.ts         # tool:read — 文件读取
+│   │       ├── write.ts        # tool:write — 文件写入
+│   │       ├── edit.ts         # tool:edit — 文件编辑
+│   │       ├── find.ts         # tool:find — 文件查找
+│   │       ├── web-search.ts   # tool:web-search — 搜索引擎
+│   │       ├── web-fetch.ts    # tool:web-fetch — URL 抓取
+│   │       ├── search-skill.ts # tool:search-skill — 技能检索
+│   │       └── create-skill.ts # tool:create-skill — 技能创建
 │   ├── core/             # ReAct 核心循环
 │   │   ├── types.ts      # 类型定义（ExecutionTree, ReactResult 等）
 │   │   ├── execution-tree.ts  # 执行树管理（纯函数，不可变操作）
@@ -190,6 +200,22 @@ ouroboros/
 | `tool:run-agent` | Agent 调用 | 调用指定 Agent 执行任务（阶段四实现） |
 | `tool:search-tool` | 工具检索 | qmd 语义搜索 + 关键词匹配工具库 |
 | `tool:create-tool` | 工具创建 | 动态创建 .js 工具脚本并注册 |
+
+### 二级工具
+
+基于一级工具能力构建的常用操作工具集：
+
+| 工具 ID | 名称 | 说明 |
+|---------|------|------|
+| `tool:bash` | 命令执行 | 在子进程中执行 shell 命令，支持超时控制 |
+| `tool:read` | 文件读取 | 读取指定文件内容，支持行范围限制 |
+| `tool:write` | 文件写入 | 将内容写入文件（覆盖），自动创建父目录 |
+| `tool:edit` | 文件编辑 | 精确字符串替换（差异修改） |
+| `tool:find` | 文件查找 | 使用 glob 模式在 workspace 中查找文件 |
+| `tool:web-search` | 搜索引擎 | 检索互联网信息，返回标题、摘要和链接 |
+| `tool:web-fetch` | URL 抓取 | 获取指定 URL 的网页内容 |
+| `tool:search-skill` | 技能检索 | 在技能库中搜索匹配的技能 |
+| `tool:create-skill` | 技能创建 | 创建新的自定义技能并注册 |
 
 ### 工具调用协议
 
