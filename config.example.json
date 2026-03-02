@@ -84,6 +84,14 @@
     "enabled": true,
     "minSkillConfidence": 0.7
   },
+  "api": {
+    "port": 3000,
+    "host": "127.0.0.1",
+    "apiKey": "",
+    "rateLimitWindowMs": 60000,
+    "rateLimitMaxRequests": 60,
+    "corsOrigin": "*"
+  },
   "persistence": {
     "enabled": true,
     "checkpointIntervalMs": 60000,

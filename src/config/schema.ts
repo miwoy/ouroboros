@@ -162,6 +162,25 @@ const superAgentConfigSchema = z.object({
 });
 
 /**
+ * API 配置 Schema
+ * 控制 Chat API 层的行为参数
+ */
+const apiConfigSchema = z.object({
+  /** HTTP 端口 */
+  port: z.number().int().positive().default(3000),
+  /** 绑定主机 */
+  host: z.string().default("127.0.0.1"),
+  /** API 密钥（空则无认证） */
+  apiKey: z.string().optional(),
+  /** 速率限制 — 时间窗口（毫秒） */
+  rateLimitWindowMs: z.number().int().positive().default(60000),
+  /** 速率限制 — 窗口内最大请求数 */
+  rateLimitMaxRequests: z.number().int().positive().default(60),
+  /** CORS 来源 */
+  corsOrigin: z.string().default("*"),
+});
+
+/**
  * 持久化系统配置 Schema
  * 控制状态持久化与恢复的行为参数
  */
@@ -227,6 +246,13 @@ export const configSchema = z.object({
     enabled: true,
     minSkillConfidence: 0.7,
   }),
+  api: apiConfigSchema.default({
+    port: 3000,
+    host: "127.0.0.1",
+    rateLimitWindowMs: 60000,
+    rateLimitMaxRequests: 60,
+    corsOrigin: "*",
+  }),
   persistence: persistenceConfigSchema.default({
     enabled: true,
     checkpointIntervalMs: 60000,
@@ -269,6 +295,9 @@ export type InspectorSchemaConfig = z.infer<typeof inspectorConfigSchema>;
 
 /** 反思程序配置类型 */
 export type ReflectionSchemaConfig = z.infer<typeof reflectionConfigSchema>;
+
+/** API 配置类型 */
+export type ApiSchemaConfig = z.infer<typeof apiConfigSchema>;
 
 /** 持久化系统配置类型 */
 export type PersistenceSchemaConfig = z.infer<typeof persistenceConfigSchema>;

@@ -187,6 +187,16 @@ ouroboros/
 │   │   ├── recovery.ts   # 恢复管理器（检测/恢复/标记）
 │   │   ├── shutdown.ts   # 优雅关闭处理器（SIGINT/SIGTERM）
 │   │   └── index.ts      # 公共导出
+│   ├── api/              # Chat API 层
+│   │   ├── types.ts      # 类型定义（ApiResponse, SSEEvent, ApiConfig）
+│   │   ├── response.ts   # 统一响应构建器
+│   │   ├── router.ts     # HTTP 路由器（路径参数匹配）
+│   │   ├── middleware.ts  # 中间件（认证、速率限制、CORS）
+│   │   ├── formatter.ts  # 响应格式化（Markdown）
+│   │   ├── session.ts    # 会话管理（内存）
+│   │   ├── handlers.ts   # 路由处理器（REST API 端点）
+│   │   ├── server.ts     # HTTP 服务器
+│   │   └── index.ts      # 公共导出
 │   ├── workspace/        # workspace 初始化
 │   ├── errors/           # 错误体系
 │   └── index.ts          # 入口
@@ -574,6 +584,57 @@ const handler = createShutdownHandler();
 handler.register(async () => {
   await pm.saveSnapshot(createSnapshot({ trigger: "graceful-shutdown", ... }));
 });
+```
+
+## Chat API 层
+
+基于 Node.js 原生 `http` 模块的 RESTful API，支持消息处理、会话管理和 SSE 流式输出。
+
+### API 端点
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/health` | 健康检查 |
+| POST | `/api/sessions` | 创建会话 |
+| GET | `/api/sessions` | 列出会话 |
+| GET | `/api/sessions/:id` | 获取会话详情 |
+| POST | `/api/sessions/:id/delete` | 删除会话 |
+| POST | `/api/chat/message` | 发送消息（支持 `stream: true` 流式） |
+| GET | `/api/chat/messages/:sessionId` | 获取消息历史（分页） |
+| GET | `/api/agents` | 列出 Agent |
+| GET | `/api/agents/:agentId` | 获取 Agent 详情 |
+
+### 使用示例
+
+```typescript
+import { createApiServer } from "ouroboros";
+
+const server = createApiServer({
+  logger,
+  workspacePath: "./workspace",
+  config: {
+    port: 3000,
+    host: "127.0.0.1",
+    apiKey: "my-secret-key", // 可选，空则无认证
+    rateLimit: { windowMs: 60000, maxRequests: 60 },
+    corsOrigin: "*",
+  },
+});
+
+await server.start();
+// API 服务器已启动: http://127.0.0.1:3000
+
+// 发送消息
+const res = await fetch("http://127.0.0.1:3000/api/chat/message", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer my-secret-key",
+  },
+  body: JSON.stringify({ message: "你好", stream: false }),
+});
+const body = await res.json();
+// { success: true, data: { sessionId: "...", response: "...", formatted: "..." }, error: null }
 ```
 
 ## 日志系统

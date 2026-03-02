@@ -157,3 +157,13 @@ export class StateRecoveryError extends PersistenceError {
     this.name = "StateRecoveryError";
   }
 }
+
+// ─── API 错误 ──────────────────────────────────────────────────
+
+/** API 相关错误基类 */
+export class ApiServerError extends OuroborosError {
+  constructor(message: string, cause?: unknown) {
+    super(message, "API_ERROR", cause);
+    this.name = "ApiServerError";
+  }
+}
