@@ -95,6 +95,7 @@ export interface SelfSchemaVariables {
   readonly availableMemory: string;
   readonly gpu: string;
   readonly workspacePath: string;
+  readonly currentDateTime: string;
   readonly worldModel: string;
   readonly selfAwareness: string;
   readonly focusLevel: string;

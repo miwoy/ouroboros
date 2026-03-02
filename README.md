@@ -704,6 +704,43 @@ npm run build
 # 产出目录: web/dist/
 ```
 
+## TUI 终端界面
+
+基于 Node.js readline 的终端交互界面，无需额外依赖。
+
+### 启动
+
+```bash
+# 先启动后端 API 服务器
+npm run dev
+
+# 启动 TUI（另一个终端）
+npm run tui
+
+# 自定义连接参数
+npm run tui -- --host 192.168.1.100 --port 8080 --key my-api-key
+```
+
+### 功能
+
+- **交互式对话**：与 Agent 实时聊天，SSE 流式输出
+- **ReAct 可视化**：显示思考过程、工具调用和结果
+- **会话管理**：创建、切换、查看会话列表和历史
+- **状态监控**：查看服务器健康信息
+
+### 内置命令
+
+| 命令 | 说明 |
+|------|------|
+| `/help` | 显示帮助信息 |
+| `/new` | 创建新会话 |
+| `/sessions` | 列出所有会话 |
+| `/switch <id>` | 切换到指定会话 |
+| `/history` | 显示当前会话消息历史 |
+| `/health` | 显示服务器健康状态 |
+| `/clear` | 清屏 |
+| `/exit` | 退出 TUI |
+
 ## 日志系统
 
 日志写入 `workspace/logs/yyyy-MM-dd.log`，JSONL 格式，异步写入不阻塞主循环。
@@ -720,6 +757,7 @@ logger.info("react-loop", "循环开始", { task: "..." });
 | 文档 | 位置 | 说明 |
 |------|------|------|
 | [DESIGN](docs/DESIGN.md) | docs/ | 系统设计文档 |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | docs/ | 架构文档（分层、目录、模块职责） |
 | [CONFIGURE](docs/CONFIGURE.md) | docs/ | 配置项说明 |
 | [PROTOCOL](docs/PROTOCOL.md) | docs/ | 标准协议（实体接口规范） |
 

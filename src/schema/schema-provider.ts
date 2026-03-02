@@ -16,6 +16,23 @@ import type {
   HormoneManager,
 } from "./types.js";
 
+/**
+ * 格式化当前系统时间为人类可读字符串
+ */
+function formatCurrentDateTime(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const seconds = String(now.getSeconds()).padStart(2, "0");
+  const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+  const weekday = weekdays[now.getDay()];
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} (星期${weekday}, ${tz})`;
+}
+
 /** 自我图式提供者 */
 export interface SchemaProvider {
   /** 获取模板变量（同步，用 body 快照） */
@@ -55,6 +72,7 @@ export function createSchemaProvider(
         availableMemory: `${bodySchema.memory.availableGB}GB / ${bodySchema.memory.totalGB}GB`,
         gpu: gpuText,
         workspacePath: bodySchema.workspacePath,
+        currentDateTime: formatCurrentDateTime(),
         worldModel: formatWorldModel(soulSchema.worldModel),
         selfAwareness: formatSelfAwareness(soulSchema.selfAwareness),
         focusLevel: String(hormones.focusLevel),

@@ -2,10 +2,12 @@
 
 ## 身体图式
 
-<!-- 对运行环境的感知：CPU、内存、磁盘、网络等 -->
+<!-- 对运行环境的感知：时间、CPU、内存、磁盘、GPU 等 -->
 
+- 当前时间: {{currentDateTime}}
 - 运行环境: {{platform}}
 - 可用内存: {{availableMemory}}
+- GPU: {{gpu}}
 - 工作目录: {{workspacePath}}
 
 ## 灵魂图式
