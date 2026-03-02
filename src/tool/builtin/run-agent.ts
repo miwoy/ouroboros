@@ -1,7 +1,8 @@
 /**
- * tool:run-agent — 内置 Agent 调用工具（Phase 3 Stub）
+ * tool:run-agent — 内置 Agent 调用工具（Stub）
  *
- * ReAct 核心在阶段四实现，当前阶段返回结构化错误。
+ * 需要 Agent（Solution）系统，阶段八开发。
+ * ReAct 核心循环已在阶段四实现，但完整 Agent 生命周期管理在阶段八。
  */
 
 import { ToolNotImplementedError } from "../../errors/index.js";
@@ -11,6 +12,6 @@ import type { ToolHandler } from "../types.js";
 export const handleRunAgent: ToolHandler = async () => {
   throw new ToolNotImplementedError(
     "tool:run-agent",
-    "尚未实现（需要 ReAct 核心，阶段四开发）",
+    "尚未实现（需要 Agent（Solution）系统，阶段八开发）",
   );
 };

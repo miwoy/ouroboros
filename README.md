@@ -121,6 +121,15 @@ ouroboros/
 │   │       ├── run-agent.ts    # tool:run-agent — Agent 调用（stub）
 │   │       ├── search-tool.ts  # tool:search-tool — 工具检索
 │   │       └── create-tool.ts  # tool:create-tool — 工具创建
+│   ├── react/            # ReAct 核心循环
+│   │   ├── types.ts      # 类型定义（ExecutionTree, ReactResult 等）
+│   │   ├── execution-tree.ts  # 执行树管理（纯函数，不可变操作）
+│   │   ├── exception.ts  # 异常处理（回滚、终止、死循环检测）
+│   │   ├── context-compression.ts  # 上下文压缩（摘要累加）
+│   │   └── loop.ts       # ReAct 核心循环实现
+│   ├── logger/           # 日志系统
+│   │   ├── types.ts      # 类型定义（LogLevel, Logger 接口）
+│   │   └── logger.ts     # 文件日志实现（JSONL 格式）
 │   ├── workspace/        # workspace 初始化
 │   ├── errors/           # 错误体系
 │   └── index.ts          # 入口
@@ -206,6 +215,47 @@ const response = await executor.execute({
 ### 类型转换
 
 `toModelToolDefinition()` 将 `OuroborosTool` 转换为模型层 `ToolDefinition`，供 `callModel` 的 `tools` 参数使用。
+
+## ReAct 核心循环
+
+Agent 通过 Thought → Action → Observation 循环逐步推理解决问题。
+
+### 核心特性
+
+- **执行树管理**：不可变纯函数操作，跟踪任务分解和执行状态
+- **并行工具调用**：模型返回多个工具调用时通过 `Promise.all` 并行执行
+- **上下文压缩**：消息历史超过阈值时自动摘要压缩，保留关键信息
+- **死循环检测**：连续 3 次相同工具+相同参数调用触发异常报告
+- **异常处理**：支持回滚、终止子树、终止整棵树等操作
+
+### 使用示例
+
+```typescript
+import { runReactLoop, type ReactLoopConfig, type ReactDependencies } from "ouroboros";
+
+const result = await runReactLoop(
+  "查询今天的日期并写入文件",
+  systemPrompt,
+  tools,
+  { maxIterations: 20, stepTimeout: 60000, parallelToolCalls: true, compressionThreshold: 10, agentId: "agent:core" },
+  { callModel, toolExecutor, toolRegistry, logger, workspacePath },
+);
+
+console.log(result.answer);      // 最终回答
+console.log(result.steps);       // 每个步骤的工具调用
+console.log(result.executionTree); // 执行树
+```
+
+## 日志系统
+
+日志写入 `workspace/logs/yyyy-MM-dd.log`，JSONL 格式，异步写入不阻塞主循环。
+
+```typescript
+import { createLogger } from "ouroboros";
+
+const logger = createLogger("./workspace", "info");
+logger.info("react-loop", "循环开始", { task: "..." });
+```
 
 ## 文档
 

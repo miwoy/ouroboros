@@ -20,12 +20,12 @@ describe("handleRunAgent", () => {
   it("应抛出 ToolNotImplementedError", async () => {
     const ctx = createMockContext();
 
-    await expect(
-      handleRunAgent({ agentId: "agent:test", task: "执行测试" }, ctx),
-    ).rejects.toThrow(ToolNotImplementedError);
+    await expect(handleRunAgent({ agentId: "agent:test", task: "执行测试" }, ctx)).rejects.toThrow(
+      ToolNotImplementedError,
+    );
   });
 
-  it("错误消息应包含阶段四信息", async () => {
+  it("错误消息应包含阶段八信息", async () => {
     const ctx = createMockContext();
 
     try {
@@ -33,7 +33,7 @@ describe("handleRunAgent", () => {
       expect.fail("应该抛出错误");
     } catch (err) {
       expect(err).toBeInstanceOf(ToolNotImplementedError);
-      expect((err as ToolNotImplementedError).message).toContain("阶段四");
+      expect((err as ToolNotImplementedError).message).toContain("阶段八");
     }
   });
 });

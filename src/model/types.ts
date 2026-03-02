@@ -12,6 +12,8 @@ export interface Message {
   readonly content: string;
   /** 工具调用 ID（仅 role=tool 时使用） */
   readonly toolCallId?: string;
+  /** 工具调用列表（仅 role=assistant 时使用，ReAct 循环中保留模型的工具调用） */
+  readonly toolCalls?: readonly ToolCall[];
 }
 
 /** 工具参数 Schema（JSON Schema 格式） */
@@ -78,7 +80,10 @@ export interface ModelResponse {
 /** 流式事件类型 */
 export type StreamEvent =
   | { readonly type: "text_delta"; readonly text: string }
-  | { readonly type: "tool_call_start"; readonly toolCall: { readonly id: string; readonly name: string } }
+  | {
+      readonly type: "tool_call_start";
+      readonly toolCall: { readonly id: string; readonly name: string };
+    }
   | { readonly type: "tool_call_delta"; readonly arguments: string }
   | { readonly type: "tool_call_end" }
   | { readonly type: "done"; readonly response: ModelResponse };
@@ -106,5 +111,9 @@ export interface ModelProvider {
    * @param signal - 取消信号
    * @returns 完整响应（流结束后返回）
    */
-  stream(request: ModelRequest, callback: StreamCallback, signal?: AbortSignal): Promise<ModelResponse>;
+  stream(
+    request: ModelRequest,
+    callback: StreamCallback,
+    signal?: AbortSignal,
+  ): Promise<ModelResponse>;
 }

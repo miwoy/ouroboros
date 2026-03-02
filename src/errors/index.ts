@@ -105,3 +105,29 @@ export class ToolNotImplementedError extends ToolError {
     this.name = "ToolNotImplementedError";
   }
 }
+
+// ─── ReAct 循环错误 ──────────────────────────────────────────────────
+
+/** ReAct 循环相关错误基类 */
+export class ReactError extends OuroborosError {
+  constructor(message: string, cause?: unknown) {
+    super(message, "REACT_ERROR", cause);
+    this.name = "ReactError";
+  }
+}
+
+/** 达到最大迭代次数 */
+export class MaxIterationsError extends ReactError {
+  constructor(maxIterations: number) {
+    super(`ReAct 循环达到最大迭代次数（${maxIterations}）`);
+    this.name = "MaxIterationsError";
+  }
+}
+
+/** 执行树操作错误 */
+export class ExecutionTreeError extends ReactError {
+  constructor(message: string, cause?: unknown) {
+    super(message, cause);
+    this.name = "ExecutionTreeError";
+  }
+}

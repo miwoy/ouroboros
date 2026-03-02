@@ -47,5 +47,11 @@
     "defaultMaxRetries": 0,
     "codeGenerationProvider": "ollama",
     "codeGenerationModel": "llama3"
+  },
+  "react": {
+    "maxIterations": 20,
+    "stepTimeout": 60000,
+    "parallelToolCalls": true,
+    "compressionThreshold": 10
   }
 }

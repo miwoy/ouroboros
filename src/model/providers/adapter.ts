@@ -117,10 +117,24 @@ function toContext(request: ModelRequest): PiContext {
           timestamp: now,
         } satisfies PiUserMessage);
         break;
-      case "assistant":
+      case "assistant": {
+        const content: (TextContent | PiToolCall)[] = [];
+        if (msg.content) {
+          content.push({ type: "text", text: msg.content });
+        }
+        if (msg.toolCalls) {
+          for (const tc of msg.toolCalls) {
+            content.push({
+              type: "toolCall",
+              id: tc.id,
+              name: tc.name,
+              arguments: JSON.parse(tc.arguments),
+            } as PiToolCall);
+          }
+        }
         messages.push({
           role: "assistant",
-          content: [{ type: "text", text: msg.content }],
+          content: content.length > 0 ? content : [{ type: "text", text: "" }],
           api: "openai-completions",
           provider: "openai",
           model: "",
@@ -132,10 +146,11 @@ function toContext(request: ModelRequest): PiContext {
             totalTokens: 0,
             cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
           },
-          stopReason: "stop",
+          stopReason: msg.toolCalls?.length ? "toolUse" : "stop",
           timestamp: now,
         } satisfies PiAssistantMessage);
         break;
+      }
       case "tool":
         messages.push({
           role: "toolResult",

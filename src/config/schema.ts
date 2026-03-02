@@ -69,6 +69,21 @@ const toolConfigSchema = z.object({
 });
 
 /**
+ * ReAct 循环配置 Schema
+ * 控制 Agent 核心循环的行为参数
+ */
+const reactConfigSchema = z.object({
+  /** 最大迭代次数（防止无限循环） */
+  maxIterations: z.number().int().positive().default(20),
+  /** 单步超时时间（毫秒） */
+  stepTimeout: z.number().int().positive().default(60000),
+  /** 是否支持并行工具调用 */
+  parallelToolCalls: z.boolean().default(true),
+  /** 上下文压缩阈值（消息条数） */
+  compressionThreshold: z.number().int().positive().default(10),
+});
+
+/**
  * 顶层配置 Schema
  * Ouroboros 完整配置结构
  */
@@ -78,6 +93,12 @@ export const configSchema = z.object({
   tools: toolConfigSchema.default({
     defaultTimeout: 30000,
     defaultMaxRetries: 0,
+  }),
+  react: reactConfigSchema.default({
+    maxIterations: 20,
+    stepTimeout: 60000,
+    parallelToolCalls: true,
+    compressionThreshold: 10,
   }),
 });
 
@@ -92,6 +113,9 @@ export type SystemConfig = z.infer<typeof systemConfigSchema>;
 
 /** 工具配置类型 */
 export type ToolConfig = z.infer<typeof toolConfigSchema>;
+
+/** ReAct 循环配置类型 */
+export type ReactConfig = z.infer<typeof reactConfigSchema>;
 
 /** 顶层配置类型 */
 export type Config = z.infer<typeof configSchema>;
