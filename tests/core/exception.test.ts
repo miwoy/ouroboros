@@ -10,19 +10,15 @@ import {
   detectPossibleLoop,
   buildExceptionPrompt,
   applyInspectorAction,
-} from "../../src/react/exception.js";
-import {
-  createExecutionTree,
-  addNode,
-  completeNode,
-} from "../../src/react/execution-tree.js";
+} from "../../src/core/exception.js";
+import { createExecutionTree, addNode, completeNode } from "../../src/core/execution-tree.js";
 import {
   TaskState,
   TreeState,
   NodeType,
   ExceptionType,
   type InspectorAction,
-} from "../../src/react/types.js";
+} from "../../src/core/types.js";
 import { ExecutionTreeError } from "../../src/errors/index.js";
 
 describe("异常处理", () => {

@@ -40,7 +40,7 @@ import {
   TreeState,
   type ReactLoopConfig,
   type ReactDependencies,
-} from "../react/index.js";
+} from "../core/index.js";
 import { createLogger } from "../logger/index.js";
 
 /** 格式化打印分隔线 */

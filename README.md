@@ -121,7 +121,7 @@ ouroboros/
 │   │       ├── run-agent.ts    # tool:run-agent — Agent 调用（stub）
 │   │       ├── search-tool.ts  # tool:search-tool — 工具检索
 │   │       └── create-tool.ts  # tool:create-tool — 工具创建
-│   ├── react/            # ReAct 核心循环
+│   ├── core/             # ReAct 核心循环
 │   │   ├── types.ts      # 类型定义（ExecutionTree, ReactResult 等）
 │   │   ├── execution-tree.ts  # 执行树管理（纯函数，不可变操作）
 │   │   ├── exception.ts  # 异常处理（回滚、终止、死循环检测）

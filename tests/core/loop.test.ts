@@ -3,10 +3,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { runReactLoop } from "../../src/react/loop.js";
-import { TreeState, type ReactLoopConfig, type ReactDependencies } from "../../src/react/types.js";
+import { runReactLoop } from "../../src/core/loop.js";
+import { TreeState, type ReactLoopConfig, type ReactDependencies } from "../../src/core/types.js";
 import type { ModelResponse, TokenUsage } from "../../src/model/types.js";
-import type { ToolCallResponse, OuroborosTool, ToolRegistry, CallModelFn } from "../../src/tool/types.js";
+import type {
+  ToolCallResponse,
+  OuroborosTool,
+  ToolRegistry,
+  CallModelFn,
+} from "../../src/tool/types.js";
 import type { ToolExecutor } from "../../src/tool/executor.js";
 import type { Logger } from "../../src/logger/types.js";
 import { EntityStatus, EntityType } from "../../src/tool/types.js";
@@ -103,13 +108,7 @@ describe("ReAct 核心循环", () => {
         workspacePath: "/workspace",
       };
 
-      const result = await runReactLoop(
-        "今天几号？",
-        "你是助手",
-        tools,
-        defaultConfig,
-        deps,
-      );
+      const result = await runReactLoop("今天几号？", "你是助手", tools, defaultConfig, deps);
 
       expect(result.answer).toContain("2026");
       expect(result.stopReason).toBe("completed");
@@ -125,14 +124,17 @@ describe("ReAct 核心循环", () => {
 
       // 第一次调用：模型请求工具
       // 第二次调用：模型给出最终回答
-      const callModel = vi.fn()
+      const callModel = vi
+        .fn()
         .mockResolvedValueOnce({
           content: "让我查询日期",
-          toolCalls: [{
-            id: "tc-1",
-            name: "tool:get-date",
-            arguments: "{}",
-          }],
+          toolCalls: [
+            {
+              id: "tc-1",
+              name: "tool:get-date",
+              arguments: "{}",
+            },
+          ],
           stopReason: "tool_use",
           usage: defaultUsage(),
           model: "test",
@@ -145,14 +147,19 @@ describe("ReAct 核心循环", () => {
           model: "test",
         } satisfies ModelResponse);
 
-      const executor = createMockExecutor(new Map([
-        ["tool:get-date", {
-          requestId: "tc-1",
-          success: true,
-          output: { date: "2026-03-02" },
-          duration: 5,
-        }],
-      ]));
+      const executor = createMockExecutor(
+        new Map([
+          [
+            "tool:get-date",
+            {
+              requestId: "tc-1",
+              success: true,
+              output: { date: "2026-03-02" },
+              duration: 5,
+            },
+          ],
+        ]),
+      );
 
       const deps: ReactDependencies = {
         callModel: callModel as CallModelFn,
@@ -162,13 +169,7 @@ describe("ReAct 核心循环", () => {
         workspacePath: "/workspace",
       };
 
-      const result = await runReactLoop(
-        "查询日期",
-        "你是助手",
-        [getDateTool],
-        defaultConfig,
-        deps,
-      );
+      const result = await runReactLoop("查询日期", "你是助手", [getDateTool], defaultConfig, deps);
 
       expect(result.stopReason).toBe("completed");
       expect(result.totalIterations).toBe(2);
@@ -182,7 +183,8 @@ describe("ReAct 核心循环", () => {
       const tool1 = createMockTool("tool:a", "工具A");
       const tool2 = createMockTool("tool:b", "工具B");
 
-      const callModel = vi.fn()
+      const callModel = vi
+        .fn()
         .mockResolvedValueOnce({
           content: "需要调用两个工具",
           toolCalls: [
@@ -269,13 +271,7 @@ describe("ReAct 核心循环", () => {
         workspacePath: "/workspace",
       };
 
-      const result = await runReactLoop(
-        "任务",
-        "系统",
-        [],
-        defaultConfig,
-        deps,
-      );
+      const result = await runReactLoop("任务", "系统", [], defaultConfig, deps);
 
       expect(result.stopReason).toBe("error");
       expect(result.answer).toContain("模型调用失败");
@@ -285,7 +281,8 @@ describe("ReAct 核心循环", () => {
     it("工具调用失败不应中断循环", async () => {
       const tool = createMockTool("tool:fail", "失败工具");
 
-      const callModel = vi.fn()
+      const callModel = vi
+        .fn()
         .mockResolvedValueOnce({
           content: "调用工具",
           toolCalls: [{ id: "tc-1", name: "tool:fail", arguments: "{}" }],
@@ -318,13 +315,7 @@ describe("ReAct 核心循环", () => {
         workspacePath: "/workspace",
       };
 
-      const result = await runReactLoop(
-        "任务",
-        "系统",
-        [tool],
-        defaultConfig,
-        deps,
-      );
+      const result = await runReactLoop("任务", "系统", [tool], defaultConfig, deps);
 
       expect(result.stopReason).toBe("completed");
       expect(result.steps[0]!.toolCalls[0]!.success).toBe(false);
@@ -335,7 +326,8 @@ describe("ReAct 核心循环", () => {
     it("应记录正确的节点结构", async () => {
       const tool = createMockTool("tool:test", "测试工具");
 
-      const callModel = vi.fn()
+      const callModel = vi
+        .fn()
         .mockResolvedValueOnce({
           content: "调用工具",
           toolCalls: [{ id: "tc-1", name: "tool:test", arguments: "{}" }],
@@ -359,13 +351,7 @@ describe("ReAct 核心循环", () => {
         workspacePath: "/workspace",
       };
 
-      const result = await runReactLoop(
-        "任务",
-        "系统",
-        [tool],
-        defaultConfig,
-        deps,
-      );
+      const result = await runReactLoop("任务", "系统", [tool], defaultConfig, deps);
 
       const { executionTree } = result;
       const nodeCount = Object.keys(executionTree.nodes).length;
@@ -377,7 +363,8 @@ describe("ReAct 核心循环", () => {
   describe("Usage 累加", () => {
     it("应累加所有迭代的 token 用量", async () => {
       const usage: TokenUsage = { promptTokens: 10, completionTokens: 5, totalTokens: 15 };
-      const callModel = vi.fn()
+      const callModel = vi
+        .fn()
         .mockResolvedValueOnce({
           content: "调用",
           toolCalls: [{ id: "tc-1", name: "tool:a", arguments: "{}" }],

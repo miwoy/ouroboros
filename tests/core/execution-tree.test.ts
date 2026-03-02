@@ -15,8 +15,8 @@ import {
   getDescendantIds,
   treeToJSON,
   treeFromJSON,
-} from "../../src/react/execution-tree.js";
-import { TaskState, TreeState, NodeType } from "../../src/react/types.js";
+} from "../../src/core/execution-tree.js";
+import { TaskState, TreeState, NodeType } from "../../src/core/types.js";
 import { ExecutionTreeError } from "../../src/errors/index.js";
 
 describe("执行树管理", () => {
@@ -100,17 +100,17 @@ describe("执行树管理", () => {
 
     it("节点不存在时应抛出 ExecutionTreeError", () => {
       const tree = createExecutionTree("agent:core", "测试");
-      expect(() =>
-        updateNodeState(tree, "non-existent", TaskState.Completed),
-      ).toThrow(ExecutionTreeError);
+      expect(() => updateNodeState(tree, "non-existent", TaskState.Completed)).toThrow(
+        ExecutionTreeError,
+      );
     });
 
     it("终态节点不应允许状态变更", () => {
       const tree = createExecutionTree("agent:core", "测试");
       const completed = completeNode(tree, tree.rootNodeId, "完成");
-      expect(() =>
-        updateNodeState(completed, tree.rootNodeId, TaskState.Working),
-      ).toThrow(ExecutionTreeError);
+      expect(() => updateNodeState(completed, tree.rootNodeId, TaskState.Working)).toThrow(
+        ExecutionTreeError,
+      );
     });
   });
 

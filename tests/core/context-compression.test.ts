@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { compressContext, fallbackCompression } from "../../src/react/context-compression.js";
+import { compressContext, fallbackCompression } from "../../src/core/context-compression.js";
 import type { Message, ModelResponse } from "../../src/model/types.js";
 import type { CallModelFn } from "../../src/tool/types.js";
 
