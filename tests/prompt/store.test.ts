@@ -196,7 +196,7 @@ describe("listMemoryFiles", () => {
 describe("getPromptFilePath", () => {
   it("core 类型返回源码路径", () => {
     const path = getPromptFilePath("/workspace", "core");
-    expect(path).toContain("src/prompt/core.md");
+    expect(path).toContain("src/prompt/template/core.md");
   });
 
   it("其他类型返回 workspace/prompts/ 路径", () => {

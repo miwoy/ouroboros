@@ -12,7 +12,7 @@
  *   workspace/prompts/memory.md    — 长期记忆
  *   workspace/prompts/memory/      — 短期记忆（按日期）
  *
- * 注意: core.md 不存于 workspace，直接引用 src/prompt/core.md
+ * 注意: core.md 不存于 workspace，直接引用 src/prompt/template/core.md
  */
 
 import { readFile, writeFile, readdir, copyFile, access } from "node:fs/promises";
@@ -21,8 +21,8 @@ import { fileURLToPath } from "node:url";
 import { OuroborosError } from "../errors/index.js";
 import type { PromptFile, PromptFileType, PromptMetadata } from "./types.js";
 
-/** src/prompt/ 目录路径（模板源码所在） */
-const SRC_PROMPT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), ".");
+/** src/prompt/template/ 目录路径（模板源码所在） */
+const SRC_TEMPLATE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "template");
 
 /** 需要复制到 workspace 的模板文件（core 不复制，直接引用） */
 const TEMPLATE_FILES: readonly PromptFileType[] = ["self", "tool", "skill", "agent", "memory"];
@@ -51,10 +51,7 @@ export async function readPromptFile(filePath: string): Promise<PromptFile | nul
  * @param filePath - .md 文件的完整路径
  * @param promptFile - 提示词文件内容
  */
-export async function writePromptFile(
-  filePath: string,
-  promptFile: PromptFile,
-): Promise<void> {
+export async function writePromptFile(filePath: string, promptFile: PromptFile): Promise<void> {
   const raw = serializeFrontmatter(promptFile);
   await writeFile(filePath, raw, "utf-8");
 }
@@ -65,10 +62,7 @@ export async function writePromptFile(
  * @param filePath - .md 文件的完整路径
  * @param content - 要追加的内容
  */
-export async function appendToPromptFile(
-  filePath: string,
-  content: string,
-): Promise<void> {
+export async function appendToPromptFile(filePath: string, content: string): Promise<void> {
   const existing = await readPromptFile(filePath);
   if (!existing) {
     throw new PromptStoreError(`提示词文件不存在: ${filePath}`);
@@ -85,7 +79,7 @@ export async function appendToPromptFile(
  * 获取 core.md 的源码路径（直接引用，不复制）
  */
 export function getCorePath(): string {
-  return join(SRC_PROMPT_DIR, "core.md");
+  return join(SRC_TEMPLATE_DIR, "core.md");
 }
 
 /**
@@ -116,7 +110,7 @@ export async function copyDefaultTemplates(workspacePath: string): Promise<reado
   const copied: string[] = [];
 
   for (const fileType of TEMPLATE_FILES) {
-    const src = join(SRC_PROMPT_DIR, `${fileType}.md`);
+    const src = join(SRC_TEMPLATE_DIR, `${fileType}.md`);
     const dest = join(promptsDir, `${fileType}.md`);
 
     // 只在目标文件不存在时复制

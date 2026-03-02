@@ -96,12 +96,13 @@ ouroboros/
 │   ├── model/            # 模型抽象层（多提供商统一接口）
 │   │   └── providers/    # pi-ai 适配器（统一多模型接口）
 │   ├── prompt/           # 提示词系统
-│   │   ├── core.md       # 系统提示词（不可修改，直接引用）
-│   │   ├── self.md       # 自我图式模板
-│   │   ├── tool.md       # 工具模板
-│   │   ├── skill.md      # 技能模板
-│   │   ├── agent.md      # Agent 模板
-│   │   ├── memory.md     # 长期记忆模板
+│   │   ├── template/     # 提示词模板文件
+│   │   │   ├── core.md   # 系统提示词（含内置工具/技能/解决方案，不可修改）
+│   │   │   ├── self.md   # 自我图式模板（含 {{variable}} 变量）
+│   │   │   ├── tool.md   # 自定义工具注册表模板
+│   │   │   ├── skill.md  # 自定义技能注册表模板
+│   │   │   ├── agent.md  # 自定义 Agent 注册表模板
+│   │   │   └── memory.md # 长期记忆模板
 │   │   ├── types.ts      # 类型定义
 │   │   ├── template.ts   # 模板引擎（{{variable}} 替换）
 │   │   ├── store.ts      # 存储层（文件读写 + frontmatter）
@@ -140,13 +141,15 @@ ouroboros/
 
 | 文件 | 位置 | 说明 | qmd 索引 |
 |------|------|------|----------|
-| `core.md` | `src/prompt/` | 系统提示词（安全边界、ReAct 核心），直接引用不复制 | 否 |
-| `self.md` | `workspace/prompts/` | 自我图式（身体图式+灵魂图式+激素），运行时更新 | 否 |
-| `tool.md` | `workspace/prompts/` | 工具注册表，随工具增长 | 是 |
-| `skill.md` | `workspace/prompts/` | 技能注册表，随技能增长 | 是 |
-| `agent.md` | `workspace/prompts/` | Agent 注册表，量小直接加载 | 否 |
-| `memory.md` | `workspace/prompts/` | 长期记忆（压缩摘要），持续累积 | 是 |
-| `memory/*.md` | `workspace/prompts/memory/` | 短期记忆（按日期文件），详细交互 | 是 |
+| `core.md` | `src/prompt/template/` | 系统提示词（安全边界、ReAct 核心、内置工具/技能/解决方案），直接引用不复制 | 否 |
+| `self.md` | `workspace/prompts/` | 自我图式（身体图式+灵魂图式+激素），含 {{variable}} 变量，运行时更新 | 否 |
+| `tool.md` | `workspace/prompts/` | 自定义工具注册表，动态累加，无变量 | 是 |
+| `skill.md` | `workspace/prompts/` | 自定义技能注册表，动态累加，无变量 | 是 |
+| `agent.md` | `workspace/prompts/` | 自定义 Agent 注册表，量小直接加载，无变量 | 否 |
+| `memory.md` | `workspace/prompts/` | 长期记忆（压缩摘要），动态累加，无变量 | 是 |
+| `memory/*.md` | `workspace/prompts/memory/` | 短期记忆（按日期文件），详细交互，无变量 | 是 |
+
+> **注意**: 内置工具、技能、解决方案的描述在 `core.md` 中，不暴露给用户修改。`tool.md`、`skill.md`、`agent.md` 仅记录用户自定义的内容。
 
 ### qmd 向量索引
 
