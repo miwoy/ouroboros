@@ -53,5 +53,10 @@
     "stepTimeout": 60000,
     "parallelToolCalls": true,
     "compressionThreshold": 10
+  },
+  "memory": {
+    "shortTerm": true,
+    "longTerm": true,
+    "hotSessionMaxTokens": 4000
   }
 }

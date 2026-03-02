@@ -84,6 +84,19 @@ const reactConfigSchema = z.object({
 });
 
 /**
+ * 记忆系统配置 Schema
+ * 控制记忆系统的行为参数
+ */
+const memoryConfigSchema = z.object({
+  /** 是否启用短期记忆（每日交互记录） */
+  shortTerm: z.boolean().default(true),
+  /** 是否启用长期记忆（压缩摘要） */
+  longTerm: z.boolean().default(true),
+  /** Hot Session 最大 token 数 */
+  hotSessionMaxTokens: z.number().int().positive().default(4000),
+});
+
+/**
  * 顶层配置 Schema
  * Ouroboros 完整配置结构
  */
@@ -99,6 +112,11 @@ export const configSchema = z.object({
     stepTimeout: 60000,
     parallelToolCalls: true,
     compressionThreshold: 10,
+  }),
+  memory: memoryConfigSchema.default({
+    shortTerm: true,
+    longTerm: true,
+    hotSessionMaxTokens: 4000,
   }),
 });
 
@@ -116,6 +134,9 @@ export type ToolConfig = z.infer<typeof toolConfigSchema>;
 
 /** ReAct 循环配置类型 */
 export type ReactConfig = z.infer<typeof reactConfigSchema>;
+
+/** 记忆系统配置类型 */
+export type MemorySchemaConfig = z.infer<typeof memoryConfigSchema>;
 
 /** 顶层配置类型 */
 export type Config = z.infer<typeof configSchema>;

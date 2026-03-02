@@ -137,6 +137,13 @@ ouroboros/
 │   │   ├── executor.ts   # 技能执行器（模板渲染 + ReAct 循环）
 │   │   └── builtin/      # 内置技能
 │   │       └── definitions.ts  # createSolution 等内置技能定义
+│   ├── memory/           # 记忆系统
+│   │   ├── types.ts      # 类型定义（HotMemory, ColdMemory, ShortTermMemory, LongTermMemory）
+│   │   ├── session.ts    # Session 记忆（Hot: 内存常驻, Cold: 临时文件缓存）
+│   │   ├── short-term.ts # 短期记忆（按日期文件持久化）
+│   │   ├── long-term.ts  # 长期记忆（压缩摘要）
+│   │   ├── manager.ts    # 记忆管理器（四层统一管理）
+│   │   └── index.ts      # 公共导出
 │   ├── core/             # ReAct 核心循环
 │   │   ├── types.ts      # 类型定义（ExecutionTree, ReactResult 等）
 │   │   ├── execution-tree.ts  # 执行树管理（纯函数，不可变操作）
@@ -307,6 +314,46 @@ const result = await runReactLoop(
 console.log(result.answer);      // 最终回答
 console.log(result.steps);       // 每个步骤的工具调用
 console.log(result.executionTree); // 执行树
+```
+
+## 记忆系统
+
+四层分层记忆架构，从高频内存到持久文件逐级过渡。
+
+### 记忆层级
+
+| 层级 | 存储 | 生命周期 | 说明 |
+|------|------|----------|------|
+| **Hot Memory** | 内存 | 每次 callModel 注入 | 实时记忆，token 限制自动淘汰旧条目 |
+| **Cold Memory** | tmp/memory/ | 任务结束清理 | 步骤级缓存，按需加载 |
+| **短期记忆** | prompts/memory/*.md | 持久（按日期） | 完整交互记录，按日期分文件 |
+| **长期记忆** | prompts/memory.md | 持久（累积） | 压缩摘要：知识、行为模式、决策 |
+
+### 使用示例
+
+```typescript
+import { createMemoryManager } from "ouroboros";
+
+const memoryManager = createMemoryManager(workspacePath, {
+  shortTerm: true,
+  longTerm: true,
+  hotSessionMaxTokens: 4000,
+});
+
+// Hot Memory — 实时注入 callModel
+memoryManager.hot.add({ timestamp: "...", type: "conversation", content: "..." });
+const promptText = memoryManager.hot.toPromptText();
+
+// 短期记忆 — 追加交互记录
+await memoryManager.shortTerm.append({ timestamp: "...", type: "tool-call", content: "..." });
+const todayEntries = await memoryManager.shortTerm.loadToday();
+
+// 长期记忆 — 压缩摘要
+await memoryManager.longTerm.appendKnowledge("项目采用分层架构");
+const summary = await memoryManager.longTerm.compressFromShortTerm("2026-03-02", callModel);
+
+// 任务结束时清理
+await memoryManager.cleanup();
 ```
 
 ## 日志系统
