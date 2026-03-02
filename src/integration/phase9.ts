@@ -101,10 +101,7 @@ async function main() {
       if (registry.list().length !== 1) throw new Error("数量不对");
 
       // 验证持久化
-      const raw = await readFile(
-        join(TEST_DIR, "super-agents", "registry.json"),
-        "utf-8",
-      );
+      const raw = await readFile(join(TEST_DIR, "super-agents", "registry.json"), "utf-8");
       const data = JSON.parse(raw);
       if (data.superAgents.length !== 1) throw new Error("持久化失败");
 
@@ -125,19 +122,13 @@ async function main() {
 
       // 验证 config.json
       const config = JSON.parse(
-        await readFile(
-          join(TEST_DIR, "super-agents", "test-project", "config.json"),
-          "utf-8",
-        ),
+        await readFile(join(TEST_DIR, "super-agents", "test-project", "config.json"), "utf-8"),
       );
       if (config.id !== "super-agent:test-project") throw new Error("config.json 内容错误");
 
       // 验证 metadata.json
       const meta = JSON.parse(
-        await readFile(
-          join(TEST_DIR, "super-agents", "test-project", "metadata.json"),
-          "utf-8",
-        ),
+        await readFile(join(TEST_DIR, "super-agents", "test-project", "metadata.json"), "utf-8"),
       );
       if (meta.roles.length !== 3) throw new Error("metadata roles 数量错误");
       if (meta.collaborationMode !== "sequential") throw new Error("协作模式错误");
@@ -206,13 +197,10 @@ async function main() {
     // [8] 构建并行模式 Super Agent
     try {
       const parDef = makeDefinition("parallel-proj", "parallel");
-      const instance = await buildSuperAgent(parDef, TEST_DIR);
+      await buildSuperAgent(parDef, TEST_DIR);
 
       const meta = JSON.parse(
-        await readFile(
-          join(TEST_DIR, "super-agents", "parallel-proj", "metadata.json"),
-          "utf-8",
-        ),
+        await readFile(join(TEST_DIR, "super-agents", "parallel-proj", "metadata.json"), "utf-8"),
       );
       if (meta.collaborationMode !== "parallel") throw new Error("并行模式不正确");
 

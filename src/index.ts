@@ -10,3 +10,6 @@ export * from "./skill/index.js";
 export * from "./memory/index.js";
 export * from "./solution/index.js";
 export * from "./super-agent/index.js";
+export * from "./schema/index.js";
+export * from "./inspector/index.js";
+export * from "./reflection/index.js";

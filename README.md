@@ -160,6 +160,19 @@ ouroboros/
 │   ├── logger/           # 日志系统
 │   │   ├── types.ts      # 类型定义（LogLevel, Logger 接口）
 │   │   └── logger.ts     # 文件日志实现（JSONL 格式）
+│   ├── schema/           # 自我图式系统
+│   │   ├── types.ts      # 类型定义（BodySchema, SoulSchema, HormoneState）
+│   │   ├── body.ts       # 身体图式（系统资源感知）
+│   │   ├── soul.ts       # 灵魂图式（世界模型+自我认知）
+│   │   ├── hormone.ts    # 激素系统（决策倾向调节）
+│   │   └── schema-provider.ts  # 统一提供者（模板变量输出）
+│   ├── inspector/        # 审查程序
+│   │   ├── types.ts      # 类型定义（InspectorConfig, InspectionResult）
+│   │   ├── rules.ts      # 审查规则（死循环/高重试/超时/资源耗尽）
+│   │   └── inspector.ts  # 审查核心（定时调度+规则执行）
+│   ├── reflection/       # 反思程序
+│   │   ├── types.ts      # 类型定义（ReflectionInput/Output, SkillSuggestion）
+│   │   └── reflector.ts  # 反思执行器（分析+记忆写入+Skill建议）
 │   ├── super-agent/      # Super Agent 协作系统
 │   │   ├── types.ts      # 类型定义（SuperAgentDefinition, AgentRole, CollaborationSpec）
 │   │   ├── registry.ts   # Super Agent 注册表（持久化 + 状态管理）
@@ -464,6 +477,44 @@ const response = await executor.execute({
 console.log(response.result);       // 汇总结果
 console.log(response.roleResults);  // 各角色结果
 console.log(response.success);      // 是否全部成功
+```
+
+## 自我图式系统
+
+Agent 的自我感知：身体图式（运行环境）、灵魂图式（世界模型+自我认知）、激素系统（决策倾向）。
+
+```typescript
+import { createSchemaProvider } from "ouroboros";
+
+const provider = createSchemaProvider(workspacePath, {
+  hormoneDefaults: { focusLevel: 70, cautionLevel: 40, creativityLevel: 60 },
+});
+
+// 获取模板变量（用于渲染 self.md）
+const vars = provider.getVariables();
+// { platform, availableMemory, workspacePath, worldModel, selfAwareness, focusLevel, cautionLevel, creativityLevel }
+
+// 动态调整激素
+const hormones = provider.getHormoneManager();
+hormones.adjustCaution(10); // 检测到风险时增加谨慎度
+```
+
+## 审查与反思系统
+
+审查程序定时检查执行树，检测死循环、超时、资源耗尽等异常。反思程序在任务完成后分析执行过程，更新长期记忆和建议 Skill 封装。
+
+```typescript
+import { createInspector, createReflector } from "ouroboros";
+
+// 审查程序
+const inspector = createInspector(logger);
+const result = inspector.inspect({ tree, bodySchema, startTime, config });
+// result.hasAnomalies, result.reports, result.suggestedActions
+
+// 反思程序
+const reflector = createReflector({ callModel, longTermMemory, logger });
+const output = await reflector.reflect({ taskDescription, steps, result, ... });
+// output.insights, output.patterns, output.skillSuggestions, output.memorySummary
 ```
 
 ## 日志系统

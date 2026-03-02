@@ -108,6 +108,49 @@ const agentConfigSchema = z.object({
 });
 
 /**
+ * 自我图式配置 Schema
+ * 控制身体图式、灵魂图式和激素系统
+ */
+const selfSchemaConfigSchema = z.object({
+  /** 激素默认值 - 专注度 */
+  focusLevel: z.number().int().min(0).max(100).default(60),
+  /** 激素默认值 - 谨慎度 */
+  cautionLevel: z.number().int().min(0).max(100).default(50),
+  /** 激素默认值 - 创造力 */
+  creativityLevel: z.number().int().min(0).max(100).default(50),
+});
+
+/**
+ * 审查程序配置 Schema
+ * 控制审查程序的行为参数
+ */
+const inspectorConfigSchema = z.object({
+  /** 是否启用审查 */
+  enabled: z.boolean().default(true),
+  /** 审查间隔（毫秒） */
+  checkInterval: z.number().int().positive().default(180000),
+  /** 死循环检测阈值（连续重复次数） */
+  loopDetectionThreshold: z.number().int().positive().default(3),
+  /** 单节点最大重试次数 */
+  maxRetryThreshold: z.number().int().positive().default(5),
+  /** 最小可用内存（MB） */
+  minAvailableMemoryMB: z.number().int().positive().default(100),
+  /** 最大执行时间（秒） */
+  maxExecutionTimeSecs: z.number().int().positive().default(3600),
+});
+
+/**
+ * 反思程序配置 Schema
+ * 控制反思程序的行为参数
+ */
+const reflectionConfigSchema = z.object({
+  /** 是否启用反思 */
+  enabled: z.boolean().default(true),
+  /** Skill 建议最低置信度 */
+  minSkillConfidence: z.number().min(0).max(1).default(0.7),
+});
+
+/**
  * Super Agent 系统配置 Schema
  * 控制 Super Agent 协作系统的行为参数
  */
@@ -148,6 +191,23 @@ export const configSchema = z.object({
     defaultMaxDuration: 600,
     maxParallelAgents: 5,
   }),
+  self: selfSchemaConfigSchema.default({
+    focusLevel: 60,
+    cautionLevel: 50,
+    creativityLevel: 50,
+  }),
+  inspector: inspectorConfigSchema.default({
+    enabled: true,
+    checkInterval: 180000,
+    loopDetectionThreshold: 3,
+    maxRetryThreshold: 5,
+    minAvailableMemoryMB: 100,
+    maxExecutionTimeSecs: 3600,
+  }),
+  reflection: reflectionConfigSchema.default({
+    enabled: true,
+    minSkillConfidence: 0.7,
+  }),
 });
 
 /** 模型提供商配置类型 */
@@ -173,6 +233,15 @@ export type AgentSchemaConfig = z.infer<typeof agentConfigSchema>;
 
 /** Super Agent 系统配置类型 */
 export type SuperAgentSchemaConfig = z.infer<typeof superAgentConfigSchema>;
+
+/** 自我图式配置类型 */
+export type SelfSchemaSchemaConfig = z.infer<typeof selfSchemaConfigSchema>;
+
+/** 审查程序配置类型 */
+export type InspectorSchemaConfig = z.infer<typeof inspectorConfigSchema>;
+
+/** 反思程序配置类型 */
+export type ReflectionSchemaConfig = z.infer<typeof reflectionConfigSchema>;
 
 /** 顶层配置类型 */
 export type Config = z.infer<typeof configSchema>;

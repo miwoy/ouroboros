@@ -66,5 +66,22 @@
   "superAgents": {
     "defaultMaxDuration": 600,
     "maxParallelAgents": 5
+  },
+  "self": {
+    "focusLevel": 60,
+    "cautionLevel": 50,
+    "creativityLevel": 50
+  },
+  "inspector": {
+    "enabled": true,
+    "checkInterval": 180000,
+    "loopDetectionThreshold": 3,
+    "maxRetryThreshold": 5,
+    "minAvailableMemoryMB": 100,
+    "maxExecutionTimeSecs": 3600
+  },
+  "reflection": {
+    "enabled": true,
+    "minSkillConfidence": 0.7
   }
 }
