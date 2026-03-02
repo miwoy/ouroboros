@@ -1,0 +1,126 @@
+.agents-page {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px;
+  max-width: 960px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.agents-header {
+  margin-bottom: 24px;
+}
+.agents-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.agents-subtitle {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.agents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.agent-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px;
+  transition: border-color var(--transition);
+}
+.agent-card:hover {
+  border-color: var(--color-primary);
+}
+
+.agent-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.agent-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-agent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.agent-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.agent-id {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-family: monospace;
+}
+
+.agent-status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.status-active {
+  background: rgba(63, 185, 80, 0.15);
+  color: var(--color-success);
+}
+.status-idle {
+  background: rgba(210, 153, 34, 0.15);
+  color: var(--color-warning);
+}
+
+.agent-description {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.agent-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.skill-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+
+.page-loading,
+.page-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+.page-error {
+  color: var(--color-danger);
+}

@@ -222,6 +222,16 @@ ouroboros/
 │   ├── logs/             # 日志（按日期分隔）
 │   ├── tmp/              # 临时文件（任务完成后清理）
 │   └── vectors/          # 向量索引（qmd，XDG_CACHE_HOME 隔离）
+├── web/                  # Web UI 客户端（React + Vite）
+│   ├── src/
+│   │   ├── components/   # UI 组件（Header, Sidebar, ChatView）
+│   │   ├── pages/        # 页面（AgentsPage, MonitorPage）
+│   │   ├── hooks/        # React Hooks（useChat）
+│   │   ├── services/     # API 客户端
+│   │   └── styles/       # 主题与全局样式
+│   ├── index.html
+│   ├── vite.config.ts
+│   └── package.json
 ├── config.example.json   # 配置模板
 └── ROADMAP.md            # 开发计划（不入版本控制）
 ```
@@ -635,6 +645,41 @@ const res = await fetch("http://127.0.0.1:3000/api/chat/message", {
 });
 const body = await res.json();
 // { success: true, data: { sessionId: "...", response: "...", formatted: "..." }, error: null }
+```
+
+## Web UI 客户端
+
+基于 React + Vite + TypeScript 的 Web 界面，提供对话、Agent 管理与系统监控功能。
+
+### 功能
+
+- **Chat 对话界面**：消息输入、SSE 流式输出、Markdown 渲染（react-markdown）、代码高亮（highlight.js）
+- **Agent 管理面板**：查看 Agent 列表、状态、技能信息
+- **系统监控**：健康检查、版本信息、运行时间、连接状态
+- **会话管理**：侧边栏会话列表，创建/切换/删除会话
+- **响应式设计**：支持桌面和移动端
+
+### 启动
+
+```bash
+# 先启动后端 API 服务器
+npm run dev
+
+# 启动 Web UI（另一个终端）
+cd web
+npm install
+npm run dev
+# 访问 http://localhost:5173
+```
+
+开发模式下，Vite 会自动代理 `/api` 请求到后端 `http://127.0.0.1:3000`。
+
+### 构建
+
+```bash
+cd web
+npm run build
+# 产出目录: web/dist/
 ```
 
 ## 日志系统

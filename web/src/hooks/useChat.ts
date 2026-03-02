@@ -1,0 +1,168 @@
+/**
+ * 聊天状态管理 Hook
+ */
+
+import { useState, useCallback, useRef } from "react";
+import * as api from "../services/api";
+
+export interface DisplayMessage {
+  readonly id: string;
+  readonly role: "user" | "agent" | "system";
+  readonly content: string;
+  readonly timestamp: string;
+  readonly streaming?: boolean;
+}
+
+export function useChat() {
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<DisplayMessage[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  /** 加载会话消息历史 */
+  const loadSession = useCallback(async (sid: string) => {
+    setSessionId(sid);
+    setError(null);
+    const res = await api.getMessages(sid);
+    if (res.success && res.data) {
+      setMessages(
+        res.data.map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp,
+        })),
+      );
+    }
+  }, []);
+
+  /** 创建新会话 */
+  const newSession = useCallback(async (description?: string) => {
+    setError(null);
+    const res = await api.createSession(description);
+    if (res.success && res.data) {
+      setSessionId(res.data.sessionId);
+      setMessages([]);
+      return res.data.sessionId;
+    }
+    return null;
+  }, []);
+
+  /** 发送消息（流式） */
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim() || loading) return;
+      setError(null);
+
+      // 添加用户消息
+      const userMsg: DisplayMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: text,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, userMsg]);
+
+      // 添加 Agent 占位消息
+      const agentMsgId = `agent-${Date.now()}`;
+      const agentMsg: DisplayMessage = {
+        id: agentMsgId,
+        role: "agent",
+        content: "",
+        timestamp: new Date().toISOString(),
+        streaming: true,
+      };
+      setMessages((prev) => [...prev, agentMsg]);
+      setLoading(true);
+
+      const controller = api.streamMessage(
+        text,
+        {
+          onTextDelta: (delta) => {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === agentMsgId ? { ...m, content: m.content + delta } : m)),
+            );
+          },
+          onDone: (data) => {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === agentMsgId ? { ...m, streaming: false } : m)),
+            );
+            if (!sessionId && data.sessionId) {
+              setSessionId(data.sessionId);
+            }
+            setLoading(false);
+          },
+          onError: (err) => {
+            setError(err);
+            setLoading(false);
+          },
+        },
+        sessionId || undefined,
+      );
+      abortRef.current = controller;
+    },
+    [sessionId, loading],
+  );
+
+  /** 非流式发送（回退方案） */
+  const sendMessageSync = useCallback(
+    async (text: string) => {
+      if (!text.trim() || loading) return;
+      setError(null);
+      setLoading(true);
+
+      const userMsg: DisplayMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: text,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, userMsg]);
+
+      const res = await api.sendMessage(text, sessionId || undefined);
+      if (res.success && res.data) {
+        if (!sessionId) setSessionId(res.data.sessionId);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `agent-${Date.now()}`,
+            role: "agent",
+            content: res.data!.response,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      } else {
+        setError(res.error?.message || "发送失败");
+      }
+      setLoading(false);
+    },
+    [sessionId, loading],
+  );
+
+  /** 停止流式生成 */
+  const stopGeneration = useCallback(() => {
+    abortRef.current?.abort();
+    setLoading(false);
+  }, []);
+
+  /** 清除当前会话 */
+  const clearChat = useCallback(() => {
+    setSessionId(null);
+    setMessages([]);
+    setError(null);
+  }, []);
+
+  return {
+    sessionId,
+    messages,
+    loading,
+    error,
+    sendMessage,
+    sendMessageSync,
+    stopGeneration,
+    loadSession,
+    newSession,
+    clearChat,
+  };
+}
