@@ -131,6 +131,12 @@ ouroboros/
 │   │       ├── web-fetch.ts    # tool:web-fetch — URL 抓取
 │   │       ├── search-skill.ts # tool:search-skill — 技能检索
 │   │       └── create-skill.ts # tool:create-skill — 技能创建
+│   ├── skill/            # 技能系统
+│   │   ├── types.ts      # 类型定义（SkillDefinition, SkillExecuteRequest/Response）
+│   │   ├── registry.ts   # 技能注册表（内存 + workspace/skills/ 加载）
+│   │   ├── executor.ts   # 技能执行器（模板渲染 + ReAct 循环）
+│   │   └── builtin/      # 内置技能
+│   │       └── definitions.ts  # createSolution 等内置技能定义
 │   ├── core/             # ReAct 核心循环
 │   │   ├── types.ts      # 类型定义（ExecutionTree, ReactResult 等）
 │   │   ├── execution-tree.ts  # 执行树管理（纯函数，不可变操作）
@@ -241,6 +247,37 @@ const response = await executor.execute({
 ### 类型转换
 
 `toModelToolDefinition()` 将 `OuroborosTool` 转换为模型层 `ToolDefinition`，供 `callModel` 的 `tools` 参数使用。
+
+## 技能系统
+
+Skill 是工具编排的逻辑封装，包含提示词模板和可选辅助脚本。
+
+### 核心概念
+
+- **SkillDefinition**：技能定义（提示词模板 + 变量声明 + 依赖工具列表）
+- **SkillRegistry**：技能注册表（内置技能 + workspace/skills/ 用户技能）
+- **SkillExecutor**：技能执行器（模板渲染 → 工具筛选 → ReAct 循环执行）
+
+### 使用示例
+
+```typescript
+import { createSkillRegistry, createSkillExecutor } from "ouroboros";
+
+const skillRegistry = await createSkillRegistry(workspacePath);
+const skillExecutor = createSkillExecutor({
+  skillRegistry, toolRegistry, toolExecutor, callModel, logger, workspacePath,
+});
+
+const response = await skillExecutor.execute({
+  requestId: "req-001",
+  skillId: "skill:文件摘要",
+  variables: { filePath: "docs/DESIGN.md" },
+  caller: { entityId: "agent:core" },
+});
+
+console.log(response.result);    // 摘要内容
+console.log(response.toolCalls); // 执行过程中的工具调用记录
+```
 
 ## ReAct 核心循环
 
