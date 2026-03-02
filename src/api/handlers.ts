@@ -5,20 +5,23 @@
  * 支持三层模式：占位符 → 直连模型 → ReAct 循环。
  */
 
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { Router } from "./router.js";
 import type { SessionManager } from "./session.js";
 import type { ApiDeps, SendMessageRequest, CreateSessionRequest, SSEEvent } from "./types.js";
-import type { TreeState, ReactStep, ExecutionTree } from "../core/types.js";
+import type { TreeState, ReactStep, ExecutionTree, ReactLoopConfig } from "../core/types.js";
 import type { Message } from "../model/types.js";
 import type { CallModelFn } from "../tool/types.js";
 import type { RenderedPrompt, PromptFileType } from "../prompt/types.js";
 import { treeToJSON } from "../core/execution-tree.js";
 import { runReactLoop } from "../core/loop.js";
-import { createToolExecutor } from "../tool/executor.js";
+import { createToolExecutor, type ToolExecutor } from "../tool/executor.js";
 import { filterSafeTools } from "./safe-tools.js";
 import { loadAllPromptFiles } from "../prompt/loader.js";
 import { renderTemplate } from "../prompt/template.js";
 import { assemblePrompt } from "../prompt/assembler.js";
+import { DEFAULT_INSPECTOR_CONFIG } from "../inspector/inspector.js";
 import {
   successResponse,
   notFoundError,
@@ -27,6 +30,9 @@ import {
   paginatedResponse,
 } from "./response.js";
 import { formatAgentResponse } from "./formatter.js";
+
+/** 默认 Agent ID */
+const DEFAULT_AGENT_ID = "agent:core";
 
 /**
  * 注册所有路由处理器
@@ -38,11 +44,12 @@ export function registerHandlers(
 ): void {
   // ─── 健康检查 ──────────────────────────────────
   router.get("/api/health", async (ctx) => {
+    const version = await readPackageVersion();
     ctx.respond(
       200,
       successResponse({
         status: "ok",
-        version: "0.12.0",
+        version,
         uptime: process.uptime(),
       }),
     );
@@ -53,7 +60,7 @@ export function registerHandlers(
   // 创建会话
   router.post("/api/sessions", async (ctx) => {
     const body = ctx.body as CreateSessionRequest | undefined;
-    const agentId = body?.agentId || "agent:core";
+    const agentId = body?.agentId || DEFAULT_AGENT_ID;
     const description = body?.description;
 
     const session = sessionManager.createSession(agentId, description);
@@ -124,7 +131,7 @@ export function registerHandlers(
     // 获取或创建会话
     let sessionId = body.sessionId;
     if (!sessionId) {
-      const session = sessionManager.createSession(body.agentId || "agent:core");
+      const session = sessionManager.createSession(body.agentId || DEFAULT_AGENT_ID);
       sessionId = session.sessionId;
     }
 
@@ -172,46 +179,58 @@ export function registerHandlers(
 
   // 列出 Agent
   router.get("/api/agents", async (ctx) => {
-    const agents = [
-      {
-        id: "agent:core",
-        name: "Core Agent",
-        description: "默认系统 Agent",
-        status: "active",
-        skills: [],
-      },
-    ];
-    ctx.respond(200, successResponse(agents));
+    const registered = await loadRegisteredAgents(deps.workspacePath);
+    const coreAgent = {
+      id: DEFAULT_AGENT_ID,
+      name: "Core Agent",
+      description: "默认系统 Agent",
+      status: "active",
+      skills: [] as readonly string[],
+    };
+    ctx.respond(200, successResponse([coreAgent, ...registered]));
   });
 
   // 获取 Agent 详情
   router.get("/api/agents/:agentId", async (ctx) => {
-    if (ctx.params.agentId === "agent:core") {
+    if (ctx.params.agentId === DEFAULT_AGENT_ID) {
       ctx.respond(
         200,
         successResponse({
-          id: "agent:core",
+          id: DEFAULT_AGENT_ID,
           name: "Core Agent",
           description: "默认系统 Agent",
           status: "active",
-          skills: [],
+          skills: [] as readonly string[],
         }),
       );
+      return;
+    }
+    // 从 solution registry 查找
+    const registered = await loadRegisteredAgents(deps.workspacePath);
+    const agent = registered.find((a) => a.id === ctx.params.agentId);
+    if (agent) {
+      ctx.respond(200, successResponse(agent));
       return;
     }
     ctx.respond(404, notFoundError("Agent"));
   });
 }
 
-/** 系统提示词 */
-const CHAT_SYSTEM_PROMPT = "你是 Ouroboros，一个智能助手。请用简洁、有帮助的方式回答用户的问题。";
+/** 直连模式兜底提示词（schemaProvider 不可用时） */
+const FALLBACK_SYSTEM_PROMPT =
+  "你是 Ouroboros，一个智能助手。请用简洁、有帮助的方式回答用户的问题。";
 
 /**
- * 从会话历史构建模型消息列表
+ * 从会话历史构建模型消息列表（直连模式用）
  */
-function buildModelMessages(sessionManager: SessionManager, sessionId: string): readonly Message[] {
+async function buildModelMessages(
+  sessionManager: SessionManager,
+  sessionId: string,
+  deps: ApiDeps,
+): Promise<readonly Message[]> {
+  const systemPrompt = (await buildContextPrompt(deps)) || FALLBACK_SYSTEM_PROMPT;
   const { messages } = sessionManager.getMessages(sessionId, 1, 200);
-  const modelMessages: Message[] = [{ role: "system", content: CHAT_SYSTEM_PROMPT }];
+  const modelMessages: Message[] = [{ role: "system", content: systemPrompt }];
   for (const m of messages) {
     modelMessages.push({
       role: m.role === "agent" ? "assistant" : (m.role as "user" | "system"),
@@ -219,15 +238,6 @@ function buildModelMessages(sessionManager: SessionManager, sessionId: string): 
     });
   }
   return modelMessages;
-}
-
-/**
- * 构建 callModel 函数（从 provider 包装）
- */
-function buildCallModelFn(deps: ApiDeps): CallModelFn | null {
-  if (!deps.providerRegistry || !deps.defaultProvider) return null;
-  const provider = deps.providerRegistry.get(deps.defaultProvider);
-  return (request, options) => provider.complete(request, options?.signal);
 }
 
 /**
@@ -311,7 +321,7 @@ function triggerReflection(
   deps.reflector
     .reflect({
       taskDescription: message,
-      agentId: "agent:core",
+      agentId: DEFAULT_AGENT_ID,
       executionTree: result.executionTree,
       steps: [...result.steps],
       result: result.answer,
@@ -351,23 +361,9 @@ async function processMessage(
   }
 
   // 第三层：有 provider + toolRegistry → ReAct 循环
-  const callModelFn = buildCallModelFn(deps);
+  const callModelFn = getCallModelFn(deps);
   if (callModelFn && deps.toolRegistry) {
-    const safeTools = filterSafeTools(deps.toolRegistry.list());
-    const toolExecutor = createToolExecutor(deps.toolRegistry, {
-      workspacePath: deps.workspacePath,
-      callModel: callModelFn,
-      httpFetch: deps.httpFetch,
-      config: deps.fullConfig ? { webSearch: deps.fullConfig.webSearch } : undefined,
-    });
-
-    const reactConfig = {
-      maxIterations: deps.reactConfig?.maxIterations ?? 20,
-      stepTimeout: deps.reactConfig?.stepTimeout ?? 60000,
-      parallelToolCalls: deps.reactConfig?.parallelToolCalls ?? true,
-      compressionThreshold: deps.reactConfig?.compressionThreshold ?? 10,
-      agentId: "agent:core",
-    };
+    const { safeTools, toolExecutor, reactConfig } = prepareReactDeps(deps, callModelFn);
 
     const contextPrompt = await buildContextPrompt(deps);
     const result = await runReactLoop(message, contextPrompt, safeTools, reactConfig, {
@@ -394,7 +390,7 @@ async function processMessage(
 
   // 第二层：有 provider 无 toolRegistry → 直连模型
   const provider = deps.providerRegistry.get(deps.defaultProvider);
-  const messages = buildModelMessages(sessionManager, sessionId);
+  const messages = await buildModelMessages(sessionManager, sessionId, deps);
   const response = await provider.complete({ messages });
 
   sessionManager.addMessage(sessionId, "agent", response.content);
@@ -426,7 +422,7 @@ async function* createStreamEvents(
   }
 
   // 第三层：有 provider + toolRegistry → ReAct SSE
-  const callModelFn = buildCallModelFn(deps);
+  const callModelFn = getCallModelFn(deps);
   if (callModelFn && deps.toolRegistry) {
     yield* createReactStreamEvents(sessionId, message, deps, sessionManager, callModelFn);
     return;
@@ -438,8 +434,6 @@ async function* createStreamEvents(
 
 /**
  * ReAct 循环 SSE 流式事件
- *
- * 事件流：thinking → react_step/tool_call/tool_result → text_delta → done
  */
 async function* createReactStreamEvents(
   sessionId: string,
@@ -450,39 +444,8 @@ async function* createReactStreamEvents(
 ): AsyncIterable<SSEEvent> {
   yield { event: "thinking", data: JSON.stringify({ sessionId }) };
 
-  // 事件队列：桥接 onStep 回调 → async generator
-  const eventQueue: Array<SSEEvent | null> = [];
-  let notifier: (() => void) | null = null;
-
-  function pushEvent(event: SSEEvent | null): void {
-    eventQueue.push(event);
-    if (notifier) {
-      notifier();
-      notifier = null;
-    }
-  }
-
-  function waitForEvent(): Promise<void> {
-    return new Promise((resolve) => {
-      notifier = resolve;
-    });
-  }
-
-  const safeTools = filterSafeTools(deps.toolRegistry!.list());
-  const toolExecutor = createToolExecutor(deps.toolRegistry!, {
-    workspacePath: deps.workspacePath,
-    callModel: callModelFn,
-    httpFetch: deps.httpFetch,
-    config: deps.fullConfig ? { webSearch: deps.fullConfig.webSearch } : undefined,
-  });
-
-  const reactConfig = {
-    maxIterations: deps.reactConfig?.maxIterations ?? 20,
-    stepTimeout: deps.reactConfig?.stepTimeout ?? 60000,
-    parallelToolCalls: deps.reactConfig?.parallelToolCalls ?? true,
-    compressionThreshold: deps.reactConfig?.compressionThreshold ?? 10,
-    agentId: "agent:core",
-  };
+  const { pushEvent, waitForEvent, drainQueue } = createEventQueue();
+  const { safeTools, toolExecutor, reactConfig } = prepareReactDeps(deps, callModelFn);
 
   // 刷新自我图式（每次 SSE 请求前获取最新状态）
   if (deps.schemaProvider) {
@@ -500,24 +463,15 @@ async function* createReactStreamEvents(
     logger: deps.logger,
     workspacePath: deps.workspacePath,
     onStep: (step: ReactStep, tree: ExecutionTree) => {
-      // 推送 react_step 事件
       pushEvent({
         event: "react_step",
-        data: JSON.stringify({
-          stepIndex: step.stepIndex,
-          thought: step.thought,
-        }),
+        data: JSON.stringify({ stepIndex: step.stepIndex, thought: step.thought }),
       });
 
-      // 推送 tool_call + tool_result 事件
       for (const tc of step.toolCalls) {
         pushEvent({
           event: "tool_call",
-          data: JSON.stringify({
-            toolCallId: tc.requestId,
-            toolName: tc.toolId,
-            input: tc.input,
-          }),
+          data: JSON.stringify({ toolCallId: tc.requestId, toolName: tc.toolId, input: tc.input }),
         });
         pushEvent({
           event: "tool_result",
@@ -530,7 +484,6 @@ async function* createReactStreamEvents(
         });
       }
 
-      // 更新执行树
       sessionManager.setExecutionTree(sessionId, tree);
 
       // Inspector 检查
@@ -539,14 +492,7 @@ async function* createReactStreamEvents(
           tree,
           bodySchema: deps.schemaProvider.getBodySchema(),
           startTime: loopStartTime,
-          config: deps.fullConfig?.inspector ?? {
-            enabled: true,
-            checkInterval: 180000,
-            loopDetectionThreshold: 3,
-            maxRetryThreshold: 5,
-            minAvailableMemoryMB: 100,
-            maxExecutionTimeSecs: 3600,
-          },
+          config: deps.fullConfig?.inspector ?? DEFAULT_INSPECTOR_CONFIG,
         });
         if (inspectResult.hasAnomalies) {
           deps.logger.warn("api", "Inspector 检测到异常", {
@@ -557,48 +503,24 @@ async function* createReactStreamEvents(
     },
   })
     .then((result) => {
-      // 推送最终答案
-      pushEvent({
-        event: "text_delta",
-        data: JSON.stringify({ text: result.answer }),
-      });
-
+      pushEvent({ event: "text_delta", data: JSON.stringify({ text: result.answer }) });
       sessionManager.setExecutionTree(sessionId, result.executionTree);
       sessionManager.addMessage(sessionId, "agent", result.answer);
-
-      // 记忆回写 + 反思（fire-and-forget）
       writebackMemory(deps, message, result.answer);
       triggerReflection(deps, message, result);
-
       pushEvent({
         event: "done",
-        data: JSON.stringify({
-          sessionId,
-          complete: true,
-          stopReason: result.stopReason,
-        }),
+        data: JSON.stringify({ sessionId, complete: true, stopReason: result.stopReason }),
       });
       pushEvent(null);
     })
     .catch((err: Error) => {
       deps.logger.error("api", `ReAct 循环失败: ${err.message}`);
-      pushEvent({
-        event: "error",
-        data: JSON.stringify({ message: err.message }),
-      });
+      pushEvent({ event: "error", data: JSON.stringify({ message: err.message }) });
       pushEvent(null);
     });
 
-  // 从队列消费事件
-  while (true) {
-    while (eventQueue.length === 0) {
-      await waitForEvent();
-    }
-    const event = eventQueue.shift()!;
-    if (event === null) break;
-    yield event;
-  }
-
+  yield* drainQueue(waitForEvent);
   await reactPromise;
 }
 
@@ -614,24 +536,8 @@ async function* createDirectStreamEvents(
   yield { event: "thinking", data: JSON.stringify({ sessionId }) };
 
   const provider = deps.providerRegistry!.get(deps.defaultProvider!);
-  const messages = buildModelMessages(sessionManager, sessionId);
-
-  const eventQueue: Array<SSEEvent | null> = [];
-  let notifier: (() => void) | null = null;
-
-  function pushEvent(event: SSEEvent | null): void {
-    eventQueue.push(event);
-    if (notifier) {
-      notifier();
-      notifier = null;
-    }
-  }
-
-  function waitForEvent(): Promise<void> {
-    return new Promise((resolve) => {
-      notifier = resolve;
-    });
-  }
+  const messages = await buildModelMessages(sessionManager, sessionId, deps);
+  const { pushEvent, waitForEvent, drainQueue } = createEventQueue();
 
   let fullContent = "";
 
@@ -639,38 +545,21 @@ async function* createDirectStreamEvents(
     .stream({ messages }, (event) => {
       if (event.type === "text_delta") {
         fullContent += event.text;
-        pushEvent({
-          event: "text_delta",
-          data: JSON.stringify({ text: event.text }),
-        });
+        pushEvent({ event: "text_delta", data: JSON.stringify({ text: event.text }) });
       }
     })
     .then(() => {
       sessionManager.addMessage(sessionId, "agent", fullContent);
-      pushEvent({
-        event: "done",
-        data: JSON.stringify({ sessionId, complete: true }),
-      });
+      pushEvent({ event: "done", data: JSON.stringify({ sessionId, complete: true }) });
       pushEvent(null);
     })
     .catch((err: Error) => {
       deps.logger.error("api", `流式调用失败: ${err.message}`);
-      pushEvent({
-        event: "error",
-        data: JSON.stringify({ message: err.message }),
-      });
+      pushEvent({ event: "error", data: JSON.stringify({ message: err.message }) });
       pushEvent(null);
     });
 
-  while (true) {
-    while (eventQueue.length === 0) {
-      await waitForEvent();
-    }
-    const event = eventQueue.shift()!;
-    if (event === null) break;
-    yield event;
-  }
-
+  yield* drainQueue(waitForEvent);
   await streamPromise;
 }
 
@@ -718,5 +607,128 @@ async function* createTreeStreamEvents(
     }
 
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
+  }
+}
+
+// ─── 共享辅助函数 ──────────────────────────────────────────────────
+
+/** 从 provider 获取 callModel 函数 */
+function getCallModelFn(deps: ApiDeps): CallModelFn | null {
+  if (!deps.providerRegistry || !deps.defaultProvider) return null;
+  if (deps.callModel) return deps.callModel;
+  const provider = deps.providerRegistry.get(deps.defaultProvider);
+  return (request, options) => provider.complete(request, options?.signal);
+}
+
+/** 准备 ReAct 循环共享依赖（工具 + 配置） */
+function prepareReactDeps(
+  deps: ApiDeps,
+  callModelFn: CallModelFn,
+): {
+  safeTools: readonly import("../tool/types.js").OuroborosTool[];
+  toolExecutor: ToolExecutor;
+  reactConfig: ReactLoopConfig;
+} {
+  const safeTools = filterSafeTools(deps.toolRegistry!.list());
+  const toolExecutor = createToolExecutor(deps.toolRegistry!, {
+    workspacePath: deps.workspacePath,
+    callModel: callModelFn,
+    httpFetch: deps.httpFetch,
+    config: deps.fullConfig ? { webSearch: deps.fullConfig.webSearch } : undefined,
+  });
+  const reactConfig: ReactLoopConfig = {
+    maxIterations: deps.reactConfig?.maxIterations ?? 20,
+    stepTimeout: deps.reactConfig?.stepTimeout ?? 60000,
+    parallelToolCalls: deps.reactConfig?.parallelToolCalls ?? true,
+    compressionThreshold: deps.reactConfig?.compressionThreshold ?? 10,
+    agentId: DEFAULT_AGENT_ID,
+  };
+  return { safeTools, toolExecutor, reactConfig };
+}
+
+/** SSE 事件队列（桥接 callback → async generator） */
+function createEventQueue(): {
+  pushEvent: (event: SSEEvent | null) => void;
+  waitForEvent: () => Promise<void>;
+  drainQueue: (wait: () => Promise<void>) => AsyncGenerator<SSEEvent>;
+} {
+  const queue: Array<SSEEvent | null> = [];
+  let notifier: (() => void) | null = null;
+
+  function pushEvent(event: SSEEvent | null): void {
+    queue.push(event);
+    if (notifier) {
+      notifier();
+      notifier = null;
+    }
+  }
+
+  function waitForEvent(): Promise<void> {
+    return new Promise((resolve) => {
+      notifier = resolve;
+    });
+  }
+
+  async function* drainQueue(wait: () => Promise<void>): AsyncGenerator<SSEEvent> {
+    while (true) {
+      while (queue.length === 0) {
+        await wait();
+      }
+      const event = queue.shift()!;
+      if (event === null) break;
+      yield event;
+    }
+  }
+
+  return { pushEvent, waitForEvent, drainQueue };
+}
+
+/** 从 solution registry 加载已注册 Agent 列表 */
+async function loadRegisteredAgents(workspacePath: string): Promise<
+  readonly {
+    id: string;
+    name: string;
+    description: string;
+    status: string;
+    skills: readonly string[];
+  }[]
+> {
+  try {
+    const registryPath = join(workspacePath, "solutions", "registry.json");
+    const raw = await readFile(registryPath, "utf-8");
+    const data = JSON.parse(raw) as {
+      solutions?: readonly {
+        id: string;
+        name: string;
+        description: string;
+        status: string;
+        skills?: readonly string[];
+      }[];
+    };
+    return (data.solutions ?? []).map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      status: s.status,
+      skills: s.skills ?? [],
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** 缓存的 package.json 版本号 */
+let cachedVersion: string | null = null;
+
+/** 读取 package.json 版本（缓存） */
+async function readPackageVersion(): Promise<string> {
+  if (cachedVersion) return cachedVersion;
+  try {
+    const pkgPath = join(import.meta.dirname ?? ".", "..", "..", "package.json");
+    const raw = await readFile(pkgPath, "utf-8");
+    cachedVersion = (JSON.parse(raw) as { version: string }).version;
+    return cachedVersion;
+  } catch {
+    return "unknown";
   }
 }

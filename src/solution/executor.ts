@@ -36,6 +36,7 @@ export function createAgentExecutor(deps: AgentExecutorDeps): AgentExecutor {
   return {
     async execute(request: SendTaskRequest): Promise<SendTaskResponse> {
       const { callModel, toolRegistry, toolExecutor, logger, workspacePath } = deps;
+      // skillRegistry 在 deps 中声明，预留给技能调度（阶段八扩展）
 
       // 1. 加载 Agent
       const agentName = request.agentId.replace(/^solution:/, "");

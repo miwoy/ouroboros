@@ -6,7 +6,8 @@
 
 import type { Logger } from "../logger/types.js";
 import type { ProviderRegistry } from "../model/registry.js";
-import type { ToolRegistry } from "../tool/types.js";
+import type { ToolRegistry, CallModelFn } from "../tool/types.js";
+import type { ReactLoopConfig } from "../core/types.js";
 import type { SchemaProvider } from "../schema/schema-provider.js";
 import type { MemoryManager } from "../memory/types.js";
 import type { Inspector } from "../inspector/types.js";
@@ -159,13 +160,10 @@ export interface ApiDeps {
   readonly defaultProvider?: string;
   /** 工具注册表（可选，有则启用 ReAct 循环） */
   readonly toolRegistry?: ToolRegistry;
+  /** 统一 callModel 函数（含超时+重试，优先于从 providerRegistry 裸包装） */
+  readonly callModel?: CallModelFn;
   /** ReAct 循环配置 */
-  readonly reactConfig?: {
-    readonly maxIterations: number;
-    readonly stepTimeout: number;
-    readonly parallelToolCalls: boolean;
-    readonly compressionThreshold: number;
-  };
+  readonly reactConfig?: Omit<ReactLoopConfig, "agentId">;
   /** HTTP 代理 fetch（传给 ToolExecutor） */
   readonly httpFetch?: typeof globalThis.fetch;
   /** 自我图式提供者 */

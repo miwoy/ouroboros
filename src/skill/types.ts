@@ -11,6 +11,7 @@
 import type { TemplateVariable } from "../prompt/types.js";
 import { EntityStatus, EntityType } from "../tool/types.js";
 
+// 重新导出供 skill 子系统内部及测试使用
 export { EntityStatus, EntityType };
 
 // ─── Skill 定义 ──────────────────────────────────────────────────

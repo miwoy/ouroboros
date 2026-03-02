@@ -78,8 +78,8 @@ export interface SearchOptions {
   readonly threshold?: number;
 }
 
-/** 搜索结果 */
-export interface SearchResult {
+/** 提示词搜索结果 */
+export interface PromptSearchResult {
   readonly fileType: PromptFileType;
   readonly fileName: string; // 文件名（如 skill.md）
   readonly content: string; // 匹配的内容片段

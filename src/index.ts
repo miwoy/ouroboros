@@ -20,7 +20,7 @@ export {
   type SearchProvider,
   type SearchProviderType,
   type SearchResponse,
-  type SearchResult as WebSearchResult,
+  type SearchResult,
   type CreateSearchProviderOptions,
   createSearchProvider,
   createBingProvider,

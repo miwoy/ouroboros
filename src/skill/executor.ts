@@ -92,7 +92,7 @@ export function createSkillExecutor(deps: SkillExecutorDeps): SkillExecutor {
 
         // 6. 运行 ReAct 循环
         const reactConfig: ReactLoopConfig = {
-          maxIterations: deps.reactConfig?.maxIterations ?? 15,
+          maxIterations: deps.reactConfig?.maxIterations ?? 20,
           stepTimeout: deps.reactConfig?.stepTimeout ?? 60000,
           parallelToolCalls: deps.reactConfig?.parallelToolCalls ?? true,
           compressionThreshold: deps.reactConfig?.compressionThreshold ?? 10,

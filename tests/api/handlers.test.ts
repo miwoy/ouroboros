@@ -151,7 +151,7 @@ describe("API 路由处理器", () => {
       expect(res.status).toBe(200);
       expect(body.success).toBe(true);
       expect(body.data.status).toBe("ok");
-      expect(body.data.version).toBe("0.12.0");
+      expect(body.data.version).toBe("0.1.0");
       expect(body.data.uptime).toBeGreaterThan(0);
     });
   });

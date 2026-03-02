@@ -272,6 +272,7 @@ function buildRoleContext(
   request: SuperAgentTaskRequest,
   role: AgentRole,
   previousOutput: string,
+  // previousResults 预留给编排模式中的跨角色依赖引用
   _previousResults: readonly RoleResult[],
 ): string {
   const parts: string[] = [];
@@ -323,6 +324,7 @@ function topologicalSort(agents: readonly AgentRole[]): readonly AgentRole[] {
 /** 按依赖层级分组（同层可并行） */
 function buildLayers(
   sorted: readonly AgentRole[],
+  // all 参数预留给未来动态拓扑重建
   _all: readonly AgentRole[],
 ): readonly (readonly AgentRole[])[] {
   const layers: AgentRole[][] = [];

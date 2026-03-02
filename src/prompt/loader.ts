@@ -6,14 +6,9 @@
  */
 
 import { join } from "node:path";
-import {
-  readPromptFile,
-  getPromptFilePath,
-  listPromptFiles,
-  listMemoryFiles,
-} from "./store.js";
+import { readPromptFile, getPromptFilePath, listPromptFiles, listMemoryFiles } from "./store.js";
 import { isQmdAvailable, vectorSearch, type VectorSearchOptions } from "./vector.js";
-import type { PromptFile, PromptFileType, SearchOptions, SearchResult } from "./types.js";
+import type { PromptFile, PromptFileType, SearchOptions, PromptSearchResult } from "./types.js";
 
 /**
  * 加载指定类型的提示词文件
@@ -67,7 +62,7 @@ export async function searchBySemantic(
   workspacePath: string,
   query: string,
   options?: SearchOptions & { readonly mode?: VectorSearchOptions["mode"] },
-): Promise<readonly SearchResult[]> {
+): Promise<readonly PromptSearchResult[]> {
   const qmdReady = await isQmdAvailable(workspacePath);
   if (!qmdReady) {
     return searchByKeyword(workspacePath, query, options);
@@ -99,11 +94,11 @@ export async function searchByKeyword(
   workspacePath: string,
   query: string,
   options?: SearchOptions,
-): Promise<readonly SearchResult[]> {
+): Promise<readonly PromptSearchResult[]> {
   const queryTerms = tokenize(query);
   if (queryTerms.length === 0) return [];
 
-  const scored: SearchResult[] = [];
+  const scored: PromptSearchResult[] = [];
 
   // 搜索主提示词文件
   const files = await listPromptFiles(workspacePath);

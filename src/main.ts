@@ -12,6 +12,7 @@ import { createHttpClient, type HttpClient } from "./http/index.js";
 import { createApiServer, type ApiServer } from "./api/server.js";
 import type { ApiConfig } from "./api/types.js";
 import { createProviderRegistry } from "./model/registry.js";
+import { createCallModel } from "./model/call-model.js";
 import { createToolRegistry } from "./tool/registry.js";
 import { createSchemaProvider } from "./schema/schema-provider.js";
 import { createMemoryManager } from "./memory/manager.js";
@@ -22,11 +23,9 @@ import { createPersistenceManager } from "./persistence/manager.js";
 async function main(): Promise<void> {
   // 1. 加载配置
   const config = await loadConfig();
-  console.log("[ouroboros] 配置加载完成");
 
   // 2. 初始化 workspace
   await initWorkspace(config.system.workspacePath);
-  console.log("[ouroboros] workspace 初始化完成");
 
   // 3. 创建日志器
   const logger = createLogger(config.system.workspacePath, config.system.logLevel);
@@ -75,12 +74,10 @@ async function main(): Promise<void> {
   const inspector = createInspector(logger);
   logger.info("main", "审查程序已创建");
 
-  // 11. 创建反思器
-  const defaultProvider = providerRegistry.get(config.model.defaultProvider);
-  const callModelFn = (
-    request: Parameters<typeof defaultProvider.complete>[0],
-    options?: { signal?: AbortSignal },
-  ) => defaultProvider.complete(request, options?.signal);
+  // 11. 创建统一 callModel 函数（含超时 + 重试）
+  const callModelFn = createCallModel(config, providerRegistry);
+
+  // 12. 创建反思器
   const reflector = createReflector(
     {
       callModel: callModelFn,
@@ -91,7 +88,7 @@ async function main(): Promise<void> {
   );
   logger.info("main", "反思器已创建");
 
-  // 12. 创建持久化管理器
+  // 13. 创建持久化管理器
   const persistenceManager = createPersistenceManager({
     logger,
     workspacePath: config.system.workspacePath,
@@ -123,6 +120,7 @@ async function main(): Promise<void> {
     fullConfig: config,
     inspector,
     reflector,
+    callModel: callModelFn,
   });
 
   await server.start();

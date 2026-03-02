@@ -6,6 +6,7 @@
  */
 
 import { exec } from "node:child_process";
+import { homedir } from "node:os";
 import type { ToolHandler } from "../types.js";
 
 /** bash 工具处理函数 */
@@ -21,7 +22,7 @@ export const handleBash: ToolHandler = async (input, context) => {
         cwd,
         timeout: timeoutMs,
         maxBuffer: 1024 * 1024, // 1MB
-        env: { ...process.env, HOME: process.env["HOME"] ?? "/tmp" },
+        env: { ...process.env, HOME: process.env["HOME"] ?? homedir() },
         signal: context.signal,
       },
       (error, stdout, stderr) => {

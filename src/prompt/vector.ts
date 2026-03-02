@@ -15,14 +15,19 @@
 import { execFile } from "node:child_process";
 import { resolve } from "node:path";
 import { OuroborosError } from "../errors/index.js";
-import type { PromptFileType, SearchResult } from "./types.js";
+import type { PromptFileType, PromptSearchResult } from "./types.js";
 
 /** qmd 索引名称 */
 const QMD_INDEX = "ouroboros";
 
 /** qmd collection 配置：需要索引的提示词文件和目录 */
 const QMD_COLLECTIONS: readonly QmdCollectionConfig[] = [
-  { name: "prompts", path: "prompts", mask: "*.md", description: "提示词注册表（tool/skill/memory）" },
+  {
+    name: "prompts",
+    path: "prompts",
+    mask: "*.md",
+    description: "提示词注册表（tool/skill/memory）",
+  },
   { name: "memory", path: "prompts/memory", mask: "*.md", description: "短期记忆（按日期文件）" },
 ];
 
@@ -77,18 +82,18 @@ export async function initVectorIndex(workspacePath: string): Promise<void> {
     if (!exists) {
       // 注册 collection
       await execQmd(workspacePath, [
-        "collection", "add", collectionPath,
-        "--name", col.name,
-        "--mask", col.mask,
+        "collection",
+        "add",
+        collectionPath,
+        "--name",
+        col.name,
+        "--mask",
+        col.mask,
       ]);
 
       // 添加上下文描述
       try {
-        await execQmd(workspacePath, [
-          "context", "add",
-          `qmd://${col.name}`,
-          col.description,
-        ]);
+        await execQmd(workspacePath, ["context", "add", `qmd://${col.name}`, col.description]);
       } catch {
         // context 已存在时忽略
       }
@@ -126,7 +131,7 @@ export async function vectorSearch(
   workspacePath: string,
   query: string,
   options?: VectorSearchOptions,
-): Promise<readonly SearchResult[]> {
+): Promise<readonly PromptSearchResult[]> {
   const args = [
     options?.mode === "keyword" ? "search" : options?.mode === "vector" ? "vsearch" : "query",
     query,
@@ -156,7 +161,7 @@ export async function vectorSearch(
     return [];
   }
 
-  // 将 qmd 结果转换为 SearchResult
+  // 将 qmd 结果转换为 PromptSearchResult
   return qmdResults.map((qr) => ({
     fileType: inferFileType(qr.file),
     fileName: extractFileName(qr.file),

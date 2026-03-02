@@ -6,6 +6,7 @@
  */
 
 import type { ToolHandler } from "../types.js";
+import { createLogger } from "../../logger/logger.js";
 
 /** run-agent 工具处理函数 */
 export const handleRunAgent: ToolHandler = async (input, context) => {
@@ -31,7 +32,7 @@ export const handleRunAgent: ToolHandler = async (input, context) => {
     toolRegistry: context.registry,
     toolExecutor,
     skillRegistry: await loadSkillRegistry(context.workspacePath),
-    logger: createNoopLogger(),
+    logger: createLogger(context.workspacePath),
     workspacePath: context.workspacePath,
   });
 
@@ -54,10 +55,4 @@ export const handleRunAgent: ToolHandler = async (input, context) => {
 async function loadSkillRegistry(workspacePath: string) {
   const { createSkillRegistry } = await import("../../skill/registry.js");
   return createSkillRegistry(workspacePath);
-}
-
-/** 创建空操作 Logger（Agent 的 ReAct 循环日志） */
-function createNoopLogger(): import("../../logger/types.js").Logger {
-  const noop = () => {};
-  return { debug: noop, info: noop, warn: noop, error: noop };
 }

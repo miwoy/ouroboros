@@ -65,7 +65,7 @@ export const CALL_MODEL_TOOL: OuroborosTool = {
   },
 };
 
-/** tool:run-agent — Agent 调用（Phase 3 为 stub） */
+/** tool:run-agent — Agent 调用 */
 export const RUN_AGENT_TOOL: OuroborosTool = {
   id: "tool:run-agent",
   type: EntityType.Tool,
@@ -187,5 +187,5 @@ export function getPrimaryToolDefinitions(): readonly OuroborosTool[] {
   return [CALL_MODEL_TOOL, RUN_AGENT_TOOL, SEARCH_TOOL_TOOL, CREATE_TOOL_TOOL];
 }
 
-/** 获取所有内置工具定义（一级 + 二级） */
+/** 获取所有内置工具定义（一级 + 二级），当前等同于一级 */
 export { getPrimaryToolDefinitions as getBuiltinToolDefinitions };

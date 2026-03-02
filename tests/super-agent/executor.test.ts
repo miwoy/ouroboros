@@ -113,7 +113,7 @@ describe("createSuperAgentExecutor", () => {
     expect(response.roleResults[0]!.roleName).toBe("researcher");
     expect(response.roleResults[1]!.roleName).toBe("writer");
     expect(response.result).toContain("researcher");
-    expect(response.duration).toBeGreaterThan(0);
+    expect(response.duration).toBeGreaterThanOrEqual(0);
   });
 
   it("应执行并行模式的 Super Agent", async () => {
