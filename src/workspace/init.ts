@@ -20,9 +20,10 @@
  *   └── vectors/           # qmd 索引数据
  */
 
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile, access } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { copyDefaultTemplates } from "../prompt/store.js";
+import type { ToolRegistryData } from "../tool/types.js";
 
 /**
  * workspace 子目录定义
@@ -32,6 +33,7 @@ const WORKSPACE_DIRS = [
   "prompts", // 提示词根目录
   "prompts/memory", // 短期记忆（按日期文件 yyyy-MM-dd.md）
   "tools", // 自定义工具
+  "tools/scripts", // 自定义工具脚本
   "skills", // 自定义技能
   "agents", // Agent 实例及工作空间
   "logs", // 日志（按日期分隔，格式 yyyy-MM-dd.log）
@@ -62,7 +64,37 @@ export async function initWorkspace(workspacePath = "./workspace"): Promise<read
   // 复制默认提示词模板
   await copyDefaultTemplates(root);
 
+  // 初始化工具注册表文件（幂等）
+  await initToolRegistry(root);
+
   return created;
+}
+
+/**
+ * 初始化空的工具注册表文件
+ * 如果 registry.json 已存在则跳过（幂等）
+ */
+async function initToolRegistry(workspacePath: string): Promise<void> {
+  const registryPath = join(workspacePath, "tools", "registry.json");
+  const exists = await fileExists(registryPath);
+  if (exists) return;
+
+  const emptyRegistry: ToolRegistryData = {
+    version: "1.0.0",
+    updatedAt: new Date().toISOString(),
+    tools: [],
+  };
+  await writeFile(registryPath, JSON.stringify(emptyRegistry, null, 2), "utf-8");
+}
+
+/** 检查文件是否存在 */
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -84,6 +116,7 @@ export async function initAgentWorkspace(
     "prompts",
     "prompts/memory",
     "tools",
+    "tools/scripts",
     "skills",
     "logs",
     "tmp",
@@ -96,6 +129,9 @@ export async function initAgentWorkspace(
 
   // Agent workspace 也复制默认模板
   await copyDefaultTemplates(agentRoot);
+
+  // Agent workspace 也初始化工具注册表
+  await initToolRegistry(agentRoot);
 
   return agentRoot;
 }

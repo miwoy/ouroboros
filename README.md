@@ -109,6 +109,18 @@ ouroboros/
 │   │   ├── loader.ts     # 加载器（加载 + 关键词/语义搜索）
 │   │   ├── assembler.ts  # 装配器（按优先级拼装）
 │   │   └── vector.ts     # 向量索引（qmd 集成）
+│   ├── tool/             # 一级工具系统
+│   │   ├── types.ts      # 类型定义（EntityCard, OuroborosTool, ToolCallRequest/Response）
+│   │   ├── schema.ts     # Zod 校验（输入校验）
+│   │   ├── registry.ts   # 工具注册表（内存 + 文件持久化）
+│   │   ├── executor.ts   # 工具执行器（分发 + 超时 + 错误处理）
+│   │   ├── converter.ts  # OuroborosTool → 模型层 ToolDefinition 转换
+│   │   └── builtin/      # 内置工具实现
+│   │       ├── definitions.ts  # 4 个内置工具的 OuroborosTool 定义
+│   │       ├── call-model.ts   # tool:call-model — 模型调用
+│   │       ├── run-agent.ts    # tool:run-agent — Agent 调用（stub）
+│   │       ├── search-tool.ts  # tool:search-tool — 工具检索
+│   │       └── create-tool.ts  # tool:create-tool — 工具创建
 │   ├── workspace/        # workspace 初始化
 │   ├── errors/           # 错误体系
 │   └── index.ts          # 入口
@@ -158,6 +170,42 @@ ouroboros/
 - 只索引 tool.md、skill.md、memory.md 和 memory/ 目录
 - `initVectorIndex` 幂等，不重复创建已有 collection
 - `collection add` 后需显式 `embed`
+
+## 一级工具系统
+
+### 四个系统原语
+
+| 工具 ID | 名称 | 说明 |
+|---------|------|------|
+| `tool:call-model` | 模型调用 | 调用大语言模型进行推理和生成 |
+| `tool:run-agent` | Agent 调用 | 调用指定 Agent 执行任务（阶段四实现） |
+| `tool:search-tool` | 工具检索 | qmd 语义搜索 + 关键词匹配工具库 |
+| `tool:create-tool` | 工具创建 | 动态创建 .js 工具脚本并注册 |
+
+### 工具调用协议
+
+所有工具通过统一的 `ToolCallRequest` / `ToolCallResponse` 协议调用：
+
+```typescript
+const response = await executor.execute({
+  requestId: "req-001",
+  toolId: "tool:call-model",
+  input: { messages: [{ role: "user", content: "你好" }] },
+  caller: { entityId: "agent:core" },
+});
+```
+
+### 自定义工具
+
+通过 `tool:create-tool` 动态创建工具：
+- 生成 `.js` ES Module 脚本（`export default async function(input, context) { ... }`）
+- 动态 import 校验导出格式
+- SHA-256 代码签名存入 metadata
+- 自动注册到 `workspace/tools/registry.json` 和 `prompts/tool.md`
+
+### 类型转换
+
+`toModelToolDefinition()` 将 `OuroborosTool` 转换为模型层 `ToolDefinition`，供 `callModel` 的 `tools` 参数使用。
 
 ## 文档
 

@@ -54,12 +54,31 @@ const systemConfigSchema = z.object({
 });
 
 /**
+ * 工具配置 Schema
+ * 工具系统全局设置
+ */
+const toolConfigSchema = z.object({
+  /** 工具执行默认超时时间（毫秒） */
+  defaultTimeout: z.number().int().positive().default(30000),
+  /** 工具执行默认最大重试次数 */
+  defaultMaxRetries: z.number().int().min(0).max(5).default(0),
+  /** 代码生成使用的提供商名称（createTool 时使用） */
+  codeGenerationProvider: z.string().optional(),
+  /** 代码生成使用的模型 ID */
+  codeGenerationModel: z.string().optional(),
+});
+
+/**
  * 顶层配置 Schema
  * Ouroboros 完整配置结构
  */
 export const configSchema = z.object({
   system: systemConfigSchema,
   model: modelConfigSchema,
+  tools: toolConfigSchema.default({
+    defaultTimeout: 30000,
+    defaultMaxRetries: 0,
+  }),
 });
 
 /** 模型提供商配置类型 */
@@ -70,6 +89,9 @@ export type ModelConfig = z.infer<typeof modelConfigSchema>;
 
 /** 系统配置类型 */
 export type SystemConfig = z.infer<typeof systemConfigSchema>;
+
+/** 工具配置类型 */
+export type ToolConfig = z.infer<typeof toolConfigSchema>;
 
 /** 顶层配置类型 */
 export type Config = z.infer<typeof configSchema>;

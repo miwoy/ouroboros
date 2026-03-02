@@ -17,6 +17,7 @@ describe("initWorkspace", () => {
       "prompts",
       "prompts/memory",
       "tools",
+      "tools/scripts",
       "skills",
       "agents",
       "logs",
@@ -46,9 +47,7 @@ describe("initWorkspace", () => {
     await initWorkspace(TEST_WORKSPACE);
 
     // core.md 不应存在于 workspace/prompts/
-    await expect(
-      stat(join(TEST_WORKSPACE, "prompts", "core.md")),
-    ).rejects.toThrow();
+    await expect(stat(join(TEST_WORKSPACE, "prompts", "core.md"))).rejects.toThrow();
   });
 
   it("不应有旧的分类子目录", async () => {
@@ -66,6 +65,16 @@ describe("initWorkspace", () => {
     for (const dir of oldDirs) {
       await expect(stat(join(TEST_WORKSPACE, dir))).rejects.toThrow();
     }
+  });
+
+  it("应该创建空的 tools/registry.json", async () => {
+    await initWorkspace(TEST_WORKSPACE);
+
+    const registryPath = join(TEST_WORKSPACE, "tools", "registry.json");
+    const content = await readFile(registryPath, "utf-8");
+    const data = JSON.parse(content);
+    expect(data.version).toBe("1.0.0");
+    expect(data.tools).toEqual([]);
   });
 
   it("重复调用不应报错（幂等）", async () => {
@@ -104,6 +113,7 @@ describe("initAgentWorkspace", () => {
       "prompts",
       "prompts/memory",
       "tools",
+      "tools/scripts",
       "skills",
       "logs",
       "tmp",

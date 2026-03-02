@@ -41,5 +41,11 @@
         "models": ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
       }
     }
+  },
+  "tools": {
+    "defaultTimeout": 30000,
+    "defaultMaxRetries": 0,
+    "codeGenerationProvider": "ollama",
+    "codeGenerationModel": "llama3"
   }
 }
