@@ -24,6 +24,7 @@
     "test:phase10": "tsx src/integration/phase10.ts",
     "test:phase11": "tsx src/integration/phase11.ts",
     "test:phase12": "tsx src/integration/phase12.ts",
+    "test:all": "tsx src/integration/phase-all.ts",
     "lint": "eslint src/",
     "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'"
   },

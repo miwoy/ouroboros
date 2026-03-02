@@ -5,6 +5,7 @@
  */
 
 import type { Logger } from "../logger/types.js";
+import type { ProviderRegistry } from "../model/registry.js";
 
 // ─── 统一响应格式 ──────────────────────────────────────────────
 
@@ -144,6 +145,10 @@ export interface ApiDeps {
   readonly logger: Logger;
   readonly workspacePath: string;
   readonly config: ApiConfig;
+  /** 模型提供商注册表（可选，无则 chat 使用占位符响应） */
+  readonly providerRegistry?: ProviderRegistry;
+  /** 默认提供商名称 */
+  readonly defaultProvider?: string;
 }
 
 // ─── 路由 ──────────────────────────────────────────────

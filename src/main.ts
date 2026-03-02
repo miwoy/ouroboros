@@ -11,6 +11,7 @@ import { createLogger } from "./logger/logger.js";
 import { createHttpClient, type HttpClient } from "./http/index.js";
 import { createApiServer, type ApiServer } from "./api/server.js";
 import type { ApiConfig } from "./api/types.js";
+import { createProviderRegistry } from "./model/registry.js";
 
 async function main(): Promise<void> {
   // 1. 加载配置
@@ -45,10 +46,16 @@ async function main(): Promise<void> {
     corsOrigin: config.api.corsOrigin,
   };
 
+  // 6. 创建模型提供商注册表
+  const providerRegistry = createProviderRegistry(config.model.providers);
+  logger.info("main", `模型提供商已加载: ${providerRegistry.names().join(", ")}`);
+
   const server: ApiServer = createApiServer({
     logger,
     workspacePath: config.system.workspacePath,
     config: apiConfig,
+    providerRegistry,
+    defaultProvider: config.model.defaultProvider,
   });
 
   await server.start();

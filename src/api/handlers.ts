@@ -8,6 +8,7 @@ import type { Router } from "./router.js";
 import type { SessionManager } from "./session.js";
 import type { ApiDeps, SendMessageRequest, CreateSessionRequest, SSEEvent } from "./types.js";
 import type { TreeState } from "../core/types.js";
+import type { Message } from "../model/types.js";
 import { treeToJSON } from "../core/execution-tree.js";
 import {
   successResponse,
@@ -129,7 +130,7 @@ export function registerHandlers(
 
     // 流式响应
     if (body.stream) {
-      const events = createStreamEvents(sessionId, body.message, deps);
+      const events = createStreamEvents(sessionId, body.message, deps, sessionManager);
       ctx.respondSSE(events);
       return;
     }
@@ -194,6 +195,24 @@ export function registerHandlers(
   });
 }
 
+/** 系统提示词 */
+const CHAT_SYSTEM_PROMPT = "你是 Ouroboros，一个智能助手。请用简洁、有帮助的方式回答用户的问题。";
+
+/**
+ * 从会话历史构建模型消息列表
+ */
+function buildModelMessages(sessionManager: SessionManager, sessionId: string): readonly Message[] {
+  const { messages } = sessionManager.getMessages(sessionId, 1, 200);
+  const modelMessages: Message[] = [{ role: "system", content: CHAT_SYSTEM_PROMPT }];
+  for (const m of messages) {
+    modelMessages.push({
+      role: m.role === "agent" ? "assistant" : (m.role as "user" | "system"),
+      content: m.content,
+    });
+  }
+  return modelMessages;
+}
+
 /**
  * 处理非流式消息
  */
@@ -207,39 +226,116 @@ async function processMessage(
   readonly response: string;
   readonly formatted: string;
 }> {
-  // 当前阶段返回 placeholder 响应
-  // 完整实现需要集成 ReAct 循环 + Agent 执行器
-  const responseText = `收到消息: "${message}"。Agent 处理功能将在完整集成后可用。`;
+  // 无模型提供商时回退到占位符
+  if (!deps.providerRegistry || !deps.defaultProvider) {
+    const responseText = `收到消息: "${message}"。请在 config.json 中配置模型提供商以启用 AI 对话。`;
+    sessionManager.addMessage(sessionId, "agent", responseText);
+    return {
+      sessionId,
+      response: responseText,
+      formatted: formatAgentResponse(responseText, []),
+    };
+  }
 
-  sessionManager.addMessage(sessionId, "agent", responseText);
+  const provider = deps.providerRegistry.get(deps.defaultProvider);
+  const messages = buildModelMessages(sessionManager, sessionId);
+  const response = await provider.complete({ messages });
 
+  sessionManager.addMessage(sessionId, "agent", response.content);
   deps.logger.info("api", `消息已处理: session=${sessionId}`);
 
   return {
     sessionId,
-    response: responseText,
-    formatted: formatAgentResponse(responseText, []),
+    response: response.content,
+    formatted: formatAgentResponse(response.content, []),
   };
 }
 
 /**
  * 创建 SSE 流式事件
+ *
+ * 有模型提供商时调用真实模型流式输出，否则回退到占位符。
+ * 使用事件队列桥接回调式 stream API → async generator。
  */
 async function* createStreamEvents(
   sessionId: string,
   message: string,
-  _deps: ApiDeps,
+  deps: ApiDeps,
+  sessionManager: SessionManager,
 ): AsyncIterable<SSEEvent> {
-  // 模拟流式输出
-  yield { event: "thinking", data: JSON.stringify({ sessionId }) };
-
-  const words = `收到消息: "${message}"。Agent 处理功能将在完整集成后可用。`.split("");
-
-  for (const char of words) {
-    yield { event: "text_delta", data: JSON.stringify({ text: char }) };
+  // 无模型提供商时回退到占位符
+  if (!deps.providerRegistry || !deps.defaultProvider) {
+    yield { event: "thinking", data: JSON.stringify({ sessionId }) };
+    const text = `收到消息: "${message}"。请在 config.json 中配置模型提供商以启用 AI 对话。`;
+    yield { event: "text_delta", data: JSON.stringify({ text }) };
+    yield { event: "done", data: JSON.stringify({ sessionId, complete: true }) };
+    return;
   }
 
-  yield { event: "done", data: JSON.stringify({ sessionId, complete: true }) };
+  yield { event: "thinking", data: JSON.stringify({ sessionId }) };
+
+  const provider = deps.providerRegistry.get(deps.defaultProvider);
+  const messages = buildModelMessages(sessionManager, sessionId);
+
+  // 事件队列：桥接回调式 stream → async generator
+  const eventQueue: Array<SSEEvent | null> = [];
+  let notifier: (() => void) | null = null;
+
+  function pushEvent(event: SSEEvent | null): void {
+    eventQueue.push(event);
+    if (notifier) {
+      notifier();
+      notifier = null;
+    }
+  }
+
+  function waitForEvent(): Promise<void> {
+    return new Promise((resolve) => {
+      notifier = resolve;
+    });
+  }
+
+  let fullContent = "";
+
+  // 启动模型流式调用（后台执行）
+  const streamPromise = provider
+    .stream({ messages }, (event) => {
+      if (event.type === "text_delta") {
+        fullContent += event.text;
+        pushEvent({
+          event: "text_delta",
+          data: JSON.stringify({ text: event.text }),
+        });
+      }
+    })
+    .then(() => {
+      sessionManager.addMessage(sessionId, "agent", fullContent);
+      pushEvent({
+        event: "done",
+        data: JSON.stringify({ sessionId, complete: true }),
+      });
+      pushEvent(null); // 终止信号
+    })
+    .catch((err: Error) => {
+      deps.logger.error("api", `流式调用失败: ${err.message}`);
+      pushEvent({
+        event: "error",
+        data: JSON.stringify({ message: err.message }),
+      });
+      pushEvent(null);
+    });
+
+  // 从队列消费事件
+  while (true) {
+    while (eventQueue.length === 0) {
+      await waitForEvent();
+    }
+    const event = eventQueue.shift()!;
+    if (event === null) break;
+    yield event;
+  }
+
+  await streamPromise;
 }
 
 /** 执行树终态集合 */

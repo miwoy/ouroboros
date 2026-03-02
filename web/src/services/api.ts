@@ -184,12 +184,14 @@ export function streamMessage(
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
 
-        for (const line of lines) {
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
           if (line.startsWith("event: ")) {
             const event = line.slice(7).trim();
-            const nextLine = lines[lines.indexOf(line) + 1];
+            const nextLine = lines[i + 1];
             if (nextLine?.startsWith("data: ")) {
               const data = JSON.parse(nextLine.slice(6));
+              i++; // 跳过已处理的 data 行
               switch (event) {
                 case "thinking":
                   callbacks.onThinking?.();
