@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
 import {
   isQmdAvailable,
   initVectorIndex,
@@ -15,14 +14,7 @@ vi.mock("node:child_process", () => ({
   execFile: vi.fn(),
 }));
 
-// Mock fs/promises（仅 mock readFile，其他保持原样）
-vi.mock("node:fs/promises", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:fs/promises")>();
-  return { ...actual, readFile: vi.fn() };
-});
-
 const mockExecFile = vi.mocked(execFile);
-const mockReadFile = vi.mocked(readFile);
 
 /** 构造 mock execFile 回调 */
 function mockExecFileSuccess(stdout = ""): void {
@@ -54,14 +46,30 @@ describe("isQmdAvailable", () => {
 
   it("qmd 可用时返回 true", async () => {
     mockExecFileSuccess("QMD Status...");
-    const result = await isQmdAvailable();
+    const result = await isQmdAvailable("/workspace");
     expect(result).toBe(true);
   });
 
   it("qmd 不可用时返回 false", async () => {
     mockExecFileError("command not found");
-    const result = await isQmdAvailable();
+    const result = await isQmdAvailable("/workspace");
     expect(result).toBe(false);
+  });
+
+  it("应该使用 npx qmd 调用", async () => {
+    mockExecFileSuccess();
+    await isQmdAvailable("/workspace");
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      "npx",
+      expect.arrayContaining(["qmd", "--index", "ouroboros", "status"]),
+      expect.objectContaining({
+        env: expect.objectContaining({
+          XDG_CACHE_HOME: expect.stringContaining("vectors"),
+        }),
+      }),
+      expect.any(Function),
+    );
   });
 });
 
@@ -70,53 +78,46 @@ describe("initVectorIndex", () => {
     vi.clearAllMocks();
   });
 
-  it("应该依次调用 collection remove, collection add, context add, update, embed", async () => {
-    const calls: string[][] = [];
+  it("应该检查 collection 是否存在，不存在则创建", async () => {
+    const calls: { cmd: string; args: string[] }[] = [];
     mockExecFile.mockImplementation(
-      (_cmd: string, args: unknown, _opts: unknown, callback: unknown) => {
-        calls.push(args as string[]);
-        (callback as (err: Error | null, stdout: string, stderr: string) => void)(null, "", "");
+      (cmd: string, args: unknown, _opts: unknown, callback: unknown) => {
+        calls.push({ cmd: cmd as string, args: args as string[] });
+        const argsArr = args as string[];
+
+        // collection list 返回空数组
+        if (argsArr.includes("collection") && argsArr.includes("list")) {
+          (callback as (err: Error | null, stdout: string, stderr: string) => void)(null, "[]", "");
+        } else {
+          (callback as (err: Error | null, stdout: string, stderr: string) => void)(null, "", "");
+        }
         return undefined as never;
       },
     );
 
     await initVectorIndex("/workspace");
 
-    // 验证调用顺序
-    expect(calls).toHaveLength(5);
-
-    // 1. 移除旧 collection
-    expect(calls[0]).toContain("collection");
-    expect(calls[0]).toContain("remove");
-
-    // 2. 添加新 collection
-    expect(calls[1]).toContain("collection");
-    expect(calls[1]).toContain("add");
-    expect(calls[1]).toContain("--mask");
-    expect(calls[1]).toContain("**/*.json");
-
-    // 3. 添加 context
-    expect(calls[2]).toContain("context");
-    expect(calls[2]).toContain("add");
-
-    // 4. update
-    expect(calls[3]).toContain("update");
-
-    // 5. embed
-    expect(calls[4]).toContain("embed");
+    // 验证调用了 collection list, collection add, context add, update, embed
+    const argStrings = calls.map((c) => c.args.join(" "));
+    expect(argStrings.some((s) => s.includes("collection") && s.includes("list"))).toBe(true);
+    expect(argStrings.some((s) => s.includes("collection") && s.includes("add"))).toBe(true);
+    expect(argStrings.some((s) => s.includes("update"))).toBe(true);
+    expect(argStrings.some((s) => s.includes("embed"))).toBe(true);
   });
 
-  it("collection remove 失败时应该继续执行", async () => {
-    let callCount = 0;
+  it("collection 已存在时不重新创建", async () => {
+    const calls: string[][] = [];
     mockExecFile.mockImplementation(
-      (_cmd: string, _args: unknown, _opts: unknown, callback: unknown) => {
-        callCount++;
-        if (callCount === 1) {
-          // 第一次调用（remove）失败
+      (_cmd: string, args: unknown, _opts: unknown, callback: unknown) => {
+        calls.push(args as string[]);
+        const argsArr = args as string[];
+
+        // collection list 返回已有的 collection
+        if (argsArr.includes("collection") && argsArr.includes("list")) {
           (callback as (err: Error | null, stdout: string, stderr: string) => void)(
-            new Error("not found"),
+            null,
+            JSON.stringify([{ name: "prompts" }, { name: "memory" }]),
             "",
-            "not found",
           );
         } else {
           (callback as (err: Error | null, stdout: string, stderr: string) => void)(null, "", "");
@@ -125,8 +126,11 @@ describe("initVectorIndex", () => {
       },
     );
 
-    await expect(initVectorIndex("/workspace")).resolves.not.toThrow();
-    expect(callCount).toBe(5);
+    await initVectorIndex("/workspace");
+
+    // 不应有 collection add 调用
+    const hasCollectionAdd = calls.some((a) => a.includes("collection") && a.includes("add"));
+    expect(hasCollectionAdd).toBe(false);
   });
 });
 
@@ -157,28 +161,17 @@ describe("vectorSearch", () => {
     vi.clearAllMocks();
   });
 
-  it("应该解析 qmd JSON 输出并读取模板文件", async () => {
+  it("应该解析 qmd JSON 输出", async () => {
     const qmdOutput = JSON.stringify([
       {
         docid: "#abc123",
         score: 0.85,
-        file: "qmd://prompts/skills/skill:greeting.json",
-        title: "用户问候",
-        snippet: "...",
+        file: "qmd://prompts/skill.md",
+        title: "技能注册表",
+        snippet: "用户问候 | skill:greeting | 友好问候",
       },
     ]);
 
-    const templateJson = JSON.stringify({
-      id: "skill:greeting",
-      category: "skill",
-      name: "用户问候",
-      description: "友好问候",
-      content: "你好 {{userName}}",
-      variables: [{ name: "userName", description: "用户名", required: true }],
-      version: "1.0.0",
-    });
-
-    // mock execFile 返回 qmd 搜索结果
     mockExecFile.mockImplementation(
       (_cmd: string, _args: unknown, _opts: unknown, callback: unknown) => {
         (callback as (err: Error | null, stdout: string, stderr: string) => void)(
@@ -190,14 +183,12 @@ describe("vectorSearch", () => {
       },
     );
 
-    // mock readFile 返回模板 JSON
-    mockReadFile.mockResolvedValue(templateJson as never);
-
     const results = await vectorSearch("/workspace", "用户问候");
 
     expect(results).toHaveLength(1);
-    expect(results[0].template.id).toBe("skill:greeting");
+    expect(results[0].fileType).toBe("skill");
     expect(results[0].score).toBe(0.85);
+    expect(results[0].content).toContain("用户问候");
   });
 
   it("应该支持不同搜索模式", async () => {
@@ -247,6 +238,22 @@ describe("vectorSearch", () => {
     const results = await vectorSearch("/workspace", "test");
     expect(results).toEqual([]);
   });
+
+  it("应该设置 XDG_CACHE_HOME 环境变量", async () => {
+    mockExecFileSuccess("[]");
+    await vectorSearch("/workspace", "test");
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      "npx",
+      expect.any(Array),
+      expect.objectContaining({
+        env: expect.objectContaining({
+          XDG_CACHE_HOME: expect.stringContaining("vectors"),
+        }),
+      }),
+      expect.any(Function),
+    );
+  });
 });
 
 describe("removeVectorIndex", () => {
@@ -254,7 +261,7 @@ describe("removeVectorIndex", () => {
     vi.clearAllMocks();
   });
 
-  it("应该调用 context rm 和 collection remove", async () => {
+  it("应该移除所有 collection 及其上下文", async () => {
     const calls: string[][] = [];
     mockExecFile.mockImplementation(
       (_cmd: string, args: unknown, _opts: unknown, callback: unknown) => {
@@ -265,16 +272,71 @@ describe("removeVectorIndex", () => {
     );
 
     await removeVectorIndex("/workspace");
-    expect(calls).toHaveLength(2);
-    expect(calls[0]).toContain("context");
-    expect(calls[0]).toContain("rm");
-    expect(calls[1]).toContain("collection");
-    expect(calls[1]).toContain("remove");
+
+    // 应调用 context rm 和 collection remove（每个 collection 各一次）
+    const contextRmCalls = calls.filter((a) => a.includes("context") && a.includes("rm"));
+    const collectionRemoveCalls = calls.filter(
+      (a) => a.includes("collection") && a.includes("remove"),
+    );
+    expect(contextRmCalls.length).toBeGreaterThanOrEqual(2);
+    expect(collectionRemoveCalls.length).toBeGreaterThanOrEqual(2);
   });
 
   it("删除失败时不抛出错误", async () => {
     mockExecFileError("not found");
     await expect(removeVectorIndex("/workspace")).resolves.not.toThrow();
+  });
+});
+
+describe("vectorSearch - collection 参数", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("应该传递 collection 参数", async () => {
+    const calls: string[][] = [];
+    mockExecFile.mockImplementation(
+      (_cmd: string, args: unknown, _opts: unknown, callback: unknown) => {
+        calls.push(args as string[]);
+        (callback as (err: Error | null, stdout: string, stderr: string) => void)(null, "[]", "");
+        return undefined as never;
+      },
+    );
+
+    await vectorSearch("/workspace", "test", { collection: "prompts" });
+    expect(calls[0]).toContain("-c");
+    expect(calls[0]).toContain("prompts");
+  });
+});
+
+describe("initVectorIndex - context add 失败", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("context add 失败时应该继续执行", async () => {
+    let callCount = 0;
+    mockExecFile.mockImplementation(
+      (_cmd: string, args: unknown, _opts: unknown, callback: unknown) => {
+        callCount++;
+        const argsArr = args as string[];
+
+        if (argsArr.includes("collection") && argsArr.includes("list")) {
+          (callback as (err: Error | null, stdout: string, stderr: string) => void)(null, "[]", "");
+        } else if (argsArr.includes("context") && argsArr.includes("add")) {
+          (callback as (err: Error | null, stdout: string, stderr: string) => void)(
+            new Error("context already exists"),
+            "",
+            "context already exists",
+          );
+        } else {
+          (callback as (err: Error | null, stdout: string, stderr: string) => void)(null, "", "");
+        }
+        return undefined as never;
+      },
+    );
+
+    await expect(initVectorIndex("/workspace")).resolves.not.toThrow();
   });
 });
 

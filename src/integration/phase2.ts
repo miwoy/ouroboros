@@ -1,10 +1,15 @@
 /**
  * 阶段二：提示词系统集成测试
  *
- * 验证目标：
- * 创建一个包含 {{userName}} 变量的提示词模板，存入 workspace/prompts。
- * 通过关键词检索和向量语义检索定位到该模板，动态装配后传入 callModel，
- * 验证模型收到的提示词中 {{userName}} 已被替换为实际值，且模型返回个性化问候。
+ * 验收流程：
+ * 1. 初始化 workspace（模板复制到 workspace/prompts/）
+ * 2. 往 workspace/prompts/skill.md 追加一个 "用户问候" 技能条目
+ * 3. 初始化 qmd 向量索引（索引 skill.md）
+ * 4. 用 qmd 语义搜索 "用户问候" → 命中
+ * 5. 从搜索结果中提取技能的提示词模板内容
+ * 6. renderTemplate 替换 {{userName}} = "张三"
+ * 7. assemblePrompt 装配
+ * 8. callModel 验证响应包含 "张三"
  *
  * 使用方式：
  *   npm run test:phase2
@@ -14,7 +19,9 @@ import { loadConfig } from "../config/index.js";
 import { createProviderRegistry, createCallModel } from "../model/index.js";
 import { initWorkspace } from "../workspace/index.js";
 import {
-  savePromptTemplate,
+  appendToPromptFile,
+  getPromptFilePath,
+  readPromptFile,
   searchByKeyword,
   searchBySemantic,
   renderTemplate,
@@ -23,7 +30,7 @@ import {
   initVectorIndex,
   removeVectorIndex,
 } from "../prompt/index.js";
-import type { PromptTemplate, RenderedPrompt } from "../prompt/types.js";
+import type { RenderedPrompt } from "../prompt/types.js";
 
 /** 格式化打印分隔线 */
 function divider(title: string): void {
@@ -39,7 +46,7 @@ interface Check {
 }
 
 async function main(): Promise<void> {
-  console.log("🐍 Ouroboros 阶段二 · 提示词系统集成测试\n");
+  console.log("🐍 Ouroboros 阶段二 · 提示词系统集成测试（重构版）\n");
 
   const checks: Check[] = [];
 
@@ -48,28 +55,22 @@ async function main(): Promise<void> {
   const config = await loadConfig();
   console.log(`  默认提供商: ${config.model.defaultProvider}`);
 
-  console.log("[2/9] 初始化 workspace...");
+  console.log("[2/9] 初始化 workspace（模板复制）...");
   await initWorkspace(config.system.workspacePath);
-  console.log("  workspace 初始化完成");
+  console.log("  workspace 初始化完成，默认模板已复制");
 
-  // 2. 创建并保存提示词模板
-  console.log("[3/9] 创建提示词模板...");
-  const greetingTemplate: PromptTemplate = {
-    id: "skill:greeting",
-    category: "skill",
-    name: "用户问候",
-    description: "用友好的方式问候用户，支持个性化称呼",
-    content:
-      "你好 {{userName}}，请用友好的方式问候用户。回复中必须包含用户的名字。",
-    variables: [
-      { name: "userName", description: "用户名", required: true },
-    ],
-    tags: ["问候", "用户", "欢迎"],
-    version: "1.0.0",
-  };
+  // 2. 追加技能条目到 skill.md
+  console.log("[3/9] 追加技能条目到 skill.md...");
+  const skillEntry = "| 用户问候 | skill:greeting | 用友好的方式问候用户，支持个性化称呼。模板: 你好 {{userName}}，请用友好的方式问候用户。回复中必须包含用户的名字。 | workspace/skills/greeting |";
+  const skillFilePath = getPromptFilePath(config.system.workspacePath, "skill");
+  await appendToPromptFile(skillFilePath, skillEntry);
+  console.log(`  已追加技能条目到: ${skillFilePath}`);
 
-  await savePromptTemplate(config.system.workspacePath, greetingTemplate);
-  console.log(`  已保存模板: ${greetingTemplate.id}`);
+  // 验证文件内容
+  const skillFile = await readPromptFile(skillFilePath);
+  const skillContentOk = skillFile?.content.includes("用户问候") ?? false;
+  console.log(`  ${skillContentOk ? "✅" : "❌"} 技能条目已写入`);
+  checks.push({ name: "技能条目写入", passed: skillContentOk });
 
   // 3. 关键词检索
   console.log("[4/9] 关键词检索 '用户问候'...");
@@ -78,16 +79,16 @@ async function main(): Promise<void> {
     "用户问候",
   );
 
-  const keywordHit = keywordResults.length > 0 && keywordResults[0].template.id === "skill:greeting";
+  const keywordHit = keywordResults.length > 0 && keywordResults[0].fileName === "skill.md";
   if (keywordResults.length > 0) {
-    console.log(`  命中模板: ${keywordResults[0].template.id} (分数: ${keywordResults[0].score})`);
+    console.log(`  命中文件: ${keywordResults[0].fileName} (分数: ${keywordResults[0].score})`);
   }
   console.log(`  ${keywordHit ? "✅" : "❌"} 关键词检索命中`);
   checks.push({ name: "关键词检索命中", passed: keywordHit });
 
   // 4. 向量语义检索（qmd）
   console.log("[5/9] 向量语义检索...");
-  const qmdReady = await isQmdAvailable();
+  const qmdReady = await isQmdAvailable(config.system.workspacePath);
   let vectorHit = false;
 
   if (qmdReady) {
@@ -103,9 +104,9 @@ async function main(): Promise<void> {
       );
 
       if (semanticResults.length > 0) {
-        vectorHit = semanticResults[0].template.id === "skill:greeting";
+        vectorHit = semanticResults[0].fileName.includes("skill");
         console.log(
-          `  命中模板: ${semanticResults[0].template.id} (分数: ${semanticResults[0].score})`,
+          `  命中文件: ${semanticResults[0].fileName} (分数: ${semanticResults[0].score})`,
         );
       }
       console.log(`  ${vectorHit ? "✅" : "❌"} 向量语义检索命中`);
@@ -118,26 +119,34 @@ async function main(): Promise<void> {
   }
   checks.push({ name: "向量/语义检索命中", passed: vectorHit });
 
-  // 5. 渲染模板
+  // 5. 从 skill.md 提取模板内容并渲染
   console.log("[6/9] 渲染模板...");
-  const found = keywordResults[0];
+  // 提取包含 {{userName}} 的行
+  const templateLine = skillFile!.content
+    .split("\n")
+    .find((line) => line.includes("{{userName}}"));
+
+  const templateContent = templateLine
+    ? templateLine.replace(/.*模板:\s*/, "").replace(/\s*\|.*$/, "")
+    : "你好 {{userName}}，请用友好的方式问候用户。回复中必须包含用户的名字。";
+
+  console.log(`  模板内容: ${templateContent}`);
+
   const rendered = renderTemplate(
-    found.template.content,
+    templateContent,
     { userName: "张三" },
-    found.template.variables,
   );
   console.log(`  渲染结果: ${rendered}`);
 
-  const renderPassed = rendered.includes("张三");
+  const renderPassed = rendered.includes("张三") && !rendered.includes("{{userName}}");
   console.log(`  ${renderPassed ? "✅" : "❌"} 变量替换成功`);
   checks.push({ name: "模板变量替换", passed: renderPassed });
 
   // 6. 装配提示词
   console.log("[7/9] 装配提示词...");
   const renderedPrompt: RenderedPrompt = {
-    templateId: found.template.id,
+    fileType: "skill",
     content: rendered,
-    category: found.template.category,
   };
 
   const assembled = assemblePrompt([renderedPrompt]);

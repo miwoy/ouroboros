@@ -1,113 +1,101 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { rm } from "node:fs/promises";
+import { rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  loadByCategory,
-  loadById,
+  loadPromptFile,
+  loadAllPromptFiles,
   searchByKeyword,
   searchBySemantic,
 } from "../../src/prompt/loader.js";
 import * as vectorModule from "../../src/prompt/vector.js";
-import { savePromptTemplate } from "../../src/prompt/store.js";
+import { writePromptFile } from "../../src/prompt/store.js";
 import { initWorkspace } from "../../src/workspace/init.js";
-import type { PromptTemplate } from "../../src/prompt/types.js";
+import type { PromptFile } from "../../src/prompt/types.js";
 
 const TEST_WORKSPACE = join(process.cwd(), ".test-prompt-loader-tmp");
 
-const greetingTemplate: PromptTemplate = {
-  id: "skill:greeting",
-  category: "skill",
-  name: "用户问候",
-  description: "用友好的方式问候用户，支持个性化称呼",
-  content: "你好 {{userName}}，欢迎使用 Ouroboros",
-  variables: [{ name: "userName", description: "用户名", required: true }],
-  tags: ["问候", "用户", "欢迎"],
-  version: "1.0.0",
-};
+/** 创建带 frontmatter 的测试用提示词文件 */
+function createTestMd(type: string, name: string, description: string, tags: string[], content: string): string {
+  const tagsStr = tags.map((t) => `"${t}"`).join(", ");
+  return `---
+type: ${type}
+name: "${name}"
+description: "${description}"
+tags: [${tagsStr}]
+version: "1.0.0"
+---
+${content}`;
+}
 
-const farewellTemplate: PromptTemplate = {
-  id: "skill:farewell",
-  category: "skill",
-  name: "用户告别",
-  description: "友好地与用户告别",
-  content: "再见 {{userName}}，期待下次见面",
-  variables: [{ name: "userName", description: "用户名", required: true }],
-  tags: ["告别", "用户"],
-  version: "1.0.0",
-};
-
-const systemTemplate: PromptTemplate = {
-  id: "system:base",
-  category: "system",
-  name: "基础系统提示词",
-  description: "定义 Agent 基本行为规范",
-  content: "你是一个智能助手，请遵循以下规范...",
-  variables: [],
-  tags: ["系统", "基础"],
-  version: "1.0.0",
-};
-
-describe("loadByCategory", () => {
+describe("loadPromptFile", () => {
   beforeEach(async () => {
     await initWorkspace(TEST_WORKSPACE);
-    await savePromptTemplate(TEST_WORKSPACE, greetingTemplate);
-    await savePromptTemplate(TEST_WORKSPACE, farewellTemplate);
-    await savePromptTemplate(TEST_WORKSPACE, systemTemplate);
   });
 
   afterEach(async () => {
     await rm(TEST_WORKSPACE, { recursive: true, force: true });
   });
 
-  it("应该加载指定分类的所有模板", async () => {
-    const templates = await loadByCategory(TEST_WORKSPACE, "skill");
-    expect(templates).toHaveLength(2);
-    const ids = templates.map((t) => t.id);
-    expect(ids).toContain("skill:greeting");
-    expect(ids).toContain("skill:farewell");
+  it("应该加载指定类型的提示词文件", async () => {
+    const file = await loadPromptFile(TEST_WORKSPACE, "skill");
+    expect(file).not.toBeNull();
+    expect(file!.content).toContain("技能注册表");
   });
 
-  it("空分类返回空数组", async () => {
-    const templates = await loadByCategory(TEST_WORKSPACE, "core");
-    expect(templates).toEqual([]);
+  it("core 类型应该从源码目录加载", async () => {
+    const file = await loadPromptFile(TEST_WORKSPACE, "core");
+    expect(file).not.toBeNull();
+    expect(file!.content).toContain("Ouroboros");
+  });
+
+  it("文件不存在时返回 null", async () => {
+    // 删除 agent.md 后测试
+    const agentPath = join(TEST_WORKSPACE, "prompts", "agent.md");
+    await rm(agentPath, { force: true });
+    const file = await loadPromptFile(TEST_WORKSPACE, "agent");
+    expect(file).toBeNull();
   });
 });
 
-describe("loadById", () => {
+describe("loadAllPromptFiles", () => {
   beforeEach(async () => {
     await initWorkspace(TEST_WORKSPACE);
-    await savePromptTemplate(TEST_WORKSPACE, greetingTemplate);
-    await savePromptTemplate(TEST_WORKSPACE, systemTemplate);
   });
 
   afterEach(async () => {
     await rm(TEST_WORKSPACE, { recursive: true, force: true });
   });
 
-  it("应该通过 ID 加载模板（跨分类查找）", async () => {
-    const template = await loadById(TEST_WORKSPACE, "system:base");
-    expect(template).not.toBeNull();
-    expect(template?.name).toBe("基础系统提示词");
-  });
-
-  it("应该通过 ID 加载 skill 模板", async () => {
-    const template = await loadById(TEST_WORKSPACE, "skill:greeting");
-    expect(template).not.toBeNull();
-    expect(template?.category).toBe("skill");
-  });
-
-  it("ID 不存在时返回 null", async () => {
-    const template = await loadById(TEST_WORKSPACE, "nonexistent:id");
-    expect(template).toBeNull();
+  it("应该加载所有提示词文件", async () => {
+    const files = await loadAllPromptFiles(TEST_WORKSPACE);
+    // core + self + tool + skill + agent + memory
+    expect(files.size).toBeGreaterThanOrEqual(5);
+    expect(files.has("core")).toBe(true);
+    expect(files.has("skill")).toBe(true);
   });
 });
 
 describe("searchByKeyword", () => {
   beforeEach(async () => {
     await initWorkspace(TEST_WORKSPACE);
-    await savePromptTemplate(TEST_WORKSPACE, greetingTemplate);
-    await savePromptTemplate(TEST_WORKSPACE, farewellTemplate);
-    await savePromptTemplate(TEST_WORKSPACE, systemTemplate);
+
+    // 追加一条技能到 skill.md
+    const skillContent = createTestMd(
+      "skill",
+      "技能注册表",
+      "技能名称、id、描述、路径",
+      ["技能", "注册表"],
+      `# 技能注册表
+
+| 名称 | ID | 描述 | 路径 |
+|------|-----|------|------|
+| 用户问候 | skill:greeting | 用友好的方式问候用户 | workspace/skills/greeting |`,
+    );
+    await writeFile(
+      join(TEST_WORKSPACE, "prompts", "skill.md"),
+      skillContent,
+      "utf-8",
+    );
   });
 
   afterEach(async () => {
@@ -115,43 +103,27 @@ describe("searchByKeyword", () => {
   });
 
   it("应该通过名称匹配搜索", async () => {
+    const results = await searchByKeyword(TEST_WORKSPACE, "技能注册表");
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].fileType).toBe("skill");
+  });
+
+  it("应该通过正文内容搜索", async () => {
     const results = await searchByKeyword(TEST_WORKSPACE, "用户问候");
     expect(results.length).toBeGreaterThan(0);
-    expect(results[0].template.id).toBe("skill:greeting");
-  });
-
-  it("应该通过描述匹配搜索", async () => {
-    const results = await searchByKeyword(TEST_WORKSPACE, "友好");
-    expect(results.length).toBeGreaterThanOrEqual(2);
-  });
-
-  it("应该通过标签匹配搜索", async () => {
-    const results = await searchByKeyword(TEST_WORKSPACE, "问候");
-    expect(results.length).toBeGreaterThan(0);
-    expect(results[0].template.id).toBe("skill:greeting");
+    // skill.md 的正文包含 "用户问候"
+    expect(results.some((r) => r.fileName === "skill.md")).toBe(true);
   });
 
   it("应该按匹配分数降序排列", async () => {
-    const results = await searchByKeyword(TEST_WORKSPACE, "用户");
-    // 所有匹配结果的分数应该递减
+    const results = await searchByKeyword(TEST_WORKSPACE, "技能");
     for (let i = 1; i < results.length; i++) {
       expect(results[i].score).toBeLessThanOrEqual(results[i - 1].score);
     }
   });
 
-  it("应该支持按分类过滤", async () => {
-    const results = await searchByKeyword(TEST_WORKSPACE, "用户", {
-      category: "skill",
-    });
-    for (const r of results) {
-      expect(r.template.category).toBe("skill");
-    }
-  });
-
   it("应该支持 limit 限制结果数量", async () => {
-    const results = await searchByKeyword(TEST_WORKSPACE, "用户", {
-      limit: 1,
-    });
+    const results = await searchByKeyword(TEST_WORKSPACE, "技能", { limit: 1 });
     expect(results).toHaveLength(1);
   });
 
@@ -159,14 +131,38 @@ describe("searchByKeyword", () => {
     const results = await searchByKeyword(TEST_WORKSPACE, "完全不相关的词汇xyz");
     expect(results).toEqual([]);
   });
+
+  it("应该搜索短期记忆文件", async () => {
+    // 创建短期记忆文件
+    const memoryPath = join(TEST_WORKSPACE, "prompts", "memory", "2026-03-01.md");
+    await writeFile(memoryPath, "今天学会了搜索功能", "utf-8");
+
+    const results = await searchByKeyword(TEST_WORKSPACE, "搜索功能");
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.some((r) => r.fileName.includes("memory/"))).toBe(true);
+  });
 });
 
 describe("searchBySemantic", () => {
   beforeEach(async () => {
     await initWorkspace(TEST_WORKSPACE);
-    await savePromptTemplate(TEST_WORKSPACE, greetingTemplate);
-    await savePromptTemplate(TEST_WORKSPACE, farewellTemplate);
-    await savePromptTemplate(TEST_WORKSPACE, systemTemplate);
+
+    const skillContent = createTestMd(
+      "skill",
+      "技能注册表",
+      "技能名称、id、描述、路径",
+      ["技能", "注册表"],
+      `# 技能注册表
+
+| 名称 | ID | 描述 |
+|------|-----|------|
+| 用户问候 | skill:greeting | 友好问候 |`,
+    );
+    await writeFile(
+      join(TEST_WORKSPACE, "prompts", "skill.md"),
+      skillContent,
+      "utf-8",
+    );
   });
 
   afterEach(async () => {
@@ -179,14 +175,18 @@ describe("searchBySemantic", () => {
 
     const results = await searchBySemantic(TEST_WORKSPACE, "用户问候");
     expect(results.length).toBeGreaterThan(0);
-    expect(results[0].template.id).toBe("skill:greeting");
   });
 
   it("qmd 可用时应调用 vectorSearch", async () => {
     vi.spyOn(vectorModule, "isQmdAvailable").mockResolvedValue(true);
     const mockVectorSearch = vi
       .spyOn(vectorModule, "vectorSearch")
-      .mockResolvedValue([{ template: greetingTemplate, score: 0.9 }]);
+      .mockResolvedValue([{
+        fileType: "skill",
+        fileName: "skill.md",
+        content: "用户问候",
+        score: 0.9,
+      }]);
 
     const results = await searchBySemantic(TEST_WORKSPACE, "用户问候");
 
@@ -203,10 +203,8 @@ describe("searchBySemantic", () => {
     vi.spyOn(vectorModule, "isQmdAvailable").mockResolvedValue(true);
     vi.spyOn(vectorModule, "vectorSearch").mockRejectedValue(new Error("qmd error"));
 
-    const results = await searchBySemantic(TEST_WORKSPACE, "用户问候");
-    // 应该回退到关键词搜索，依然能返回结果
+    const results = await searchBySemantic(TEST_WORKSPACE, "技能");
     expect(results.length).toBeGreaterThan(0);
-    expect(results[0].template.id).toBe("skill:greeting");
   });
 
   it("应该传递搜索选项给 vectorSearch", async () => {

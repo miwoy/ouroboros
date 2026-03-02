@@ -2,10 +2,10 @@
  * 提示词装配器
  *
  * 将多个渲染后的提示词片段按优先级拼装为最终的 AssembledPrompt。
- * 拼装顺序: core → system → schema → agent → skill → tool → memory
+ * 拼装顺序: core → self → agent → skill → tool → memory
  */
 
-import { CATEGORY_PRIORITY } from "./types.js";
+import { FILE_TYPE_PRIORITY } from "./types.js";
 import type { AssembledPrompt, RenderedPrompt } from "./types.js";
 
 /** 片段间分隔符 */
@@ -14,7 +14,7 @@ const SEPARATOR = "\n\n---\n\n";
 /**
  * 将多个 RenderedPrompt 按优先级拼装为 AssembledPrompt
  *
- * 排序规则：按 CATEGORY_PRIORITY 定义的优先级升序排列（数值越小越靠前）。
+ * 排序规则：按 FILE_TYPE_PRIORITY 定义的优先级升序排列（数值越小越靠前）。
  * 相同优先级的片段保持原始输入顺序（稳定排序）。
  *
  * @param parts - 渲染后的提示词片段列表
@@ -29,7 +29,7 @@ export function assemblePrompt(
 
   // 稳定排序：按优先级升序
   const sorted = [...parts].sort(
-    (a, b) => CATEGORY_PRIORITY[a.category] - CATEGORY_PRIORITY[b.category],
+    (a, b) => FILE_TYPE_PRIORITY[a.fileType] - FILE_TYPE_PRIORITY[b.fileType],
   );
 
   // 拼装 systemPrompt

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { rm, stat } from "node:fs/promises";
+import { rm, stat, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { initWorkspace, initAgentWorkspace } from "../../src/workspace/init.js";
 
@@ -15,18 +15,11 @@ describe("initWorkspace", () => {
 
     const expectedDirs = [
       "prompts",
-      "prompts/system",
-      "prompts/agents",
-      "prompts/skills",
-      "prompts/tools",
       "prompts/memory",
-      "prompts/schema",
-      "prompts/core",
       "tools",
       "skills",
       "agents",
       "logs",
-      "memory",
       "tmp",
       "vectors",
     ];
@@ -38,9 +31,62 @@ describe("initWorkspace", () => {
     }
   });
 
+  it("应该复制默认模板文件到 prompts/", async () => {
+    await initWorkspace(TEST_WORKSPACE);
+
+    // 检查模板文件是否存在
+    const expectedFiles = ["self.md", "tool.md", "skill.md", "agent.md", "memory.md"];
+    for (const file of expectedFiles) {
+      const fileStat = await stat(join(TEST_WORKSPACE, "prompts", file));
+      expect(fileStat.isFile()).toBe(true);
+    }
+  });
+
+  it("不应复制 core.md 到 workspace", async () => {
+    await initWorkspace(TEST_WORKSPACE);
+
+    // core.md 不应存在于 workspace/prompts/
+    await expect(
+      stat(join(TEST_WORKSPACE, "prompts", "core.md")),
+    ).rejects.toThrow();
+  });
+
+  it("不应有旧的分类子目录", async () => {
+    await initWorkspace(TEST_WORKSPACE);
+
+    // 旧的分类子目录不应存在
+    const oldDirs = [
+      "prompts/system",
+      "prompts/agents",
+      "prompts/skills",
+      "prompts/tools",
+      "prompts/schema",
+      "prompts/core",
+    ];
+    for (const dir of oldDirs) {
+      await expect(stat(join(TEST_WORKSPACE, dir))).rejects.toThrow();
+    }
+  });
+
   it("重复调用不应报错（幂等）", async () => {
     await initWorkspace(TEST_WORKSPACE);
     await expect(initWorkspace(TEST_WORKSPACE)).resolves.toBeDefined();
+  });
+
+  it("重复调用不应覆盖用户修改的文件", async () => {
+    await initWorkspace(TEST_WORKSPACE);
+
+    // 修改 skill.md
+    const skillPath = join(TEST_WORKSPACE, "prompts", "skill.md");
+    const { writeFile: fsWrite } = await import("node:fs/promises");
+    await fsWrite(skillPath, "用户自定义内容", "utf-8");
+
+    // 再次初始化
+    await initWorkspace(TEST_WORKSPACE);
+
+    // 用户修改应保留
+    const content = await readFile(skillPath, "utf-8");
+    expect(content).toBe("用户自定义内容");
   });
 });
 
@@ -56,23 +102,26 @@ describe("initAgentWorkspace", () => {
 
     const expectedDirs = [
       "prompts",
-      "prompts/system",
-      "prompts/agents",
-      "prompts/skills",
-      "prompts/tools",
       "prompts/memory",
-      "prompts/schema",
-      "prompts/core",
       "tools",
       "skills",
       "logs",
-      "memory",
       "tmp",
       "vectors",
     ];
     for (const dir of expectedDirs) {
       const dirStat = await stat(join(agentRoot, dir));
       expect(dirStat.isDirectory()).toBe(true);
+    }
+  });
+
+  it("应该为 Agent workspace 复制默认模板", async () => {
+    const agentRoot = await initAgentWorkspace(TEST_WORKSPACE, "test-agent");
+
+    const expectedFiles = ["self.md", "tool.md", "skill.md", "agent.md", "memory.md"];
+    for (const file of expectedFiles) {
+      const fileStat = await stat(join(agentRoot, "prompts", file));
+      expect(fileStat.isFile()).toBe(true);
     }
   });
 

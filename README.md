@@ -30,24 +30,6 @@ Ouroboros 是一个分层递归的 Agent 框架，核心理念是**自指循环*
 
 - Node.js >= 20
 - npm >= 10
-- [qmd](https://github.com/tobi/qmd)（可选，用于提示词向量语义检索）
-
-#### 安装 qmd（可选）
-
-qmd 是一个本地搜索引擎，支持 BM25 全文检索、向量语义匹配和 LLM 重排序。Ouroboros 的提示词系统使用 qmd 实现语义检索，未安装时自动回退到关键词匹配。
-
-```bash
-# 通过 npm 全局安装
-npm install -g @tobilu/qmd
-
-# 或通过 bun
-bun install -g @tobilu/qmd
-
-# 验证安装
-qmd status
-```
-
-> 首次使用时 qmd 会自动下载所需模型（约 2GB），包括嵌入模型、重排序模型和查询扩展模型。
 
 ### 安装
 
@@ -56,6 +38,9 @@ git clone git@github.com:miwoy/ouroboros.git
 cd ouroboros
 npm install
 ```
+
+> `@tobilu/qmd` 已作为项目依赖安装，无需全局安装。qmd 用于提示词向量语义检索，通过 `npx qmd` 调用。
+> 首次使用时 qmd 会自动下载所需模型（约 2GB），包括嵌入模型、重排序模型和查询扩展模型。
 
 ### 配置
 
@@ -110,25 +95,66 @@ ouroboros/
 │   ├── config/           # 配置系统（加载、校验、类型定义）
 │   ├── model/            # 模型抽象层（多提供商统一接口）
 │   │   └── providers/    # pi-ai 适配器（统一多模型接口）
-│   ├── prompt/           # 提示词系统（模板引擎、存储、加载、装配、向量检索）
+│   ├── prompt/           # 提示词系统
+│   │   ├── core.md       # 系统提示词（不可修改，直接引用）
+│   │   ├── self.md       # 自我图式模板
+│   │   ├── tool.md       # 工具模板
+│   │   ├── skill.md      # 技能模板
+│   │   ├── agent.md      # Agent 模板
+│   │   ├── memory.md     # 长期记忆模板
+│   │   ├── types.ts      # 类型定义
+│   │   ├── template.ts   # 模板引擎（{{variable}} 替换）
+│   │   ├── store.ts      # 存储层（文件读写 + frontmatter）
+│   │   ├── loader.ts     # 加载器（加载 + 关键词/语义搜索）
+│   │   ├── assembler.ts  # 装配器（按优先级拼装）
+│   │   └── vector.ts     # 向量索引（qmd 集成）
+│   ├── workspace/        # workspace 初始化
 │   ├── errors/           # 错误体系
 │   └── index.ts          # 入口
 ├── tests/                # 单元测试
 ├── docs/                 # 文档
 │   ├── DESIGN.md         # 设计文档
-│   └── CONFIGURE.md      # 配置说明
+│   ├── CONFIGURE.md      # 配置说明
+│   └── PROTOCOL.md       # 标准协议（实体接口规范）
 ├── workspace/            # 运行时工作空间（自动生成，不入版本控制）
-│   ├── prompts/          # 动态提示词（按分类子目录：system/agents/skills/tools/memory/schema/core）
+│   ├── prompts/          # 用户级别提示词（扁平 .md 文件）
+│   │   ├── self.md       # 自我图式
+│   │   ├── tool.md       # 工具注册表
+│   │   ├── skill.md      # 技能注册表
+│   │   ├── agent.md      # Agent 注册表
+│   │   ├── memory.md     # 长期记忆
+│   │   └── memory/       # 短期记忆（按日期 yyyy-MM-dd.md）
 │   ├── tools/            # 自定义工具
 │   ├── skills/           # 自定义技能
 │   ├── agents/           # Agent 实例及其独立工作空间
 │   ├── logs/             # 日志（按日期分隔）
-│   ├── memory/           # 短期记忆（按日期分隔）
 │   ├── tmp/              # 临时文件（任务完成后清理）
-│   └── vectors/          # 向量索引（qmd）
+│   └── vectors/          # 向量索引（qmd，XDG_CACHE_HOME 隔离）
 ├── config.example.json   # 配置模板
 └── ROADMAP.md            # 开发计划（不入版本控制）
 ```
+
+## 提示词系统
+
+### 提示词文件体系
+
+| 文件 | 位置 | 说明 | qmd 索引 |
+|------|------|------|----------|
+| `core.md` | `src/prompt/` | 系统提示词（安全边界、ReAct 核心），直接引用不复制 | 否 |
+| `self.md` | `workspace/prompts/` | 自我图式（身体图式+灵魂图式+激素），运行时更新 | 否 |
+| `tool.md` | `workspace/prompts/` | 工具注册表，随工具增长 | 是 |
+| `skill.md` | `workspace/prompts/` | 技能注册表，随技能增长 | 是 |
+| `agent.md` | `workspace/prompts/` | Agent 注册表，量小直接加载 | 否 |
+| `memory.md` | `workspace/prompts/` | 长期记忆（压缩摘要），持续累积 | 是 |
+| `memory/*.md` | `workspace/prompts/memory/` | 短期记忆（按日期文件），详细交互 | 是 |
+
+### qmd 向量索引
+
+- `@tobilu/qmd` 作为项目依赖，通过 `npx qmd` 调用
+- 索引存储在 `workspace/vectors/` 下（通过 `XDG_CACHE_HOME` 环境隔离）
+- 只索引 tool.md、skill.md、memory.md 和 memory/ 目录
+- `initVectorIndex` 幂等，不重复创建已有 collection
+- `collection add` 后需显式 `embed`
 
 ## 文档
 

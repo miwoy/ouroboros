@@ -1,31 +1,49 @@
+/**
+ * workspace 初始化
+ *
+ * 创建运行时工作空间目录结构，并将默认提示词模板复制到 workspace/prompts/。
+ *
+ * 目录结构:
+ *   workspace/
+ *   ├── prompts/           # 用户级别提示词
+ *   │   ├── self.md        # 自我图式
+ *   │   ├── tool.md        # 工具注册表
+ *   │   ├── skill.md       # 技能注册表
+ *   │   ├── agent.md       # Agent 注册表
+ *   │   ├── memory.md      # 长期记忆
+ *   │   └── memory/        # 短期记忆（按日期）
+ *   ├── tools/             # 自定义工具
+ *   ├── skills/            # 自定义技能
+ *   ├── agents/            # Agent 实例及独立工作空间
+ *   ├── logs/              # 日志
+ *   ├── tmp/               # 临时文件
+ *   └── vectors/           # qmd 索引数据
+ */
+
 import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { copyDefaultTemplates } from "../prompt/store.js";
 
 /**
  * workspace 子目录定义
- * 所有动态内容都存储在这些目录中
+ * 注意：不再有 prompts/ 下的分类子目录，改为扁平 .md 文件
  */
 const WORKSPACE_DIRS = [
-  "prompts", // 动态提示词（根目录）
-  "prompts/system", // 系统提示词
-  "prompts/agents", // Agent 提示词
-  "prompts/skills", // Skill 提示词
-  "prompts/tools", // Tool 提示词
-  "prompts/memory", // 记忆提示词
-  "prompts/schema", // 自我图式提示词
-  "prompts/core", // 核心提示词
+  "prompts", // 提示词根目录
+  "prompts/memory", // 短期记忆（按日期文件 yyyy-MM-dd.md）
   "tools", // 自定义工具
   "skills", // 自定义技能
   "agents", // Agent 实例及工作空间
   "logs", // 日志（按日期分隔，格式 yyyy-MM-dd.log）
-  "memory", // 短期记忆（按日期分隔，格式 yyyy-MM-dd.md）
   "tmp", // 临时文件（任务完成后清理）
-  "vectors", // 向量索引（预留给 qmd）
+  "vectors", // 向量索引（qmd）
 ] as const;
 
 /**
  * 初始化 workspace 工作空间
- * 创建所有必需的子目录，已存在的目录不会受影响
+ *
+ * 1. 创建所有必需的子目录
+ * 2. 将默认提示词模板复制到 workspace/prompts/（幂等）
  *
  * @param workspacePath - workspace 根目录路径（默认 ./workspace）
  * @returns 创建的目录路径列表
@@ -34,11 +52,15 @@ export async function initWorkspace(workspacePath = "./workspace"): Promise<read
   const root = resolve(workspacePath);
   const created: string[] = [];
 
+  // 创建目录结构
   for (const dir of WORKSPACE_DIRS) {
     const dirPath = join(root, dir);
     await mkdir(dirPath, { recursive: true });
     created.push(dirPath);
   }
+
+  // 复制默认提示词模板
+  await copyDefaultTemplates(root);
 
   return created;
 }
@@ -57,20 +79,13 @@ export async function initAgentWorkspace(
 ): Promise<string> {
   const agentRoot = resolve(workspacePath, "agents", agentName, "workspace");
 
-  // Agent 的工作空间也包含基本子目录（含提示词子分类）
+  // Agent 的工作空间包含基本子目录（与主 workspace 相同结构）
   const agentDirs = [
     "prompts",
-    "prompts/system",
-    "prompts/agents",
-    "prompts/skills",
-    "prompts/tools",
     "prompts/memory",
-    "prompts/schema",
-    "prompts/core",
     "tools",
     "skills",
     "logs",
-    "memory",
     "tmp",
     "vectors",
   ] as const;
@@ -78,6 +93,9 @@ export async function initAgentWorkspace(
   for (const dir of agentDirs) {
     await mkdir(join(agentRoot, dir), { recursive: true });
   }
+
+  // Agent workspace 也复制默认模板
+  await copyDefaultTemplates(agentRoot);
 
   return agentRoot;
 }
