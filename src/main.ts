@@ -20,6 +20,7 @@ import { createInspector } from "./inspector/inspector.js";
 import { createReflector } from "./reflection/reflector.js";
 import { createPersistenceManager } from "./persistence/manager.js";
 import { createSkillRegistry } from "./skill/registry.js";
+import { isQmdAvailable, initVectorIndex } from "./prompt/vector.js";
 
 async function main(): Promise<void> {
   // 1. 加载配置
@@ -31,6 +32,20 @@ async function main(): Promise<void> {
   // 3. 创建日志器
   const logger = createLogger(config.system.workspacePath, config.system.logLevel);
   logger.info("main", "Ouroboros 启动中...");
+
+  // 3.5 初始化 qmd 向量索引（语义搜索）
+  const qmdAvailable = await isQmdAvailable(config.system.workspacePath);
+  if (qmdAvailable) {
+    try {
+      await initVectorIndex(config.system.workspacePath);
+      logger.info("main", "qmd 向量索引已初始化（语义搜索可用）");
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logger.warn("main", `qmd 向量索引初始化失败，回退到关键词搜索: ${errMsg}`);
+    }
+  } else {
+    logger.info("main", "qmd 不可用，语义搜索将回退到关键词搜索");
+  }
 
   // 4. 创建 HTTP 客户端（含代理支持）
   const httpClient: HttpClient = createHttpClient({
