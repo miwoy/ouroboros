@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from "vitest";
 import { createSessionManager } from "../../src/api/session.js";
+import { createExecutionTree } from "../../src/core/execution-tree.js";
 
 describe("createSessionManager", () => {
   describe("createSession", () => {
@@ -149,6 +150,63 @@ describe("createSessionManager", () => {
     it("删除不存在的会话应返回 false", () => {
       const manager = createSessionManager();
       expect(manager.deleteSession("nonexistent")).toBe(false);
+    });
+  });
+
+  describe("executionTree", () => {
+    it("setExecutionTree 应设置执行树", () => {
+      const manager = createSessionManager();
+      const session = manager.createSession("agent:core");
+      const tree = createExecutionTree("agent:core", "测试任务");
+
+      expect(manager.setExecutionTree(session.sessionId, tree)).toBe(true);
+      const fetched = manager.getExecutionTree(session.sessionId);
+      expect(fetched).not.toBeNull();
+      expect(fetched!.agentId).toBe("agent:core");
+    });
+
+    it("setExecutionTree 应覆盖已有的执行树", () => {
+      const manager = createSessionManager();
+      const session = manager.createSession("agent:core");
+      const tree1 = createExecutionTree("agent:core", "任务1");
+      const tree2 = createExecutionTree("agent:core", "任务2");
+
+      manager.setExecutionTree(session.sessionId, tree1);
+      manager.setExecutionTree(session.sessionId, tree2);
+
+      const fetched = manager.getExecutionTree(session.sessionId);
+      expect(fetched!.id).toBe(tree2.id);
+    });
+
+    it("setExecutionTree 会话不存在时应返回 false", () => {
+      const manager = createSessionManager();
+      const tree = createExecutionTree("agent:core", "测试任务");
+      expect(manager.setExecutionTree("nonexistent", tree)).toBe(false);
+    });
+
+    it("getExecutionTree 无执行树时应返回 null", () => {
+      const manager = createSessionManager();
+      const session = manager.createSession("agent:core");
+      expect(manager.getExecutionTree(session.sessionId)).toBeNull();
+    });
+
+    it("getExecutionTree 会话不存在时应返回 null", () => {
+      const manager = createSessionManager();
+      expect(manager.getExecutionTree("nonexistent")).toBeNull();
+    });
+
+    it("toSessionInfo 应包含 hasExecutionTree 字段", () => {
+      const manager = createSessionManager();
+      const session = manager.createSession("agent:core");
+
+      // 初始无执行树
+      expect(session.hasExecutionTree).toBe(false);
+
+      // 设置后有执行树
+      const tree = createExecutionTree("agent:core", "测试任务");
+      manager.setExecutionTree(session.sessionId, tree);
+      const updated = manager.getSession(session.sessionId);
+      expect(updated!.hasExecutionTree).toBe(true);
     });
   });
 });

@@ -109,3 +109,65 @@
 .log-message {
   color: var(--color-text-secondary);
 }
+
+/* ─── 执行树控制栏 ─── */
+
+.tree-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.tree-session-select {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  outline: none;
+}
+.tree-session-select:focus {
+  border-color: var(--color-primary);
+}
+
+.tree-live-btn,
+.tree-refresh-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.tree-live-btn:hover:not(:disabled),
+.tree-refresh-btn:hover {
+  background: var(--color-border);
+}
+.tree-live-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.tree-live-btn-active {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: #fff;
+}
+.tree-live-btn-active:hover:not(:disabled) {
+  background: #c9362c;
+}
+
+.tree-placeholder {
+  padding: 24px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}

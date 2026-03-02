@@ -7,6 +7,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { ChatMessage, SessionInfo } from "./types.js";
+import type { ExecutionTree } from "../core/types.js";
 
 /** 内部会话结构 */
 interface Session {
@@ -16,6 +17,7 @@ interface Session {
   readonly messages: ChatMessage[];
   readonly createdAt: string;
   updatedAt: string;
+  executionTree: ExecutionTree | null;
 }
 
 /**
@@ -38,6 +40,7 @@ export function createSessionManager() {
       messages: [],
       createdAt: now,
       updatedAt: now,
+      executionTree: null,
     };
 
     sessions.set(sessionId, session);
@@ -105,13 +108,41 @@ export function createSessionManager() {
   }
 
   /**
+   * 设置/更新会话的执行树
+   */
+  function setExecutionTree(sessionId: string, tree: ExecutionTree): boolean {
+    const session = sessions.get(sessionId);
+    if (!session) return false;
+    session.executionTree = tree;
+    session.updatedAt = new Date().toISOString();
+    return true;
+  }
+
+  /**
+   * 获取会话的执行树
+   */
+  function getExecutionTree(sessionId: string): ExecutionTree | null {
+    const session = sessions.get(sessionId);
+    return session?.executionTree ?? null;
+  }
+
+  /**
    * 删除会话
    */
   function deleteSession(sessionId: string): boolean {
     return sessions.delete(sessionId);
   }
 
-  return { createSession, getSession, listSessions, addMessage, getMessages, deleteSession };
+  return {
+    createSession,
+    getSession,
+    listSessions,
+    addMessage,
+    getMessages,
+    setExecutionTree,
+    getExecutionTree,
+    deleteSession,
+  };
 }
 
 function toSessionInfo(session: Session): SessionInfo {
@@ -122,6 +153,7 @@ function toSessionInfo(session: Session): SessionInfo {
     messageCount: session.messages.length,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
+    hasExecutionTree: session.executionTree !== null,
   };
 }
 

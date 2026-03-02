@@ -233,9 +233,9 @@ ouroboros/
 │   └── vectors/          # 向量索引（qmd，XDG_CACHE_HOME 隔离）
 ├── web/                  # Web UI 客户端（React + Vite）
 │   ├── src/
-│   │   ├── components/   # UI 组件（Header, Sidebar, ChatView）
+│   │   ├── components/   # UI 组件（Header, Sidebar, ChatView, ExecutionTreeView）
 │   │   ├── pages/        # 页面（AgentsPage, MonitorPage）
-│   │   ├── hooks/        # React Hooks（useChat）
+│   │   ├── hooks/        # React Hooks（useChat, useExecutionTree）
 │   │   ├── services/     # API 客户端
 │   │   └── styles/       # 主题与全局样式
 │   ├── index.html
@@ -620,6 +620,8 @@ handler.register(async () => {
 | POST | `/api/sessions/:id/delete` | 删除会话 |
 | POST | `/api/chat/message` | 发送消息（支持 `stream: true` 流式） |
 | GET | `/api/chat/messages/:sessionId` | 获取消息历史（分页） |
+| GET | `/api/sessions/:id/execution-tree` | 获取执行树快照 |
+| GET | `/api/sessions/:id/execution-tree/stream` | 执行树 SSE 实时更新 |
 | GET | `/api/agents` | 列出 Agent |
 | GET | `/api/agents/:agentId` | 获取 Agent 详情 |
 
@@ -664,7 +666,7 @@ const body = await res.json();
 
 - **Chat 对话界面**：消息输入、SSE 流式输出、Markdown 渲染（react-markdown）、代码高亮（highlight.js）
 - **Agent 管理面板**：查看 Agent 列表、状态、技能信息
-- **系统监控**：健康检查、版本信息、运行时间、连接状态
+- **系统监控**：健康检查、版本信息、运行时间、连接状态、执行树可视化（实时 SSE 更新）
 - **会话管理**：侧边栏会话列表，创建/切换/删除会话
 - **响应式设计**：支持桌面和移动端
 

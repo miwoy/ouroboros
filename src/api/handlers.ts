@@ -7,6 +7,8 @@
 import type { Router } from "./router.js";
 import type { SessionManager } from "./session.js";
 import type { ApiDeps, SendMessageRequest, CreateSessionRequest, SSEEvent } from "./types.js";
+import type { TreeState } from "../core/types.js";
+import { treeToJSON } from "../core/execution-tree.js";
 import {
   successResponse,
   notFoundError,
@@ -73,6 +75,30 @@ export function registerHandlers(
       return;
     }
     ctx.respond(200, successResponse({ deleted: true }));
+  });
+
+  // ─── 执行树 ──────────────────────────────────
+
+  // 获取执行树快照
+  router.get("/api/sessions/:sessionId/execution-tree", async (ctx) => {
+    const session = sessionManager.getSession(ctx.params.sessionId);
+    if (!session) {
+      ctx.respond(404, notFoundError("会话"));
+      return;
+    }
+    const tree = sessionManager.getExecutionTree(ctx.params.sessionId);
+    ctx.respond(200, successResponse(tree));
+  });
+
+  // 执行树 SSE 实时更新
+  router.get("/api/sessions/:sessionId/execution-tree/stream", async (ctx) => {
+    const session = sessionManager.getSession(ctx.params.sessionId);
+    if (!session) {
+      ctx.respond(404, notFoundError("会话"));
+      return;
+    }
+    const events = createTreeStreamEvents(ctx.params.sessionId, sessionManager);
+    ctx.respondSSE(events);
   });
 
   // ─── 消息 ──────────────────────────────────
@@ -214,4 +240,51 @@ async function* createStreamEvents(
   }
 
   yield { event: "done", data: JSON.stringify({ sessionId, complete: true }) };
+}
+
+/** 执行树终态集合 */
+const TREE_TERMINAL_STATES: ReadonlySet<string> = new Set(["completed", "failed", "cancelled"]);
+
+/**
+ * 创建执行树 SSE 流式事件
+ *
+ * 500ms 轮询 SessionManager，JSON 变化时推送 tree_update 事件。
+ * 树进入终态时发送 done 并关闭。60s 无变化自动关闭。
+ */
+async function* createTreeStreamEvents(
+  sessionId: string,
+  sessionManager: SessionManager,
+): AsyncIterable<SSEEvent> {
+  const POLL_INTERVAL = 500;
+  const IDLE_TIMEOUT = 60_000;
+  let lastJson = "";
+  let idleStart = Date.now();
+
+  while (true) {
+    const tree = sessionManager.getExecutionTree(sessionId);
+    const currentJson = tree ? treeToJSON(tree) : "";
+
+    if (currentJson !== lastJson) {
+      lastJson = currentJson;
+      idleStart = Date.now();
+      yield {
+        event: "tree_update",
+        data: currentJson || JSON.stringify(null),
+      };
+
+      // 树进入终态，发送 done 并关闭
+      if (tree && TREE_TERMINAL_STATES.has(tree.state as TreeState)) {
+        yield { event: "done", data: JSON.stringify({ sessionId, complete: true }) };
+        return;
+      }
+    }
+
+    // 60s 无变化自动关闭
+    if (Date.now() - idleStart >= IDLE_TIMEOUT) {
+      yield { event: "done", data: JSON.stringify({ sessionId, reason: "idle_timeout" }) };
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
+  }
 }

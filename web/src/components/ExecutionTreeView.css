@@ -1,0 +1,203 @@
+/* 执行树可视化 */
+
+.execution-tree-view {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* ─── 树头部 ─── */
+
+.tree-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 12px;
+}
+
+.tree-state-label {
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.tree-state-label.state-completed { background: rgba(63, 185, 80, 0.15); color: var(--color-success); }
+.tree-state-label.state-working   { background: rgba(210, 153, 34, 0.15); color: var(--color-warning); }
+.tree-state-label.state-failed    { background: rgba(248, 81, 73, 0.15); color: var(--color-danger); }
+.tree-state-label.state-cancelled,
+.tree-state-label.state-paused    { background: rgba(139, 148, 158, 0.15); color: var(--color-text-muted); }
+.tree-state-label.state-submitted { background: rgba(88, 166, 255, 0.15); color: var(--color-primary); }
+
+.tree-live-badge {
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  animation: live-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.tree-time {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-family: monospace;
+}
+
+/* ─── 树内容 ─── */
+
+.tree-body {
+  padding: 12px 16px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* ─── 节点 ─── */
+
+.tree-node-wrapper {
+  position: relative;
+}
+
+.tree-node-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  cursor: default;
+  position: relative;
+  border-left: 3px solid transparent;
+  transition: background 0.15s;
+}
+
+.tree-node-card:hover {
+  background: rgba(139, 148, 158, 0.08);
+}
+
+.tree-node-active {
+  border-left-color: var(--color-primary);
+  background: rgba(88, 166, 255, 0.06);
+}
+
+/* ─── 子节点缩进 + 连接线 ─── */
+
+.tree-children {
+  padding-left: 20px;
+  position: relative;
+}
+
+.tree-children::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 0;
+  bottom: 12px;
+  border-left: 1px solid var(--color-border);
+}
+
+.tree-children > .tree-node-wrapper::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 15px;
+  width: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* ─── 类型图标 ─── */
+
+.node-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  color: #fff;
+}
+
+.type-root  { background: var(--color-primary); }
+.type-model { background: #8b5cf6; }
+.type-tool  { background: var(--color-success); }
+.type-agent { background: var(--color-warning); }
+
+/* ─── 状态圆点 ─── */
+
+.node-state-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.state-completed     { background: var(--color-success); }
+.state-working       { background: var(--color-warning); animation: dot-pulse 1.2s ease-in-out infinite; }
+.state-submitted     { background: var(--color-text-muted); }
+.state-failed        { background: var(--color-danger); }
+.state-cancelled     { background: var(--color-text-muted); }
+.state-paused        { background: var(--color-text-muted); }
+.state-input-required { background: var(--color-primary); }
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+/* ─── 节点摘要 ─── */
+
+.node-summary {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Tooltip ─── */
+
+.node-tooltip {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 24px;
+  z-index: 10;
+  min-width: 280px;
+  max-width: 400px;
+  background: var(--color-bg-primary, #1c2128);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  font-size: 12px;
+}
+
+.tooltip-row {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+  line-height: 1.4;
+}
+
+.tooltip-label {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  min-width: 40px;
+  flex-shrink: 0;
+}
+
+.tooltip-row > span:last-child {
+  color: var(--color-text-secondary);
+  word-break: break-word;
+}

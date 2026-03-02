@@ -22,6 +22,39 @@ export interface SessionInfo {
   readonly messageCount: number;
   readonly createdAt: string;
   readonly updatedAt: string;
+  readonly hasExecutionTree?: boolean;
+}
+
+/** 执行树节点 */
+export interface ExecutionNode {
+  readonly id: string;
+  readonly parentId: string | null;
+  readonly state: string;
+  readonly nodeType: string;
+  readonly summary: string;
+  readonly resultSummary?: string;
+  readonly children: readonly string[];
+  readonly retryCount: number;
+  readonly createdAt: string;
+  readonly completedAt?: string;
+}
+
+/** 执行树 */
+export interface ExecutionTree {
+  readonly id: string;
+  readonly agentId: string;
+  readonly rootNodeId: string;
+  readonly nodes: Readonly<Record<string, ExecutionNode>>;
+  readonly activeNodeId: string;
+  readonly state: string;
+  readonly createdAt: string;
+}
+
+/** 执行树 SSE 回调 */
+export interface TreeStreamCallbacks {
+  onTreeUpdate?: (tree: ExecutionTree | null) => void;
+  onDone?: () => void;
+  onError?: (error: string) => void;
 }
 
 /** 聊天消息 */
@@ -166,6 +199,69 @@ export function streamMessage(
                   break;
                 case "done":
                   callbacks.onDone?.(data);
+                  break;
+                case "error":
+                  callbacks.onError?.(data.message);
+                  break;
+              }
+            }
+          }
+        }
+      }
+    })
+    .catch((err) => {
+      if (err.name !== "AbortError") {
+        callbacks.onError?.(err.message);
+      }
+    });
+
+  return controller;
+}
+
+// ─── 执行树 ──────────────────────────────────────
+
+export async function getExecutionTree(sessionId: string): Promise<ApiResponse<ExecutionTree | null>> {
+  return request(`/api/sessions/${sessionId}/execution-tree`);
+}
+
+/** SSE 订阅执行树实时更新 */
+export function streamExecutionTree(
+  sessionId: string,
+  callbacks: TreeStreamCallbacks,
+): AbortController {
+  const controller = new AbortController();
+
+  fetch(`${API_BASE}/api/sessions/${sessionId}/execution-tree/stream`, {
+    headers: getHeaders(),
+    signal: controller.signal,
+  })
+    .then(async (res) => {
+      const reader = res.body?.getReader();
+      if (!reader) return;
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            const event = line.slice(7).trim();
+            const nextLine = lines[lines.indexOf(line) + 1];
+            if (nextLine?.startsWith("data: ")) {
+              const data = JSON.parse(nextLine.slice(6));
+              switch (event) {
+                case "tree_update":
+                  callbacks.onTreeUpdate?.(data);
+                  break;
+                case "done":
+                  callbacks.onDone?.();
                   break;
                 case "error":
                   callbacks.onError?.(data.message);

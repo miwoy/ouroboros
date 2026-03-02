@@ -4,18 +4,31 @@
 
 import { useEffect, useState } from "react";
 import * as api from "../services/api";
-import type { HealthData } from "../services/api";
+import type { HealthData, SessionInfo } from "../services/api";
+import { useExecutionTree } from "../hooks/useExecutionTree";
+import { ExecutionTreeView } from "../components/ExecutionTreeView";
 import "./MonitorPage.css";
 
 export function MonitorPage() {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string>("");
+  const { tree, loading: treeLoading, error: treeError, streaming, loadTree, subscribe, unsubscribe } = useExecutionTree();
 
   useEffect(() => {
     loadHealth();
+    loadSessions();
     const timer = setInterval(loadHealth, 5000);
     return () => clearInterval(timer);
   }, []);
+
+  // 选择会话时加载执行树快照
+  useEffect(() => {
+    if (selectedSessionId) {
+      loadTree(selectedSessionId);
+    }
+  }, [selectedSessionId, loadTree]);
 
   async function loadHealth() {
     try {
@@ -28,6 +41,25 @@ export function MonitorPage() {
       }
     } catch {
       setError("Cannot connect to server");
+    }
+  }
+
+  async function loadSessions() {
+    try {
+      const res = await api.listSessions();
+      if (res.success && res.data) {
+        setSessions(res.data);
+      }
+    } catch {
+      // 静默处理，不影响主页面
+    }
+  }
+
+  function handleLiveToggle() {
+    if (streaming) {
+      unsubscribe();
+    } else if (selectedSessionId) {
+      subscribe(selectedSessionId);
     }
   }
 
@@ -89,6 +121,54 @@ export function MonitorPage() {
             </span>
           </div>
         </div>
+      </div>
+
+      <div className="monitor-section">
+        <h3>Execution Tree</h3>
+        <div className="tree-controls">
+          <select
+            className="tree-session-select"
+            value={selectedSessionId}
+            onChange={(e) => {
+              unsubscribe();
+              setSelectedSessionId(e.target.value);
+            }}
+          >
+            <option value="">-- Select Session --</option>
+            {sessions.map((s) => (
+              <option key={s.sessionId} value={s.sessionId}>
+                {s.description} ({s.sessionId.slice(0, 8)})
+              </option>
+            ))}
+          </select>
+          <button
+            className={`tree-live-btn ${streaming ? "tree-live-btn-active" : ""}`}
+            onClick={handleLiveToggle}
+            disabled={!selectedSessionId}
+          >
+            {streaming ? "Stop" : "Live"}
+          </button>
+          <button
+            className="tree-refresh-btn"
+            onClick={() => { loadSessions(); if (selectedSessionId) loadTree(selectedSessionId); }}
+          >
+            Refresh
+          </button>
+        </div>
+
+        {treeError && <div className="monitor-error" style={{ marginTop: 8 }}>{treeError}</div>}
+
+        {treeLoading && <div className="tree-placeholder">Loading...</div>}
+
+        {!treeLoading && !tree && selectedSessionId && (
+          <div className="tree-placeholder">No execution tree for this session</div>
+        )}
+
+        {!treeLoading && !selectedSessionId && (
+          <div className="tree-placeholder">Select a session to view its execution tree</div>
+        )}
+
+        {tree && <ExecutionTreeView tree={tree} streaming={streaming} />}
       </div>
     </div>
   );

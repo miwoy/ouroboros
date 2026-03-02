@@ -66,6 +66,7 @@ export interface SessionInfo {
   readonly messageCount: number;
   readonly createdAt: string;
   readonly updatedAt: string;
+  readonly hasExecutionTree?: boolean;
 }
 
 /** Agent 信息 */
@@ -90,7 +91,13 @@ export interface TaskInfo {
 // ─── SSE 事件 ──────────────────────────────────────────────
 
 /** SSE 事件类型 */
-export type SSEEventType = "text_delta" | "tool_call" | "thinking" | "done" | "error";
+export type SSEEventType =
+  | "text_delta"
+  | "tool_call"
+  | "thinking"
+  | "done"
+  | "error"
+  | "tree_update";
 
 /** SSE 事件 */
 export interface SSEEvent {

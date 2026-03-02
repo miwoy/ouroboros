@@ -8,6 +8,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { createApiServer } from "../../src/api/server.js";
 import type { ApiDeps } from "../../src/api/types.js";
 import type { Logger } from "../../src/logger/types.js";
+import { createExecutionTree } from "../../src/core/execution-tree.js";
 
 function createMockLogger(): Logger {
   return {
@@ -243,6 +244,58 @@ describe("API 路由处理器", () => {
     it("GET /api/agents/:agentId 未知 agent 应返回 404", async () => {
       await startServer();
       const res = await fetch(`${baseUrl}/api/agents/agent:unknown`);
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("执行树", () => {
+    it("GET /api/sessions/:id/execution-tree 有执行树时应返回树", async () => {
+      await startServer();
+
+      // 创建会话
+      const createRes = await fetch(`${baseUrl}/api/sessions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: "树测试" }),
+      });
+      const { data: session } = await createRes.json();
+
+      // 设置执行树
+      const tree = createExecutionTree("agent:core", "测试任务");
+      server!.getSessionManager().setExecutionTree(session.sessionId, tree);
+
+      const res = await fetch(`${baseUrl}/api/sessions/${session.sessionId}/execution-tree`);
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(body.data).not.toBeNull();
+      expect(body.data.agentId).toBe("agent:core");
+      expect(body.data.rootNodeId).toBeTruthy();
+    });
+
+    it("GET /api/sessions/:id/execution-tree 无执行树时应返回 null", async () => {
+      await startServer();
+
+      const createRes = await fetch(`${baseUrl}/api/sessions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const { data: session } = await createRes.json();
+
+      const res = await fetch(`${baseUrl}/api/sessions/${session.sessionId}/execution-tree`);
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(body.data).toBeNull();
+    });
+
+    it("GET /api/sessions/:id/execution-tree 会话不存在时应返回 404", async () => {
+      await startServer();
+
+      const res = await fetch(`${baseUrl}/api/sessions/nonexistent/execution-tree`);
       expect(res.status).toBe(404);
     });
   });
