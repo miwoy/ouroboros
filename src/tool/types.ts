@@ -190,6 +190,16 @@ export interface ToolExecutionContext {
   readonly caller: ToolCallRequest["caller"];
   /** 取消信号 */
   readonly signal?: AbortSignal;
+  /** HTTP fetch 函数（支持代理注入），默认使用 globalThis.fetch */
+  readonly httpFetch?: typeof globalThis.fetch;
+  /** 运行时配置（按需注入子集） */
+  readonly config?: {
+    readonly webSearch?: {
+      readonly provider: string;
+      readonly apiKey?: string;
+      readonly baseUrl?: string;
+    };
+  };
 }
 
 /** 工具处理函数签名 */

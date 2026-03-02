@@ -114,11 +114,14 @@ describe("tool:edit", () => {
   it("应替换文件中的文本", async () => {
     await writeFile(join(tmpDir, "edit.txt"), "hello world", "utf-8");
     const ctx = createTestContext(tmpDir);
-    const result = await handleEdit({
-      path: "edit.txt",
-      oldString: "world",
-      newString: "ouroboros",
-    }, ctx);
+    const result = await handleEdit(
+      {
+        path: "edit.txt",
+        oldString: "world",
+        newString: "ouroboros",
+      },
+      ctx,
+    );
     expect(result["success"]).toBe(true);
     expect(result["replacements"]).toBe(1);
     const content = await readFile(join(tmpDir, "edit.txt"), "utf-8");
@@ -128,11 +131,14 @@ describe("tool:edit", () => {
   it("文本不唯一时应返回错误", async () => {
     await writeFile(join(tmpDir, "dup.txt"), "aaa bbb aaa", "utf-8");
     const ctx = createTestContext(tmpDir);
-    const result = await handleEdit({
-      path: "dup.txt",
-      oldString: "aaa",
-      newString: "ccc",
-    }, ctx);
+    const result = await handleEdit(
+      {
+        path: "dup.txt",
+        oldString: "aaa",
+        newString: "ccc",
+      },
+      ctx,
+    );
     expect(result["success"]).toBe(false);
     expect(result["error"]).toContain("不唯一");
   });
@@ -140,12 +146,15 @@ describe("tool:edit", () => {
   it("replaceAll 应替换所有匹配", async () => {
     await writeFile(join(tmpDir, "all.txt"), "aaa bbb aaa", "utf-8");
     const ctx = createTestContext(tmpDir);
-    const result = await handleEdit({
-      path: "all.txt",
-      oldString: "aaa",
-      newString: "ccc",
-      replaceAll: true,
-    }, ctx);
+    const result = await handleEdit(
+      {
+        path: "all.txt",
+        oldString: "aaa",
+        newString: "ccc",
+        replaceAll: true,
+      },
+      ctx,
+    );
     expect(result["success"]).toBe(true);
     expect(result["replacements"]).toBe(2);
     const content = await readFile(join(tmpDir, "all.txt"), "utf-8");
@@ -155,11 +164,14 @@ describe("tool:edit", () => {
   it("未找到文本应返回错误", async () => {
     await writeFile(join(tmpDir, "miss.txt"), "hello", "utf-8");
     const ctx = createTestContext(tmpDir);
-    const result = await handleEdit({
-      path: "miss.txt",
-      oldString: "xyz",
-      newString: "abc",
-    }, ctx);
+    const result = await handleEdit(
+      {
+        path: "miss.txt",
+        oldString: "xyz",
+        newString: "abc",
+      },
+      ctx,
+    );
     expect(result["success"]).toBe(false);
   });
 });
@@ -198,20 +210,42 @@ describe("tool:find", () => {
 });
 
 describe("tool:web-search", () => {
-  it("应调用 callModel 模拟搜索", async () => {
-    const ctx = createTestContext(tmpDir);
+  it("应使用搜索 Provider 返回结果", async () => {
+    const bingHtml = `<html><body><ol><li class="b_algo"><h2><a href="https://example.com">Test Result</a></h2><p>Test snippet</p></li></ol></body></html>`;
+    const mockHttpFetch = vi.fn().mockResolvedValue(new Response(bingHtml, { status: 200 }));
+    const ctx = {
+      ...createTestContext(tmpDir),
+      httpFetch: mockHttpFetch as unknown as typeof globalThis.fetch,
+      config: { webSearch: { provider: "bing" } },
+    };
     const result = await handleWebSearch({ query: "test query" }, ctx);
     expect(result["query"]).toBe("test query");
-    expect(ctx.callModel).toHaveBeenCalledTimes(1);
+    expect(mockHttpFetch).toHaveBeenCalledTimes(1);
     const results = result["results"] as Record<string, unknown>[];
-    expect(results.length).toBeGreaterThan(0);
+    expect(results.length).toBe(1);
+    expect(results[0]["title"]).toBe("Test Result");
+  });
+
+  it("搜索失败应返回空结果和 error 字段", async () => {
+    const mockHttpFetch = vi.fn().mockResolvedValue(new Response("", { status: 429 }));
+    const ctx = {
+      ...createTestContext(tmpDir),
+      httpFetch: mockHttpFetch as unknown as typeof globalThis.fetch,
+      config: { webSearch: { provider: "bing" } },
+    };
+    const result = await handleWebSearch({ query: "fail" }, ctx);
+    expect(result["results"]).toEqual([]);
+    expect(result["error"]).toBeDefined();
   });
 });
 
 describe("tool:web-fetch", () => {
   it("URL 获取失败应返回错误信息", async () => {
     const ctx = createTestContext(tmpDir);
-    const result = await handleWebFetch({ url: "http://localhost:1/nonexistent", timeout: 1000 }, ctx);
+    const result = await handleWebFetch(
+      { url: "http://localhost:1/nonexistent", timeout: 1000 },
+      ctx,
+    );
     expect(result["success"]).toBe(false);
     expect(result["error"]).toBeDefined();
   });

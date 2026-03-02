@@ -51,6 +51,24 @@ const systemConfigSchema = z.object({
   logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
   /** workspace 根目录路径 */
   workspacePath: z.string().default("./workspace"),
+  /** HTTP 代理地址，配置后系统所有对外请求使用此代理 */
+  proxy: z
+    .union([z.literal(""), z.string().url()])
+    .optional()
+    .transform((v) => (v === "" ? undefined : v)),
+});
+
+/**
+ * Web 搜索配置 Schema
+ * 搜索引擎设置
+ */
+const webSearchConfigSchema = z.object({
+  /** 搜索引擎提供商 */
+  provider: z.enum(["bing", "brave"]).default("bing"),
+  /** API Key（Brave 必须，Bing 不需要） */
+  apiKey: z.string().optional(),
+  /** 自定义搜索 API 地址（可选） */
+  baseUrl: z.string().url().optional(),
 });
 
 /**
@@ -261,6 +279,9 @@ export const configSchema = z.object({
     recoveryTTLSecs: 86400,
     maxSnapshots: 10,
   }),
+  webSearch: webSearchConfigSchema.default({
+    provider: "bing",
+  }),
 });
 
 /** 模型提供商配置类型 */
@@ -301,6 +322,9 @@ export type ApiSchemaConfig = z.infer<typeof apiConfigSchema>;
 
 /** 持久化系统配置类型 */
 export type PersistenceSchemaConfig = z.infer<typeof persistenceConfigSchema>;
+
+/** Web 搜索配置类型 */
+export type WebSearchConfig = z.infer<typeof webSearchConfigSchema>;
 
 /** 顶层配置类型 */
 export type Config = z.infer<typeof configSchema>;

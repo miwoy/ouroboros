@@ -82,6 +82,8 @@ export function createToolExecutor(
   baseContext: {
     readonly workspacePath: string;
     readonly callModel: CallModelFn;
+    readonly httpFetch?: typeof globalThis.fetch;
+    readonly config?: ToolExecutionContext["config"];
   },
 ): ToolExecutor {
   return {
@@ -120,6 +122,8 @@ export function createToolExecutor(
             callModel: baseContext.callModel,
             registry,
             caller: request.caller,
+            httpFetch: baseContext.httpFetch,
+            config: baseContext.config,
           },
           timeout,
           request.toolId,

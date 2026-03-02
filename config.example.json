@@ -1,7 +1,8 @@
 {
   "system": {
     "logLevel": "info",
-    "workspacePath": "./workspace"
+    "workspacePath": "./workspace",
+    "proxy": ""
   },
   "model": {
     "defaultProvider": "ollama",
@@ -91,6 +92,10 @@
     "rateLimitWindowMs": 60000,
     "rateLimitMaxRequests": 60,
     "corsOrigin": "*"
+  },
+  "webSearch": {
+    "provider": "bing",
+    "apiKey": ""
   },
   "persistence": {
     "enabled": true,

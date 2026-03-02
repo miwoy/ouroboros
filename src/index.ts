@@ -15,3 +15,14 @@ export * from "./inspector/index.js";
 export * from "./reflection/index.js";
 export * from "./persistence/index.js";
 export * from "./api/index.js";
+export * from "./http/index.js";
+export {
+  type SearchProvider,
+  type SearchProviderType,
+  type SearchResponse,
+  type SearchResult as WebSearchResult,
+  type CreateSearchProviderOptions,
+  createSearchProvider,
+  createBingProvider,
+  createBraveProvider,
+} from "./search/index.js";

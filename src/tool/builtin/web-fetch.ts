@@ -24,7 +24,8 @@ export const handleWebFetch: ToolHandler = async (input, context) => {
   }
 
   try {
-    const response = await fetch(url, {
+    const fetchFn = context.httpFetch ?? globalThis.fetch;
+    const response = await fetchFn(url, {
       signal: controller.signal,
       headers: {
         "User-Agent": "Ouroboros/1.0",

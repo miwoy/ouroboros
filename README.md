@@ -187,6 +187,14 @@ ouroboros/
 │   │   ├── recovery.ts   # 恢复管理器（检测/恢复/标记）
 │   │   ├── shutdown.ts   # 优雅关闭处理器（SIGINT/SIGTERM）
 │   │   └── index.ts      # 公共导出
+│   ├── http/             # HTTP 客户端（统一代理支持）
+│   │   ├── client.ts     # 代理封装（undici ProxyAgent）
+│   │   └── index.ts      # 公共导出
+│   ├── search/           # 搜索引擎 Provider
+│   │   ├── types.ts      # 类型定义（SearchResult, SearchProvider）
+│   │   ├── bing.ts       # Bing Provider（HTML 抓取）
+│   │   ├── brave.ts      # Brave Provider（API）
+│   │   └── index.ts      # 工厂函数 + 公共导出
 │   ├── api/              # Chat API 层
 │   │   ├── types.ts      # 类型定义（ApiResponse, SSEEvent, ApiConfig）
 │   │   ├── response.ts   # 统一响应构建器
@@ -199,7 +207,8 @@ ouroboros/
 │   │   └── index.ts      # 公共导出
 │   ├── workspace/        # workspace 初始化
 │   ├── errors/           # 错误体系
-│   └── index.ts          # 入口
+│   ├── main.ts           # 应用启动入口（npm run dev / npm start）
+│   └── index.ts          # 库导出入口
 ├── tests/                # 单元测试
 ├── docs/                 # 文档
 │   ├── DESIGN.md         # 设计文档

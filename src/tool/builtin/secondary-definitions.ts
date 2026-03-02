@@ -188,7 +188,7 @@ export const WEB_SEARCH_TOOL: OuroborosTool = {
   tags: ["search", "web", "internet", "搜索", "网络"],
   version: "1.0.0",
   status: EntityStatus.Active,
-  permissions: { network: true, modelAccess: true },
+  permissions: { network: true },
   origin: "system",
   createdAt: now,
   updatedAt: now,
@@ -320,7 +320,11 @@ export const CREATE_SKILL_TOOL: OuroborosTool = {
       name: { type: "string", description: "技能名称" },
       description: { type: "string", description: "技能功能描述" },
       promptTemplate: { type: "string", description: "任务编排提示词模板" },
-      requiredTools: { type: "array", description: "依赖的工具 ID 列表", items: { type: "string" } },
+      requiredTools: {
+        type: "array",
+        description: "依赖的工具 ID 列表",
+        items: { type: "string" },
+      },
       variables: {
         type: "array",
         description: "模板变量声明",
