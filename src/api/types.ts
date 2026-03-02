@@ -7,6 +7,11 @@
 import type { Logger } from "../logger/types.js";
 import type { ProviderRegistry } from "../model/registry.js";
 import type { ToolRegistry } from "../tool/types.js";
+import type { SchemaProvider } from "../schema/schema-provider.js";
+import type { MemoryManager } from "../memory/types.js";
+import type { Inspector } from "../inspector/types.js";
+import type { Reflector } from "../reflection/types.js";
+import type { Config } from "../config/schema.js";
 
 // ─── 统一响应格式 ──────────────────────────────────────────────
 
@@ -161,6 +166,18 @@ export interface ApiDeps {
     readonly parallelToolCalls: boolean;
     readonly compressionThreshold: number;
   };
+  /** HTTP 代理 fetch（传给 ToolExecutor） */
+  readonly httpFetch?: typeof globalThis.fetch;
+  /** 自我图式提供者 */
+  readonly schemaProvider?: SchemaProvider;
+  /** 记忆管理器 */
+  readonly memoryManager?: MemoryManager;
+  /** 完整配置（webSearch 等子配置） */
+  readonly fullConfig?: Config;
+  /** 审查程序 */
+  readonly inspector?: Inspector;
+  /** 反思器 */
+  readonly reflector?: Reflector;
 }
 
 // ─── 路由 ──────────────────────────────────────────────

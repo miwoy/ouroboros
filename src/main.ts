@@ -13,6 +13,11 @@ import { createApiServer, type ApiServer } from "./api/server.js";
 import type { ApiConfig } from "./api/types.js";
 import { createProviderRegistry } from "./model/registry.js";
 import { createToolRegistry } from "./tool/registry.js";
+import { createSchemaProvider } from "./schema/schema-provider.js";
+import { createMemoryManager } from "./memory/manager.js";
+import { createInspector } from "./inspector/inspector.js";
+import { createReflector } from "./reflection/reflector.js";
+import { createPersistenceManager } from "./persistence/manager.js";
 
 async function main(): Promise<void> {
   // 1. 加载配置
@@ -35,7 +40,18 @@ async function main(): Promise<void> {
     logger.info("main", `HTTP 代理已配置: ${config.system.proxy}`);
   }
 
-  // 5. 启动 API 服务器
+  // 5. 创建自我图式提供者
+  const schemaProvider = createSchemaProvider(config.system.workspacePath, {
+    hormoneDefaults: config.self,
+  });
+  await schemaProvider.refresh();
+  logger.info("main", "自我图式提供者已创建");
+
+  // 6. 创建记忆管理器
+  const memoryManager = createMemoryManager(config.system.workspacePath, config.memory);
+  logger.info("main", "记忆管理器已创建");
+
+  // 7. 启动 API 服务器
   const apiConfig: ApiConfig = {
     port: config.api.port,
     host: config.api.host,
@@ -55,6 +71,44 @@ async function main(): Promise<void> {
   const toolRegistry = await createToolRegistry(config.system.workspacePath);
   logger.info("main", `工具注册表已加载: ${toolRegistry.list().length} 个工具`);
 
+  // 10. 创建审查程序
+  const inspector = createInspector(logger);
+  logger.info("main", "审查程序已创建");
+
+  // 11. 创建反思器
+  const defaultProvider = providerRegistry.get(config.model.defaultProvider);
+  const callModelFn = (
+    request: Parameters<typeof defaultProvider.complete>[0],
+    options?: { signal?: AbortSignal },
+  ) => defaultProvider.complete(request, options?.signal);
+  const reflector = createReflector(
+    {
+      callModel: callModelFn,
+      longTermMemory: memoryManager.longTerm,
+      logger,
+    },
+    config.reflection,
+  );
+  logger.info("main", "反思器已创建");
+
+  // 12. 创建持久化管理器
+  const persistenceManager = createPersistenceManager({
+    logger,
+    workspacePath: config.system.workspacePath,
+    config: config.persistence,
+  });
+
+  // 尝试恢复（如启用）
+  if (config.persistence.enableAutoRecovery) {
+    const latestSnapshot = await persistenceManager.loadLatestSnapshot();
+    if (latestSnapshot) {
+      logger.info("main", `发现快照: ${latestSnapshot.snapshotId}`, {
+        trigger: latestSnapshot.metadata.trigger,
+      });
+    }
+  }
+  logger.info("main", "持久化管理器已创建");
+
   const server: ApiServer = createApiServer({
     logger,
     workspacePath: config.system.workspacePath,
@@ -63,15 +117,24 @@ async function main(): Promise<void> {
     defaultProvider: config.model.defaultProvider,
     toolRegistry,
     reactConfig: config.react,
+    httpFetch: httpClient.fetch,
+    schemaProvider,
+    memoryManager,
+    fullConfig: config,
+    inspector,
+    reflector,
   });
 
   await server.start();
 
-  // 6. 优雅关闭
+  // 优雅关闭
   const shutdown = async (signal: string) => {
     logger.info("main", `收到 ${signal} 信号，正在关闭...`);
     try {
+      inspector.stop();
+      await persistenceManager.cleanup();
       await server.stop();
+      await memoryManager.cleanup();
       httpClient.dispose();
       logger.info("main", "Ouroboros 已停止");
     } catch (err) {

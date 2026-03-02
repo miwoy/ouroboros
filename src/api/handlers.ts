@@ -11,10 +11,14 @@ import type { ApiDeps, SendMessageRequest, CreateSessionRequest, SSEEvent } from
 import type { TreeState, ReactStep, ExecutionTree } from "../core/types.js";
 import type { Message } from "../model/types.js";
 import type { CallModelFn } from "../tool/types.js";
+import type { RenderedPrompt, PromptFileType } from "../prompt/types.js";
 import { treeToJSON } from "../core/execution-tree.js";
 import { runReactLoop } from "../core/loop.js";
 import { createToolExecutor } from "../tool/executor.js";
 import { filterSafeTools } from "./safe-tools.js";
+import { loadAllPromptFiles } from "../prompt/loader.js";
+import { renderTemplate } from "../prompt/template.js";
+import { assemblePrompt } from "../prompt/assembler.js";
 import {
   successResponse,
   notFoundError,
@@ -227,6 +231,102 @@ function buildCallModelFn(deps: ApiDeps): CallModelFn | null {
 }
 
 /**
+ * 构建用户级上下文提示词（self + tool + skill + agent + memory）
+ * core.md 由 runReactLoop 内部加载，这里只拼装用户级部分。
+ */
+async function buildContextPrompt(deps: ApiDeps): Promise<string> {
+  if (!deps.schemaProvider) return "";
+
+  const promptFiles = await loadAllPromptFiles(deps.workspacePath);
+  const parts: RenderedPrompt[] = [];
+
+  // self.md — 用 schemaProvider 变量渲染
+  const selfFile = promptFiles.get("self");
+  if (selfFile) {
+    const vars = deps.schemaProvider.getVariables();
+    const rendered = renderTemplate(selfFile.content, vars as unknown as Record<string, string>);
+    parts.push({ fileType: "self", content: rendered });
+  }
+
+  // tool.md, skill.md, agent.md — 无模板变量，直接使用
+  for (const ft of ["tool", "skill", "agent"] as const) {
+    const file = promptFiles.get(ft as PromptFileType);
+    if (file) {
+      parts.push({ fileType: ft as PromptFileType, content: file.content });
+    }
+  }
+
+  // memory.md — 长期记忆
+  const memoryFile = promptFiles.get("memory");
+  if (memoryFile) {
+    parts.push({ fileType: "memory", content: memoryFile.content });
+  }
+
+  // 追加 hot memory（内存中的会话记忆）
+  if (deps.memoryManager) {
+    const hotText = deps.memoryManager.hot.toPromptText();
+    if (hotText) {
+      parts.push({ fileType: "memory", content: hotText });
+    }
+  }
+
+  if (parts.length === 0) return "";
+
+  const assembled = assemblePrompt(parts);
+  return assembled.systemPrompt;
+}
+
+/**
+ * 将对话记录写入记忆系统（fire-and-forget）
+ */
+function writebackMemory(deps: ApiDeps, message: string, answer: string): void {
+  if (!deps.memoryManager) return;
+
+  const entry = {
+    timestamp: new Date().toISOString(),
+    type: "conversation" as const,
+    content: `用户: ${message}\n助手: ${answer.slice(0, 500)}`,
+  };
+
+  deps.memoryManager.hot.add(entry);
+  deps.memoryManager.shortTerm.append(entry).catch(() => {});
+}
+
+/**
+ * 触发反思（fire-and-forget）
+ */
+function triggerReflection(
+  deps: ApiDeps,
+  message: string,
+  result: {
+    answer: string;
+    executionTree: ExecutionTree;
+    steps: readonly ReactStep[];
+    totalDuration: number;
+    stopReason: string;
+  },
+): void {
+  if (!deps.reflector || result.stopReason !== "completed") return;
+
+  deps.reflector
+    .reflect({
+      taskDescription: message,
+      agentId: "agent:core",
+      executionTree: result.executionTree,
+      steps: [...result.steps],
+      result: result.answer,
+      totalDuration: result.totalDuration,
+      success: true,
+      errors: [],
+    })
+    .catch((err: unknown) => {
+      deps.logger.warn("api", "反思失败", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+}
+
+/**
  * 处理非流式消息（三层逻辑）
  */
 async function processMessage(
@@ -257,6 +357,8 @@ async function processMessage(
     const toolExecutor = createToolExecutor(deps.toolRegistry, {
       workspacePath: deps.workspacePath,
       callModel: callModelFn,
+      httpFetch: deps.httpFetch,
+      config: deps.fullConfig ? { webSearch: deps.fullConfig.webSearch } : undefined,
     });
 
     const reactConfig = {
@@ -267,7 +369,8 @@ async function processMessage(
       agentId: "agent:core",
     };
 
-    const result = await runReactLoop(message, "", safeTools, reactConfig, {
+    const contextPrompt = await buildContextPrompt(deps);
+    const result = await runReactLoop(message, contextPrompt, safeTools, reactConfig, {
       callModel: callModelFn,
       toolExecutor,
       toolRegistry: deps.toolRegistry,
@@ -277,6 +380,10 @@ async function processMessage(
 
     sessionManager.setExecutionTree(sessionId, result.executionTree);
     sessionManager.addMessage(sessionId, "agent", result.answer);
+
+    // 记忆回写 + 反思（fire-and-forget）
+    writebackMemory(deps, message, result.answer);
+    triggerReflection(deps, message, result);
 
     return {
       sessionId,
@@ -365,6 +472,8 @@ async function* createReactStreamEvents(
   const toolExecutor = createToolExecutor(deps.toolRegistry!, {
     workspacePath: deps.workspacePath,
     callModel: callModelFn,
+    httpFetch: deps.httpFetch,
+    config: deps.fullConfig ? { webSearch: deps.fullConfig.webSearch } : undefined,
   });
 
   const reactConfig = {
@@ -375,8 +484,16 @@ async function* createReactStreamEvents(
     agentId: "agent:core",
   };
 
+  // 刷新自我图式（每次 SSE 请求前获取最新状态）
+  if (deps.schemaProvider) {
+    await deps.schemaProvider.refresh();
+  }
+
+  const contextPrompt = await buildContextPrompt(deps);
+  const loopStartTime = Date.now();
+
   // 启动 ReAct 循环（后台执行）
-  const reactPromise = runReactLoop(message, "", safeTools, reactConfig, {
+  const reactPromise = runReactLoop(message, contextPrompt, safeTools, reactConfig, {
     callModel: callModelFn,
     toolExecutor,
     toolRegistry: deps.toolRegistry!,
@@ -415,6 +532,28 @@ async function* createReactStreamEvents(
 
       // 更新执行树
       sessionManager.setExecutionTree(sessionId, tree);
+
+      // Inspector 检查
+      if (deps.inspector && deps.schemaProvider) {
+        const inspectResult = deps.inspector.inspect({
+          tree,
+          bodySchema: deps.schemaProvider.getBodySchema(),
+          startTime: loopStartTime,
+          config: deps.fullConfig?.inspector ?? {
+            enabled: true,
+            checkInterval: 180000,
+            loopDetectionThreshold: 3,
+            maxRetryThreshold: 5,
+            minAvailableMemoryMB: 100,
+            maxExecutionTimeSecs: 3600,
+          },
+        });
+        if (inspectResult.hasAnomalies) {
+          deps.logger.warn("api", "Inspector 检测到异常", {
+            reports: inspectResult.reports.length,
+          });
+        }
+      }
     },
   })
     .then((result) => {
@@ -426,6 +565,10 @@ async function* createReactStreamEvents(
 
       sessionManager.setExecutionTree(sessionId, result.executionTree);
       sessionManager.addMessage(sessionId, "agent", result.answer);
+
+      // 记忆回写 + 反思（fire-and-forget）
+      writebackMemory(deps, message, result.answer);
+      triggerReflection(deps, message, result);
 
       pushEvent({
         event: "done",
