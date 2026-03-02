@@ -4,7 +4,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import * as api from "../services/api";
-import type { ExecutionTree } from "../services/api";
+import type { ExecutionTree, TokenUsageSummary } from "../services/api";
 
 /** 工具调用展示信息 */
 export interface ToolCallDisplay {
@@ -29,6 +29,8 @@ export interface DisplayMessage {
   readonly toolCalls?: readonly ToolCallDisplay[];
   /** 执行树快照（完成后附加） */
   readonly executionTree?: ExecutionTree;
+  /** 附加元数据（如 totalUsage） */
+  readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 export function useChat() {
@@ -36,6 +38,7 @@ export function useChat() {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tokenUsage, setTokenUsage] = useState<TokenUsageSummary | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   /** 加载会话消息历史 */
@@ -44,14 +47,47 @@ export function useChat() {
     setError(null);
     const res = await api.getMessages(sid);
     if (res.success && res.data) {
-      setMessages(
-        res.data.map((m) => ({
+      const displayMsgs: DisplayMessage[] = res.data.map((m) => {
+        const base: DisplayMessage = {
           id: m.id,
           role: m.role,
           content: m.content,
           timestamp: m.timestamp,
-        })),
-      );
+        };
+        if (m.role === "agent" && m.metadata) {
+          const thought = m.metadata.thought as string | undefined;
+          const rawCalls = m.metadata.toolCalls as readonly Record<string, unknown>[] | undefined;
+          const toolCalls: ToolCallDisplay[] | undefined = rawCalls?.map((tc) => ({
+            toolCallId: String(tc.toolId ?? tc.requestId ?? ""),
+            toolName: String(tc.toolId ?? ""),
+            input: (tc.input as Record<string, unknown>) ?? {},
+            output: tc.output as Record<string, unknown> | undefined,
+            success: tc.success as boolean | undefined,
+            error: tc.error as string | undefined,
+            status: "done" as const,
+          }));
+          const totalUsage = m.metadata.totalUsage as Record<string, unknown> | undefined;
+          return { ...base, thought: thought || undefined, toolCalls, metadata: totalUsage ? { totalUsage } : undefined };
+        }
+        return base;
+      });
+      setMessages(displayMsgs);
+
+      // 获取执行树，附加到最后一条 agent 消息
+      const treeRes = await api.getExecutionTree(sid).catch(() => null);
+      if (treeRes?.success && treeRes.data) {
+        setMessages((prev) => {
+          const lastAgentIdx = prev.findLastIndex((m) => m.role === "agent");
+          if (lastAgentIdx < 0) return prev;
+          return prev.map((m, i) => (i === lastAgentIdx ? { ...m, executionTree: treeRes.data! } : m));
+        });
+      }
+
+      // 获取 token 用量
+      const usageRes = await api.getSessionUsage(sid).catch(() => null);
+      if (usageRes?.success && usageRes.data) {
+        setTokenUsage(usageRes.data);
+      }
     }
   }, []);
 
@@ -138,16 +174,19 @@ export function useChat() {
             );
           },
           onDone: (data) => {
+            const donePayload = data as { sessionId: string; totalUsage?: Record<string, unknown> };
+            // 将 totalUsage 附加到 agent 消息 metadata
+            const msgMetadata = donePayload.totalUsage ? { totalUsage: donePayload.totalUsage } : undefined;
             setMessages((prev) =>
-              prev.map((m) => (m.id === agentMsgId ? { ...m, streaming: false } : m)),
+              prev.map((m) => (m.id === agentMsgId ? { ...m, streaming: false, metadata: msgMetadata } : m)),
             );
-            const resolvedSessionId = sessionId || data.sessionId;
-            if (!sessionId && data.sessionId) {
-              setSessionId(data.sessionId);
+            const resolvedSessionId = sessionId || donePayload.sessionId;
+            if (!sessionId && donePayload.sessionId) {
+              setSessionId(donePayload.sessionId);
             }
             setLoading(false);
 
-            // 异步拉取执行树快照，附加到 agent 消息
+            // 异步拉取执行树快照 + token 用量
             if (resolvedSessionId) {
               api.getExecutionTree(resolvedSessionId).then((treeRes) => {
                 if (treeRes.success && treeRes.data) {
@@ -157,9 +196,12 @@ export function useChat() {
                     ),
                   );
                 }
-              }).catch(() => {
-                // 执行树获取失败不影响主流程
-              });
+              }).catch(() => {});
+              api.getSessionUsage(resolvedSessionId).then((usageRes) => {
+                if (usageRes.success && usageRes.data) {
+                  setTokenUsage(usageRes.data);
+                }
+              }).catch(() => {});
             }
           },
           onError: (err) => {
@@ -232,6 +274,7 @@ export function useChat() {
     setSessionId(null);
     setMessages([]);
     setError(null);
+    setTokenUsage(null);
   }, []);
 
   return {
@@ -239,6 +282,7 @@ export function useChat() {
     messages,
     loading,
     error,
+    tokenUsage,
     sendMessage,
     sendMessageSync,
     stopGeneration,

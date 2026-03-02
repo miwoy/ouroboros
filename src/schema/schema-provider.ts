@@ -44,9 +44,16 @@ export function createSchemaProvider(
   return {
     getVariables(): SelfSchemaVariables {
       const hormones = hormoneManager.getState();
+      const gpuText =
+        bodySchema.gpu.length > 0
+          ? bodySchema.gpu
+              .map((g) => `${g.name} (${g.memoryMB}MB, 利用率 ${g.utilization}%)`)
+              .join("; ")
+          : "无";
       return {
         platform: `${bodySchema.platform} (Node.js ${bodySchema.nodeVersion})`,
         availableMemory: `${bodySchema.memory.availableGB}GB / ${bodySchema.memory.totalGB}GB`,
+        gpu: gpuText,
         workspacePath: bodySchema.workspacePath,
         worldModel: formatWorldModel(soulSchema.worldModel),
         selfAwareness: formatSelfAwareness(soulSchema.selfAwareness),

@@ -5,8 +5,6 @@
  * 支持三层模式：占位符 → 直连模型 → ReAct 循环。
  */
 
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { Router } from "./router.js";
 import type { SessionManager } from "./session.js";
 import type { ApiDeps, SendMessageRequest, CreateSessionRequest, SSEEvent } from "./types.js";
@@ -30,6 +28,7 @@ import {
   paginatedResponse,
 } from "./response.js";
 import { formatAgentResponse } from "./formatter.js";
+import { createEventQueue, loadRegisteredAgents, readPackageVersion } from "./handler-utils.js";
 
 /** 默认 Agent ID */
 const DEFAULT_AGENT_ID = "agent:main";
@@ -116,6 +115,18 @@ export function registerHandlers(
     }
     const events = createTreeStreamEvents(ctx.params.sessionId, sessionManager);
     ctx.respondSSE(events);
+  });
+
+  // ─── Token 用量 ──────────────────────────────────
+
+  // 获取会话 Token 用量
+  router.get("/api/sessions/:sessionId/usage", async (ctx) => {
+    const usage = sessionManager.getTokenUsage(ctx.params.sessionId);
+    if (usage === null) {
+      ctx.respond(404, notFoundError("会话"));
+      return;
+    }
+    ctx.respond(200, successResponse(usage));
   });
 
   // ─── 消息 ──────────────────────────────────
@@ -358,9 +369,7 @@ async function buildContextPrompt(deps: ApiDeps, message?: string): Promise<stri
   return assembled.systemPrompt;
 }
 
-/**
- * 将对话记录写入记忆系统（fire-and-forget）
- */
+/** 将对话记录写入记忆系统（fire-and-forget） */
 function writebackMemory(deps: ApiDeps, message: string, answer: string): void {
   if (!deps.memoryManager) return;
 
@@ -374,9 +383,7 @@ function writebackMemory(deps: ApiDeps, message: string, answer: string): void {
   deps.memoryManager.shortTerm.append(entry).catch(() => {});
 }
 
-/**
- * 触发反思（fire-and-forget）
- */
+/** 触发反思（fire-and-forget） */
 function triggerReflection(
   deps: ApiDeps,
   message: string,
@@ -447,9 +454,10 @@ async function processMessage(
     });
 
     sessionManager.setExecutionTree(sessionId, result.executionTree);
-    sessionManager.addMessage(sessionId, "agent", result.answer);
-
-    // 记忆回写 + 反思（fire-and-forget）
+    sessionManager.addMessage(sessionId, "agent", result.answer, buildReactMetadata(result));
+    if (deps.fullConfig?.agents?.trackTokenUsage !== false) {
+      sessionManager.addTokenUsage(sessionId, result.totalUsage);
+    }
     writebackMemory(deps, message, result.answer);
     triggerReflection(deps, message, result);
 
@@ -564,6 +572,28 @@ async function* createReactStreamEvents(
 
       sessionManager.setExecutionTree(sessionId, tree);
 
+      // WS 实时推送（如有 WS 服务器）
+      if (deps.wsServer) {
+        deps.wsServer.sendToSession(sessionId, "react_step", {
+          stepIndex: step.stepIndex,
+          thought: step.thought,
+        });
+        for (const tc of step.toolCalls) {
+          deps.wsServer.sendToSession(sessionId, "tool_call", {
+            toolCallId: tc.requestId,
+            toolName: tc.toolId,
+            input: tc.input,
+          });
+          deps.wsServer.sendToSession(sessionId, "tool_result", {
+            toolCallId: tc.requestId,
+            output: tc.output,
+            success: tc.success,
+            error: tc.error,
+          });
+        }
+        deps.wsServer.sendToSession(sessionId, "tree_update", tree);
+      }
+
       // Inspector 检查
       if (deps.inspector && deps.schemaProvider) {
         const inspectResult = deps.inspector.inspect({
@@ -583,12 +613,29 @@ async function* createReactStreamEvents(
     .then((result) => {
       pushEvent({ event: "text_delta", data: JSON.stringify({ text: result.answer }) });
       sessionManager.setExecutionTree(sessionId, result.executionTree);
-      sessionManager.addMessage(sessionId, "agent", result.answer);
+      sessionManager.addMessage(sessionId, "agent", result.answer, buildReactMetadata(result));
+      if (deps.fullConfig?.agents?.trackTokenUsage !== false) {
+        sessionManager.addTokenUsage(sessionId, result.totalUsage);
+      }
+      // WS 完成推送
+      if (deps.wsServer) {
+        deps.wsServer.sendToSession(sessionId, "tree_update", result.executionTree);
+        deps.wsServer.sendToSession(sessionId, "done", {
+          sessionId,
+          stopReason: result.stopReason,
+          totalUsage: result.totalUsage,
+        });
+      }
       writebackMemory(deps, message, result.answer);
       triggerReflection(deps, message, result);
       pushEvent({
         event: "done",
-        data: JSON.stringify({ sessionId, complete: true, stopReason: result.stopReason }),
+        data: JSON.stringify({
+          sessionId,
+          complete: true,
+          stopReason: result.stopReason,
+          totalUsage: result.totalUsage,
+        }),
       });
       pushEvent(null);
     })
@@ -690,6 +737,32 @@ async function* createTreeStreamEvents(
 
 // ─── 共享辅助函数 ──────────────────────────────────────────────────
 
+/** 构建 ReAct 结果的消息元数据 */
+function buildReactMetadata(result: {
+  steps: readonly ReactStep[];
+  totalUsage: unknown;
+  stopReason: string;
+}): Record<string, unknown> {
+  return {
+    thought: result.steps
+      .map((s) => s.thought)
+      .filter(Boolean)
+      .join("\n"),
+    toolCalls: result.steps.flatMap((s) =>
+      s.toolCalls.map((tc) => ({
+        toolId: tc.toolId,
+        input: tc.input,
+        output: tc.output,
+        success: tc.success,
+        error: tc.error,
+        duration: tc.duration,
+      })),
+    ),
+    totalUsage: result.totalUsage,
+    stopReason: result.stopReason,
+  };
+}
+
 /** 从 provider 获取 callModel 函数 */
 function getCallModelFn(deps: ApiDeps): CallModelFn | null {
   if (!deps.providerRegistry || !deps.defaultProvider) return null;
@@ -722,91 +795,4 @@ function prepareReactDeps(
     agentId: DEFAULT_AGENT_ID,
   };
   return { safeTools, toolExecutor, reactConfig };
-}
-
-/** SSE 事件队列（桥接 callback → async generator） */
-function createEventQueue(): {
-  pushEvent: (event: SSEEvent | null) => void;
-  waitForEvent: () => Promise<void>;
-  drainQueue: (wait: () => Promise<void>) => AsyncGenerator<SSEEvent>;
-} {
-  const queue: Array<SSEEvent | null> = [];
-  let notifier: (() => void) | null = null;
-
-  function pushEvent(event: SSEEvent | null): void {
-    queue.push(event);
-    if (notifier) {
-      notifier();
-      notifier = null;
-    }
-  }
-
-  function waitForEvent(): Promise<void> {
-    return new Promise((resolve) => {
-      notifier = resolve;
-    });
-  }
-
-  async function* drainQueue(wait: () => Promise<void>): AsyncGenerator<SSEEvent> {
-    while (true) {
-      while (queue.length === 0) {
-        await wait();
-      }
-      const event = queue.shift()!;
-      if (event === null) break;
-      yield event;
-    }
-  }
-
-  return { pushEvent, waitForEvent, drainQueue };
-}
-
-/** 从 solution registry 加载已注册 Agent 列表 */
-async function loadRegisteredAgents(workspacePath: string): Promise<
-  readonly {
-    id: string;
-    name: string;
-    description: string;
-    status: string;
-    skills: readonly string[];
-  }[]
-> {
-  try {
-    const registryPath = join(workspacePath, "solutions", "registry.json");
-    const raw = await readFile(registryPath, "utf-8");
-    const data = JSON.parse(raw) as {
-      solutions?: readonly {
-        id: string;
-        name: string;
-        description: string;
-        status: string;
-        skills?: readonly string[];
-      }[];
-    };
-    return (data.solutions ?? []).map((s) => ({
-      id: s.id,
-      name: s.name,
-      description: s.description,
-      status: s.status,
-      skills: s.skills ?? [],
-    }));
-  } catch {
-    return [];
-  }
-}
-
-/** 缓存的 package.json 版本号 */
-let cachedVersion: string | null = null;
-
-/** 读取 package.json 版本（缓存） */
-async function readPackageVersion(): Promise<string> {
-  if (cachedVersion) return cachedVersion;
-  try {
-    const pkgPath = join(import.meta.dirname ?? ".", "..", "..", "package.json");
-    const raw = await readFile(pkgPath, "utf-8");
-    cachedVersion = (JSON.parse(raw) as { version: string }).version;
-    return cachedVersion;
-  } catch {
-    return "unknown";
-  }
 }

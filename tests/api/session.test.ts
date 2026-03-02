@@ -248,7 +248,13 @@ describe("createSessionManager", () => {
         agentId: "agent:main",
         description: "持久化测试",
         messages: [
-          { id: "msg-1", sessionId: "test-session-1", role: "user", content: "你好", timestamp: "2026-01-01T00:00:00Z" },
+          {
+            id: "msg-1",
+            sessionId: "test-session-1",
+            role: "user",
+            content: "你好",
+            timestamp: "2026-01-01T00:00:00Z",
+          },
         ],
         createdAt: "2026-01-01T00:00:00Z",
         updatedAt: "2026-01-01T00:00:00Z",
@@ -357,6 +363,99 @@ describe("createSessionManager", () => {
 
       manager.createSession("agent:main");
       // 不应有任何文件操作
+    });
+
+    it("executionTree 应持久化和恢复", async () => {
+      workspacePath = await createTempWorkspace();
+      const manager = createSessionManager(workspacePath);
+      await manager.init();
+
+      const session = manager.createSession("agent:main");
+      const tree = createExecutionTree("agent:main", "持久化测试任务");
+
+      manager.setExecutionTree(session.sessionId, tree);
+
+      // 等待防抖写盘
+      await new Promise((resolve) => setTimeout(resolve, 700));
+
+      // 创建新 manager 从磁盘恢复
+      const manager2 = createSessionManager(workspacePath);
+      await manager2.init();
+
+      const restored = manager2.getExecutionTree(session.sessionId);
+      expect(restored).not.toBeNull();
+      expect(restored!.agentId).toBe("agent:main");
+      expect(restored!.id).toBe(tree.id);
+    });
+
+    it("tokenUsage 应持久化和恢复", async () => {
+      workspacePath = await createTempWorkspace();
+      const manager = createSessionManager(workspacePath);
+      await manager.init();
+
+      const session = manager.createSession("agent:main");
+
+      manager.addTokenUsage(session.sessionId, { promptTokens: 100, completionTokens: 50 });
+      manager.addTokenUsage(session.sessionId, { promptTokens: 200, completionTokens: 100 });
+
+      // 等待防抖写盘
+      await new Promise((resolve) => setTimeout(resolve, 700));
+
+      // 创建新 manager 从磁盘恢复
+      const manager2 = createSessionManager(workspacePath);
+      await manager2.init();
+
+      const usage = manager2.getTokenUsage(session.sessionId);
+      expect(usage).not.toBeNull();
+      expect(usage!.totalPromptTokens).toBe(300);
+      expect(usage!.totalCompletionTokens).toBe(150);
+      expect(usage!.totalTokens).toBe(450);
+      expect(usage!.messageCount).toBe(2);
+    });
+  });
+
+  describe("tokenUsage", () => {
+    it("addTokenUsage 应累加用量", () => {
+      const manager = createSessionManager();
+      const session = manager.createSession("agent:main");
+
+      manager.addTokenUsage(session.sessionId, { promptTokens: 10, completionTokens: 5 });
+      manager.addTokenUsage(session.sessionId, { promptTokens: 20, completionTokens: 10 });
+
+      const usage = manager.getTokenUsage(session.sessionId);
+      expect(usage!.totalPromptTokens).toBe(30);
+      expect(usage!.totalCompletionTokens).toBe(15);
+      expect(usage!.totalTokens).toBe(45);
+      expect(usage!.messageCount).toBe(2);
+    });
+
+    it("addTokenUsage 会话不存在时返回 false", () => {
+      const manager = createSessionManager();
+      expect(manager.addTokenUsage("nonexistent", { promptTokens: 10 })).toBe(false);
+    });
+
+    it("getTokenUsage 初始为零", () => {
+      const manager = createSessionManager();
+      const session = manager.createSession("agent:main");
+
+      const usage = manager.getTokenUsage(session.sessionId);
+      expect(usage!.totalTokens).toBe(0);
+      expect(usage!.messageCount).toBe(0);
+    });
+
+    it("getTokenUsage 会话不存在时返回 null", () => {
+      const manager = createSessionManager();
+      expect(manager.getTokenUsage("nonexistent")).toBeNull();
+    });
+
+    it("toSessionInfo 应包含 tokenUsage", () => {
+      const manager = createSessionManager();
+      const session = manager.createSession("agent:main");
+
+      manager.addTokenUsage(session.sessionId, { promptTokens: 50, completionTokens: 25 });
+      const info = manager.getSession(session.sessionId);
+      expect(info!.tokenUsage).toBeDefined();
+      expect(info!.tokenUsage!.totalTokens).toBe(75);
     });
   });
 });

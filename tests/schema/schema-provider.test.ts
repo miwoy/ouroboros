@@ -15,6 +15,7 @@ describe("createSchemaProvider", () => {
     expect(vars.workspacePath).toBe("/tmp/workspace");
     expect(vars.worldModel).toContain("世界规则");
     expect(vars.selfAwareness).toContain("身份");
+    expect(vars.gpu).toBeTruthy();
     expect(vars.focusLevel).toBeTruthy();
     expect(vars.cautionLevel).toBeTruthy();
     expect(vars.creativityLevel).toBeTruthy();

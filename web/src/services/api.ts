@@ -64,6 +64,15 @@ export interface ChatMessage {
   readonly role: "user" | "agent" | "system";
   readonly content: string;
   readonly timestamp: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+/** Token 用量统计 */
+export interface TokenUsageSummary {
+  readonly totalPromptTokens: number;
+  readonly totalCompletionTokens: number;
+  readonly totalTokens: number;
+  readonly messageCount: number;
 }
 
 /** Agent 信息 */
@@ -330,13 +339,22 @@ export async function getAgent(agentId: string): Promise<ApiResponse<AgentInfo>>
 
 // ─── 自我图式 / 技能 / 工具 ──────────────────────────────────────
 
+/** GPU 信息 */
+export interface GpuInfo {
+  readonly name: string;
+  readonly memoryMB: number;
+  readonly utilization: number;
+}
+
 /** 自我图式数据 */
 export interface SelfSchemaData {
   readonly body: {
     readonly platform: string;
     readonly nodeVersion: string;
     readonly workspacePath: string;
-    readonly memory: { readonly totalGB: number; readonly availableGB: number };
+    readonly memory: { readonly totalGB: string; readonly availableGB: string; readonly usagePercent: number };
+    readonly disk: { readonly availableGB: string; readonly totalGB: string };
+    readonly gpu: readonly GpuInfo[];
     readonly cpuCores: number;
   } | null;
   readonly soul: {
@@ -382,4 +400,10 @@ export async function getSkills(): Promise<ApiResponse<SkillInfo[]>> {
 
 export async function getTools(): Promise<ApiResponse<ToolInfo[]>> {
   return request("/api/tools");
+}
+
+// ─── Token 用量 ──────────────────────────────────────
+
+export async function getSessionUsage(sessionId: string): Promise<ApiResponse<TokenUsageSummary>> {
+  return request(`/api/sessions/${sessionId}/usage`);
 }

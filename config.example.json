@@ -64,7 +64,8 @@
     "defaultMaxTurns": 50,
     "knowledgeMaxTokens": 8000,
     "think": false,
-    "thinkLevel": "medium"
+    "thinkLevel": "medium",
+    "trackTokenUsage": true
   },
   "superAgents": {
     "defaultMaxDuration": 600,

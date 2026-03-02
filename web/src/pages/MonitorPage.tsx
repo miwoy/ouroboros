@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import * as api from "../services/api";
 import type { HealthData, SelfSchemaData, SkillInfo, ToolInfo } from "../services/api";
+import { useBodySchema } from "../hooks/useBodySchema";
 import "./MonitorPage.css";
 
 type TabId = "self-schema" | "skills" | "tools";
@@ -17,8 +18,8 @@ export function MonitorPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("self-schema");
 
-  // 自我图式
-  const [schema, setSchema] = useState<SelfSchemaData | null>(null);
+  // 自我图式（WS 实时 + REST 兜底）
+  const schema = useBodySchema();
   // 技能列表
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   // 工具列表
@@ -32,8 +33,7 @@ export function MonitorPage() {
 
   // 切换 tab 时加载对应数据
   useEffect(() => {
-    if (activeTab === "self-schema") loadSelfSchema();
-    else if (activeTab === "skills") loadSkills();
+    if (activeTab === "skills") loadSkills();
     else if (activeTab === "tools") loadTools();
   }, [activeTab]);
 
@@ -49,13 +49,6 @@ export function MonitorPage() {
     } catch {
       setError("Cannot connect to server");
     }
-  }
-
-  async function loadSelfSchema() {
-    try {
-      const res = await api.getSelfSchema();
-      if (res.success && res.data) setSchema(res.data);
-    } catch { /* 静默 */ }
   }
 
   async function loadSkills() {
@@ -170,12 +163,26 @@ function SelfSchemaTab({ schema }: { readonly schema: SelfSchemaData | null }) {
             </div>
             <div className="schema-item">
               <span className="schema-key">内存</span>
-              <span className="schema-val">{schema.body.availableGB}GB / {schema.body.totalGB}GB</span>
+              <span className="schema-val">
+                {schema.body.memory.availableGB}GB / {schema.body.memory.totalGB}GB (已用 {schema.body.memory.usagePercent}%)
+              </span>
+            </div>
+            <div className="schema-item">
+              <span className="schema-key">磁盘</span>
+              <span className="schema-val">
+                可用 {schema.body.disk.availableGB}GB / 总计 {schema.body.disk.totalGB}GB
+              </span>
             </div>
             <div className="schema-item">
               <span className="schema-key">CPU 核心</span>
               <span className="schema-val">{schema.body.cpuCores}</span>
             </div>
+            {schema.body.gpu.length > 0 && schema.body.gpu.map((g, i) => (
+              <div key={i} className="schema-item">
+                <span className="schema-key">GPU {schema.body!.gpu.length > 1 ? i + 1 : ""}</span>
+                <span className="schema-val">{g.name} ({g.memoryMB}MB, 利用率 {g.utilization}%)</span>
+              </div>
+            ))}
             <div className="schema-item">
               <span className="schema-key">工作空间</span>
               <span className="schema-val schema-mono">{schema.body.workspacePath}</span>

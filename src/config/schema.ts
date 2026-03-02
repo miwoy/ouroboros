@@ -127,6 +127,8 @@ const agentConfigSchema = z.object({
   think: z.boolean().default(false),
   /** thinking 级别: low | medium | high（默认 medium） */
   thinkLevel: z.enum(["low", "medium", "high"]).default("medium"),
+  /** 是否记录 Token 消耗统计（默认开启） */
+  trackTokenUsage: z.boolean().default(true),
 });
 
 /**
@@ -248,6 +250,7 @@ export const configSchema = z.object({
     knowledgeMaxTokens: 8000,
     think: false,
     thinkLevel: "medium",
+    trackTokenUsage: true,
   }),
   superAgents: superAgentConfigSchema.default({
     defaultMaxDuration: 600,

@@ -79,6 +79,7 @@ export default function App() {
               error={chat.error}
               onSend={handleSend}
               onStop={chat.stopGeneration}
+              tokenUsage={chat.tokenUsage}
             />
           )}
           {currentView === "agents" && <AgentsPage />}

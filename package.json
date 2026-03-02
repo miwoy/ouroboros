@@ -37,6 +37,7 @@
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^25.3.3",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",
     "@vitest/coverage-v8": "^4.0.18",
@@ -50,6 +51,7 @@
   "dependencies": {
     "@mariozechner/pi-ai": "^0.55.3",
     "@tobilu/qmd": "^1.0.7",
-    "undici": "^7.22.0"
+    "undici": "^7.22.0",
+    "ws": "^8.19.0"
   }
 }

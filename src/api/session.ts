@@ -9,8 +9,9 @@
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile, readdir, unlink, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { ChatMessage, SessionInfo } from "./types.js";
+import type { ChatMessage, SessionInfo, TokenUsageSummary } from "./types.js";
 import type { ExecutionTree } from "../core/types.js";
+import { treeToJSON, treeFromJSON } from "../core/execution-tree.js";
 
 /** 内部会话结构 */
 interface Session {
@@ -21,6 +22,7 @@ interface Session {
   readonly createdAt: string;
   updatedAt: string;
   executionTree: ExecutionTree | null;
+  tokenUsage: TokenUsageSummary;
 }
 
 /** 持久化文件格式 */
@@ -31,6 +33,13 @@ interface PersistedSession {
   readonly messages: readonly ChatMessage[];
   readonly createdAt: string;
   readonly updatedAt: string;
+  readonly executionTree?: unknown;
+  readonly tokenUsage?: TokenUsageSummary;
+}
+
+/** 空 Token 用量 */
+function emptyTokenUsage(): TokenUsageSummary {
+  return { totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, messageCount: 0 };
 }
 
 /** 防抖定时器集合 */
@@ -72,6 +81,10 @@ export function createSessionManager(workspacePath?: string) {
       messages: session.messages,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
+      executionTree: session.executionTree
+        ? JSON.parse(treeToJSON(session.executionTree))
+        : undefined,
+      tokenUsage: session.tokenUsage.totalTokens > 0 ? session.tokenUsage : undefined,
     };
 
     writeFile(filePath, JSON.stringify(data, null, 2), "utf-8").catch(() => {
@@ -134,6 +147,16 @@ export function createSessionManager(workspacePath?: string) {
         // 校验必要字段
         if (!data.sessionId || !data.agentId || !Array.isArray(data.messages)) continue;
 
+        // 恢复执行树
+        let executionTree: ExecutionTree | null = null;
+        if (data.executionTree) {
+          try {
+            executionTree = treeFromJSON(JSON.stringify(data.executionTree));
+          } catch {
+            // 执行树反序列化失败，忽略
+          }
+        }
+
         const session: Session = {
           sessionId: data.sessionId,
           agentId: data.agentId,
@@ -141,7 +164,8 @@ export function createSessionManager(workspacePath?: string) {
           messages: [...data.messages],
           createdAt: data.createdAt || new Date().toISOString(),
           updatedAt: data.updatedAt || new Date().toISOString(),
-          executionTree: null,
+          executionTree,
+          tokenUsage: data.tokenUsage ?? emptyTokenUsage(),
         };
 
         sessions.set(session.sessionId, session);
@@ -166,6 +190,7 @@ export function createSessionManager(workspacePath?: string) {
       createdAt: now,
       updatedAt: now,
       executionTree: null,
+      tokenUsage: emptyTokenUsage(),
     };
 
     sessions.set(sessionId, session);
@@ -242,6 +267,7 @@ export function createSessionManager(workspacePath?: string) {
     if (!session) return false;
     session.executionTree = tree;
     session.updatedAt = new Date().toISOString();
+    debouncedPersist(session);
     return true;
   }
 
@@ -251,6 +277,36 @@ export function createSessionManager(workspacePath?: string) {
   function getExecutionTree(sessionId: string): ExecutionTree | null {
     const session = sessions.get(sessionId);
     return session?.executionTree ?? null;
+  }
+
+  /**
+   * 累加 Token 用量
+   */
+  function addTokenUsage(
+    sessionId: string,
+    usage: { promptTokens?: number; completionTokens?: number },
+  ): boolean {
+    const session = sessions.get(sessionId);
+    if (!session) return false;
+
+    const prompt = usage.promptTokens ?? 0;
+    const completion = usage.completionTokens ?? 0;
+    session.tokenUsage = {
+      totalPromptTokens: session.tokenUsage.totalPromptTokens + prompt,
+      totalCompletionTokens: session.tokenUsage.totalCompletionTokens + completion,
+      totalTokens: session.tokenUsage.totalTokens + prompt + completion,
+      messageCount: session.tokenUsage.messageCount + 1,
+    };
+    debouncedPersist(session);
+    return true;
+  }
+
+  /**
+   * 获取 Token 用量摘要
+   */
+  function getTokenUsage(sessionId: string): TokenUsageSummary | null {
+    const session = sessions.get(sessionId);
+    return session ? session.tokenUsage : null;
   }
 
   /**
@@ -279,6 +335,8 @@ export function createSessionManager(workspacePath?: string) {
     getMessages,
     setExecutionTree,
     getExecutionTree,
+    addTokenUsage,
+    getTokenUsage,
     deleteSession,
   };
 }
@@ -292,6 +350,7 @@ function toSessionInfo(session: Session): SessionInfo {
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     hasExecutionTree: session.executionTree !== null,
+    tokenUsage: session.tokenUsage,
   };
 }
 

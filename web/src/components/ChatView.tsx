@@ -16,9 +16,10 @@ interface ChatViewProps {
   readonly error: string | null;
   readonly onSend: (message: string) => void;
   readonly onStop: () => void;
+  readonly tokenUsage?: { totalTokens: number; totalPromptTokens: number; totalCompletionTokens: number } | null;
 }
 
-export function ChatView({ messages, loading, error, onSend, onStop }: ChatViewProps) {
+export function ChatView({ messages, loading, error, onSend, onStop, tokenUsage }: ChatViewProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -63,6 +64,12 @@ export function ChatView({ messages, loading, error, onSend, onStop }: ChatViewP
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {tokenUsage && tokenUsage.totalTokens > 0 && (
+        <div className="chat-token-usage">
+          Token: {tokenUsage.totalTokens.toLocaleString()} (prompt: {tokenUsage.totalPromptTokens.toLocaleString()}, completion: {tokenUsage.totalCompletionTokens.toLocaleString()})
+        </div>
+      )}
 
       <form className="chat-input-bar" onSubmit={handleSubmit}>
         <textarea
@@ -153,6 +160,11 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
             </span>
           ) : null}
         </div>
+        {!isUser && message.metadata?.totalUsage && (
+          <div className="message-token-usage">
+            {(message.metadata.totalUsage as { totalTokens: number }).totalTokens.toLocaleString()} tokens
+          </div>
+        )}
       </div>
     </div>
   );

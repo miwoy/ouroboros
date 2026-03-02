@@ -12,6 +12,8 @@ import { createRateLimiter, applyMiddleware } from "./middleware.js";
 import { createSessionManager } from "./session.js";
 import { registerHandlers } from "./handlers.js";
 import { internalError } from "./response.js";
+import { createWsServer, type WsServer } from "./ws-server.js";
+import { startBodyPush, type BodyPush } from "./ws-body-push.js";
 
 /** 服务器实例 */
 export interface ApiServer {
@@ -23,6 +25,8 @@ export interface ApiServer {
   getHttpServer(): Server;
   /** 获取会话管理器 */
   getSessionManager(): ReturnType<typeof createSessionManager>;
+  /** 获取 WebSocket 服务器 */
+  getWsServer(): WsServer | null;
 }
 
 /**
@@ -33,6 +37,10 @@ export function createApiServer(deps: ApiDeps): ApiServer {
   const router = createRouter();
   const rateLimiter = createRateLimiter(config.rateLimit);
   const sessionManager = createSessionManager(deps.workspacePath);
+
+  // 将 wsServer 注入到 deps（后续注册路由需要）
+  let wsServer: WsServer | null = null;
+  let bodyPush: BodyPush | null = null;
 
   // 注册路由
   registerHandlers(router, sessionManager, deps);
@@ -58,6 +66,16 @@ export function createApiServer(deps: ApiDeps): ApiServer {
     // 加载持久化会话
     await sessionManager.init();
 
+    // 创建 WebSocket 服务器
+    wsServer = createWsServer(server, deps.logger, config.apiKey);
+    deps.logger.info("api", "WebSocket 服务器已挂载: /ws");
+
+    // 启动身体图式定时推送
+    if (deps.schemaProvider) {
+      bodyPush = startBodyPush(deps.schemaProvider, wsServer);
+      deps.logger.info("api", "身体图式定时推送已启动（5s 间隔）");
+    }
+
     return new Promise((resolve) => {
       server.listen(config.port, config.host, () => {
         deps.logger.info("api", `API 服务器已启动: http://${config.host}:${config.port}`);
@@ -67,6 +85,8 @@ export function createApiServer(deps: ApiDeps): ApiServer {
   }
 
   async function stop(): Promise<void> {
+    bodyPush?.stop();
+    wsServer?.close();
     rateLimiter.destroy();
     return new Promise((resolve, reject) => {
       server.close((err) => {
@@ -88,5 +108,9 @@ export function createApiServer(deps: ApiDeps): ApiServer {
     return sessionManager;
   }
 
-  return { start, stop, getHttpServer, getSessionManager };
+  function getWsServerInstance(): WsServer | null {
+    return wsServer;
+  }
+
+  return { start, stop, getHttpServer, getSessionManager, getWsServer: getWsServerInstance };
 }

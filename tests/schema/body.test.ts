@@ -2,8 +2,14 @@
  * 身体图式测试
  */
 
-import { describe, it, expect } from "vitest";
-import { getBodySchema, formatBodySchema, getDiskInfo, getFullBodySchema } from "../../src/schema/body.js";
+import { describe, it, expect, vi } from "vitest";
+import {
+  getBodySchema,
+  formatBodySchema,
+  getDiskInfo,
+  getFullBodySchema,
+  getGpuInfo,
+} from "../../src/schema/body.js";
 
 describe("getBodySchema", () => {
   it("应返回完整的身体图式", () => {
@@ -24,6 +30,11 @@ describe("getBodySchema", () => {
     const schema = getBodySchema("/tmp/workspace");
     expect(schema.disk.availableGB).toBe("未知");
     expect(schema.disk.totalGB).toBe("未知");
+  });
+
+  it("GPU 默认为空数组（同步获取不含 GPU）", () => {
+    const schema = getBodySchema("/tmp/workspace");
+    expect(schema.gpu).toEqual([]);
   });
 });
 
@@ -49,6 +60,25 @@ describe("getDiskInfo", () => {
   });
 });
 
+describe("getGpuInfo", () => {
+  it("应返回数组（无论 nvidia-smi 是否可用）", async () => {
+    const gpus = await getGpuInfo();
+    expect(Array.isArray(gpus)).toBe(true);
+  });
+
+  it("nvidia-smi 不可用时返回空数组", async () => {
+    // 在大多数 CI/测试环境没有 NVIDIA GPU
+    const gpus = await getGpuInfo();
+    expect(gpus).toBeDefined();
+    // 无论有无 GPU，结果都应为数组
+    for (const g of gpus) {
+      expect(g.name).toBeTruthy();
+      expect(typeof g.memoryMB).toBe("number");
+      expect(typeof g.utilization).toBe("number");
+    }
+  });
+});
+
 describe("formatBodySchema", () => {
   it("应格式化为可读文本", () => {
     const schema = getBodySchema("/tmp/workspace");
@@ -60,5 +90,22 @@ describe("formatBodySchema", () => {
     expect(text).toContain("磁盘空间");
     expect(text).toContain("工作目录");
     expect(text).toContain("/tmp/workspace");
+  });
+
+  it("有 GPU 时应包含 GPU 行", () => {
+    const schema = {
+      ...getBodySchema("/tmp/workspace"),
+      gpu: [{ name: "RTX 4090", memoryMB: 24576, utilization: 42 }],
+    };
+    const text = formatBodySchema(schema);
+    expect(text).toContain("GPU: RTX 4090");
+    expect(text).toContain("24576MB");
+    expect(text).toContain("42%");
+  });
+
+  it("无 GPU 时不应包含 GPU 行", () => {
+    const schema = getBodySchema("/tmp/workspace");
+    const text = formatBodySchema(schema);
+    expect(text).not.toContain("GPU:");
   });
 });

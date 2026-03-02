@@ -14,6 +14,7 @@ import type { Inspector } from "../inspector/types.js";
 import type { Reflector } from "../reflection/types.js";
 import type { Config } from "../config/schema.js";
 import type { SkillRegistry } from "../skill/types.js";
+import type { WsServer } from "./ws-server.js";
 
 // ─── 统一响应格式 ──────────────────────────────────────────────
 
@@ -67,6 +68,14 @@ export interface ChatMessage {
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
+/** Token 用量统计 */
+export interface TokenUsageSummary {
+  readonly totalPromptTokens: number;
+  readonly totalCompletionTokens: number;
+  readonly totalTokens: number;
+  readonly messageCount: number;
+}
+
 /** 会话信息 */
 export interface SessionInfo {
   readonly sessionId: string;
@@ -76,6 +85,7 @@ export interface SessionInfo {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly hasExecutionTree?: boolean;
+  readonly tokenUsage?: TokenUsageSummary;
 }
 
 /** Agent 信息 */
@@ -179,6 +189,8 @@ export interface ApiDeps {
   readonly reflector?: Reflector;
   /** 技能注册表 */
   readonly skillRegistry?: SkillRegistry;
+  /** WebSocket 服务器（可选，由 server.ts 启动后注入） */
+  readonly wsServer?: WsServer;
 }
 
 // ─── 路由 ──────────────────────────────────────────────

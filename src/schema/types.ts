@@ -19,12 +19,21 @@ export interface DiskInfo {
   readonly totalGB: string;
 }
 
+/** GPU 信息 */
+export interface GpuInfo {
+  readonly name: string;
+  readonly memoryMB: number;
+  /** 利用率 0-100 */
+  readonly utilization: number;
+}
+
 /** 身体图式 */
 export interface BodySchema {
   readonly platform: string;
   readonly cpuCores: number;
   readonly memory: MemoryInfo;
   readonly disk: DiskInfo;
+  readonly gpu: readonly GpuInfo[];
   readonly nodeVersion: string;
   readonly workspacePath: string;
   readonly timestamp: string;
@@ -84,6 +93,7 @@ export interface HormoneManager {
 export interface SelfSchemaVariables {
   readonly platform: string;
   readonly availableMemory: string;
+  readonly gpu: string;
   readonly workspacePath: string;
   readonly worldModel: string;
   readonly selfAwareness: string;

@@ -8,7 +8,7 @@
 import { platform, arch, totalmem, freemem, cpus } from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { BodySchema, DiskInfo } from "./types.js";
+import type { BodySchema, DiskInfo, GpuInfo } from "./types.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -27,6 +27,7 @@ export function getBodySchema(workspacePath: string): BodySchema {
     cpuCores: cpus().length,
     memory: { totalGB, availableGB, usagePercent },
     disk: { availableGB: "未知", totalGB: "未知" },
+    gpu: [],
     nodeVersion: process.version,
     workspacePath,
     timestamp: new Date().toISOString(),
@@ -53,23 +54,54 @@ export async function getDiskInfo(workspacePath: string): Promise<DiskInfo> {
 }
 
 /**
- * 获取完整的身体图式（含磁盘信息）
+ * 获取 GPU 信息（通过 nvidia-smi）
+ *
+ * 无 NVIDIA GPU 或 nvidia-smi 不可用时返回空数组。
+ */
+export async function getGpuInfo(): Promise<readonly GpuInfo[]> {
+  try {
+    const { stdout } = await execFileAsync("nvidia-smi", [
+      "--query-gpu=name,memory.total,utilization.gpu",
+      "--format=csv,noheader,nounits",
+    ]);
+    const lines = stdout.trim().split("\n").filter(Boolean);
+    return lines.map((line) => {
+      const parts = line.split(",").map((s) => s.trim());
+      return {
+        name: parts[0] ?? "Unknown",
+        memoryMB: parseInt(parts[1] ?? "0", 10) || 0,
+        utilization: parseInt(parts[2] ?? "0", 10) || 0,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 获取完整的身体图式（含磁盘、GPU 信息）
  */
 export async function getFullBodySchema(workspacePath: string): Promise<BodySchema> {
   const base = getBodySchema(workspacePath);
-  const disk = await getDiskInfo(workspacePath);
-  return { ...base, disk };
+  const [disk, gpu] = await Promise.all([getDiskInfo(workspacePath), getGpuInfo()]);
+  return { ...base, disk, gpu };
 }
 
 /**
  * 将身体图式格式化为提示词文本
  */
 export function formatBodySchema(schema: BodySchema): string {
-  return [
+  const lines = [
     `- 运行环境: ${schema.platform} (Node.js ${schema.nodeVersion})`,
     `- CPU 核心数: ${schema.cpuCores}`,
     `- 可用内存: ${schema.memory.availableGB}GB / ${schema.memory.totalGB}GB (已用 ${schema.memory.usagePercent}%)`,
     `- 磁盘空间: 可用 ${schema.disk.availableGB}GB / 总计 ${schema.disk.totalGB}GB`,
-    `- 工作目录: ${schema.workspacePath}`,
-  ].join("\n");
+  ];
+  if (schema.gpu.length > 0) {
+    for (const g of schema.gpu) {
+      lines.push(`- GPU: ${g.name} (${g.memoryMB}MB, 利用率 ${g.utilization}%)`);
+    }
+  }
+  lines.push(`- 工作目录: ${schema.workspacePath}`);
+  return lines.join("\n");
 }
