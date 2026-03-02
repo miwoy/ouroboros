@@ -83,5 +83,13 @@
   "reflection": {
     "enabled": true,
     "minSkillConfidence": 0.7
+  },
+  "persistence": {
+    "enabled": true,
+    "checkpointIntervalMs": 60000,
+    "snapshotDir": "state",
+    "enableAutoRecovery": true,
+    "recoveryTTLSecs": 86400,
+    "maxSnapshots": 10
   }
 }

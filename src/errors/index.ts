@@ -131,3 +131,29 @@ export class ExecutionTreeError extends ReactError {
     this.name = "ExecutionTreeError";
   }
 }
+
+// ─── 持久化系统错误 ──────────────────────────────────────────────────
+
+/** 持久化相关错误基类 */
+export class PersistenceError extends OuroborosError {
+  constructor(message: string, cause?: unknown) {
+    super(message, "PERSISTENCE_ERROR", cause);
+    this.name = "PersistenceError";
+  }
+}
+
+/** 状态文件损坏 */
+export class StateCorruptedError extends PersistenceError {
+  constructor(filePath: string, cause?: unknown) {
+    super(`状态文件损坏: ${filePath}`, cause);
+    this.name = "StateCorruptedError";
+  }
+}
+
+/** 状态恢复失败 */
+export class StateRecoveryError extends PersistenceError {
+  constructor(message: string, cause?: unknown) {
+    super(message, cause);
+    this.name = "StateRecoveryError";
+  }
+}

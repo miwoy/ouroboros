@@ -13,3 +13,4 @@ export * from "./super-agent/index.js";
 export * from "./schema/index.js";
 export * from "./inspector/index.js";
 export * from "./reflection/index.js";
+export * from "./persistence/index.js";

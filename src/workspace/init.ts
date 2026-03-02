@@ -15,6 +15,7 @@
  *   ├── tools/             # 自定义工具
  *   ├── skills/            # 自定义技能
  *   ├── agents/            # Agent 实例及独立工作空间
+ *   ├── state/             # 状态持久化
  *   ├── logs/              # 日志
  *   ├── tmp/               # 临时文件
  *   └── vectors/           # qmd 索引数据
@@ -38,6 +39,7 @@ const WORKSPACE_DIRS = [
   "agents", // Agent 实例及工作空间
   "solutions", // Solution 注册表
   "super-agents", // Super Agent 协作实例
+  "state", // 状态持久化（快照 + 完整性校验）
   "logs", // 日志（按日期分隔，格式 yyyy-MM-dd.log）
   "tmp", // 临时文件（任务完成后清理）
   "vectors", // 向量索引（qmd）

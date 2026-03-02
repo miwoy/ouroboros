@@ -22,6 +22,7 @@ describe("initWorkspace", () => {
       "agents",
       "solutions",
       "super-agents",
+      "state",
       "logs",
       "tmp",
       "vectors",

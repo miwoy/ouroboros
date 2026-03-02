@@ -162,6 +162,25 @@ const superAgentConfigSchema = z.object({
 });
 
 /**
+ * 持久化系统配置 Schema
+ * 控制状态持久化与恢复的行为参数
+ */
+const persistenceConfigSchema = z.object({
+  /** 是否启用持久化 */
+  enabled: z.boolean().default(true),
+  /** 检查点间隔（毫秒） */
+  checkpointIntervalMs: z.number().int().positive().default(60000),
+  /** 快照存储目录（相对 workspace） */
+  snapshotDir: z.string().default("state"),
+  /** 是否启用自动恢复 */
+  enableAutoRecovery: z.boolean().default(true),
+  /** 恢复 TTL（秒），超过此时间的快照不尝试恢复 */
+  recoveryTTLSecs: z.number().int().positive().default(86400),
+  /** 最大保留快照数 */
+  maxSnapshots: z.number().int().positive().default(10),
+});
+
+/**
  * 顶层配置 Schema
  * Ouroboros 完整配置结构
  */
@@ -208,6 +227,14 @@ export const configSchema = z.object({
     enabled: true,
     minSkillConfidence: 0.7,
   }),
+  persistence: persistenceConfigSchema.default({
+    enabled: true,
+    checkpointIntervalMs: 60000,
+    snapshotDir: "state",
+    enableAutoRecovery: true,
+    recoveryTTLSecs: 86400,
+    maxSnapshots: 10,
+  }),
 });
 
 /** 模型提供商配置类型 */
@@ -242,6 +269,9 @@ export type InspectorSchemaConfig = z.infer<typeof inspectorConfigSchema>;
 
 /** 反思程序配置类型 */
 export type ReflectionSchemaConfig = z.infer<typeof reflectionConfigSchema>;
+
+/** 持久化系统配置类型 */
+export type PersistenceSchemaConfig = z.infer<typeof persistenceConfigSchema>;
 
 /** 顶层配置类型 */
 export type Config = z.infer<typeof configSchema>;

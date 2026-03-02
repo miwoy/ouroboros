@@ -179,6 +179,14 @@ ouroboros/
 │   │   ├── builder.ts    # Super Agent 构建器（工作空间 + config + metadata）
 │   │   ├── executor.ts   # 协作执行器（串行/并行/编排模式）
 │   │   └── index.ts      # 公共导出
+│   ├── persistence/      # 状态持久化与恢复
+│   │   ├── types.ts      # 类型定义（SystemStateSnapshot, PersistenceConfig）
+│   │   ├── integrity.ts  # 完整性校验（SHA-256 校验和）
+│   │   ├── snapshot.ts   # 快照创建与序列化
+│   │   ├── manager.ts    # 持久化管理器（保存/加载/清理）
+│   │   ├── recovery.ts   # 恢复管理器（检测/恢复/标记）
+│   │   ├── shutdown.ts   # 优雅关闭处理器（SIGINT/SIGTERM）
+│   │   └── index.ts      # 公共导出
 │   ├── workspace/        # workspace 初始化
 │   ├── errors/           # 错误体系
 │   └── index.ts          # 入口
@@ -200,6 +208,7 @@ ouroboros/
 │   ├── agents/           # Agent 实例及其独立工作空间
 │   ├── solutions/        # Solution 注册表
 │   ├── super-agents/     # Super Agent 协作实例
+│   ├── state/            # 状态持久化（快照+完整性校验）
 │   ├── logs/             # 日志（按日期分隔）
 │   ├── tmp/              # 临时文件（任务完成后清理）
 │   └── vectors/          # 向量索引（qmd，XDG_CACHE_HOME 隔离）
@@ -515,6 +524,56 @@ const result = inspector.inspect({ tree, bodySchema, startTime, config });
 const reflector = createReflector({ callModel, longTermMemory, logger });
 const output = await reflector.reflect({ taskDescription, steps, result, ... });
 // output.insights, output.patterns, output.skillSuggestions, output.memorySummary
+```
+
+## 状态持久化与恢复
+
+系统状态持久化确保长时间运行的任务在中断后能恢复继续，不丢失已完成的进度。
+
+### 核心特性
+
+- **状态快照**：将 Agent 依赖树 + 执行树序列化为 JSON 快照
+- **原子写入**：.tmp → rename 模式，防止写入过程中断导致文件损坏
+- **完整性校验**：SHA-256 校验和验证快照文件完整性
+- **自动恢复**：启动时检测未完成的快照，自动恢复到中断点
+- **优雅关闭**：SIGINT/SIGTERM 信号触发状态保存后安全退出
+- **过期清理**：自动清理超限的旧快照，保留最新 N 个
+
+### 使用示例
+
+```typescript
+import {
+  createPersistenceManager, createRecoveryManager, createShutdownHandler,
+  createSnapshot, DEFAULT_PERSISTENCE_CONFIG,
+} from "ouroboros";
+
+// 1. 创建持久化管理器
+const pm = createPersistenceManager({
+  logger, workspacePath, config: DEFAULT_PERSISTENCE_CONFIG,
+});
+
+// 2. 保存快照
+const snapshot = createSnapshot({
+  trigger: "tool-completed",
+  startTime: Date.now(),
+  taskDescription: "5步文件创建任务",
+  agents: [{ agentId: "agent-1", name: "Writer", executionTree, ... }],
+  rootAgentIds: ["agent-1"],
+});
+await pm.saveSnapshot(snapshot);
+
+// 3. 恢复
+const recovery = createRecoveryManager(pm, deps);
+if (await recovery.hasRecoverableSnapshot()) {
+  const result = await recovery.recover();
+  // result.success, result.restoredAgentCount, result.skippedStepCount
+}
+
+// 4. 优雅关闭
+const handler = createShutdownHandler();
+handler.register(async () => {
+  await pm.saveSnapshot(createSnapshot({ trigger: "graceful-shutdown", ... }));
+});
 ```
 
 ## 日志系统
