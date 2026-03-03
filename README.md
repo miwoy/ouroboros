@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" alt="Ouroboros" width="360" />
+  <img src="logo.png" alt="Ouroboros" />
 </p>
 
 <p align="center">
