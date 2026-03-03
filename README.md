@@ -32,24 +32,48 @@ Ouroboros 是一个分层递归的 Agent 框架。Agent 可以创建工具、技
 git clone git@github.com:miwoy/ouroboros.git
 cd ouroboros && npm install
 
-# 方式一：交互式配置向导（推荐）
-npm run configure
+# 首次安装向导（推荐）
+npx ouroboros init
 
-# 方式二：手动配置
-cp config.example.json config.json
-# 编辑 config.json 配置模型提供商（详见 docs/CONFIGURE.md）
+# 或手动配置
+cp config.example.json ~/.ouroboros/config.json
+# 编辑配置文件（详见 docs/CONFIGURE.md）
 
 # OAuth 登录（ChatGPT/Copilot/Anthropic/Google 订阅用户）
-npm run login -- openai-codex
+npx ouroboros login openai-codex
 
-# 启动后端
-npm run dev
+# 启动服务
+npx ouroboros start
+```
 
-# 启动 Web UI（另一个终端）
+## CLI 命令
+
+```bash
+ouroboros init              # 首次安装向导（QuickStart / Advanced）
+ouroboros start             # 启动 API 服务器（默认命令）
+ouroboros stop              # 停止正在运行的服务
+ouroboros login [provider]  # OAuth 登录指定提供商
+ouroboros configure         # 修改已有配置
+ouroboros doctor            # 环境诊断（检查 Node/配置/OAuth/依赖）
+ouroboros --help            # 查看帮助
+```
+
+全局安装后可直接使用 `ouroboros` 命令：
+
+```bash
+npm install -g .
+ouroboros init
+ouroboros start
+```
+
+### 交互界面
+
+```bash
+# Web UI（需另一个终端）
 cd web && npm install && npm run dev
 # 访问 http://localhost:5173
 
-# 或使用 TUI 终端界面
+# TUI 终端界面
 npm run tui
 ```
 
@@ -64,12 +88,20 @@ npm run tui
 
 ## 开发
 
+开发时使用 `tsx` 直接执行 TypeScript，无需编译：
+
 ```bash
-npm test              # 运行测试
-npm run test:watch    # 监视模式
-npm run test:coverage # 覆盖率报告
-npm run lint          # 代码检查
-npm run format        # 格式化
+npm run dev               # 启动服务（等同 ouroboros start）
+npm run login -- openai    # OAuth 登录
+npm run configure          # 修改配置
+npm run tui                # TUI 终端界面
+
+npm test                   # 运行测试
+npm run test:watch         # 监视模式
+npm run test:coverage      # 覆盖率报告
+npm run test:all           # 全阶段集成测试
+npm run lint               # 代码检查
+npm run format             # 格式化
 ```
 
 ## 许可证
