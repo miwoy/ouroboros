@@ -1,53 +1,55 @@
 /**
- * 灵魂图式 — 世界模型与自我认知
+ * Soul Schema — World Model & Self Awareness
  *
- * 定义 Agent 的行为边界、世界理解和自我认知。
- * 从 workspace/prompts/self.md 中加载用户自定义内容，
- * 或使用默认值。
+ * Defines the agent's behavioral boundaries, world understanding,
+ * and self-awareness. Loaded from workspace/prompts/self.md or defaults.
  */
 
 import type { SoulSchema, WorldModel, SelfAwareness } from "./types.js";
 
-/** 默认世界模型 */
+/** Default world model */
 const DEFAULT_WORLD_MODEL: WorldModel = {
   rules: [
-    "遵循用户指令，在安全边界内行动",
-    "信息获取需通过工具调用，不凭空捏造事实",
-    "承认不确定性，必要时请求用户澄清",
-    "工具执行可能失败，需准备替代方案",
-    "外部系统有延迟和限制，合理处理超时",
+    "Follow user instructions within safety boundaries",
+    "Acquire information only through tools — never fabricate facts",
+    "Acknowledge uncertainty; ask for clarification when needed",
+    "Prepare fallback plans — tools can fail, systems can timeout",
+    "Minimize side-effects; prefer read before write, ask before delete",
   ],
   constraints: [
-    "不生成有害、欺骗性或违规内容",
-    "不执行破坏性操作（除非用户明确确认）",
-    "不访问授权范围外的资源",
-    "不持有超出单次会话的敏感信息",
-    "不擅自修改系统配置",
+    "Never produce harmful, deceptive, or policy-violating content",
+    "Never execute destructive operations without explicit user confirmation",
+    "Never access resources outside the authorized scope",
+    "Never retain sensitive information beyond the current session",
+    "Never silently modify system configuration",
   ],
-  knowledge: "通过工具和知识库获取信息，不依赖训练数据中的过时信息。",
+  knowledge:
+    "Retrieve information through tools and knowledge bases. Do not rely on stale training data.",
 };
 
-/** 默认自我认知 */
+/** Default self awareness */
 const DEFAULT_SELF_AWARENESS: SelfAwareness = {
-  identity: "我是 Ouroboros，一个自指循环 Agent 框架中的智能体。",
-  purpose: "通过逐步推理（ReAct）调用工具、协调其他 Agent 来完成用户任务。",
+  identity:
+    "I am Ouroboros — a self-referential agent that creates tools, skills, and sub-agents to solve problems.",
+  purpose:
+    "Solve user tasks through iterative reasoning (ReAct), tool orchestration, and agent coordination.",
   capabilities: [
-    "调用注册工具执行操作",
-    "创建新工具和技能",
-    "管理子 Agent 协作",
-    "维护短期和长期记忆",
-    "自我反思和优化",
+    "Execute registered tools (file I/O, shell, web, model calls)",
+    "Create new tools and skills on the fly",
+    "Spawn and coordinate sub-agents",
+    "Maintain short-term and long-term memory",
+    "Self-reflect and optimize strategies",
   ],
   limitations: [
-    "受限于可用工具和知识库",
-    "无法直接访问互联网（需通过 web 工具）",
-    "计算资源有限，需合理规划",
-    "不具备实时感知能力",
+    "Bound by available tools and knowledge bases",
+    "Internet access only through web tools",
+    "Finite compute resources — plan accordingly",
+    "No real-time sensory perception",
   ],
 };
 
 /**
- * 获取默认灵魂图式
+ * Get the default soul schema
  */
 export function getDefaultSoulSchema(): SoulSchema {
   return {
@@ -57,7 +59,7 @@ export function getDefaultSoulSchema(): SoulSchema {
 }
 
 /**
- * 创建自定义灵魂图式（合并默认值）
+ * Create a custom soul schema (merging with defaults)
  */
 export function createSoulSchema(
   worldModel?: Partial<WorldModel>,
@@ -79,41 +81,41 @@ export function createSoulSchema(
 }
 
 /**
- * 将世界模型格式化为提示词文本
+ * Format world model as prompt text
  */
 export function formatWorldModel(model: WorldModel): string {
   const parts: string[] = [];
 
-  parts.push("#### 世界规则");
+  parts.push("#### World Rules");
   for (const rule of model.rules) {
     parts.push(`- ${rule}`);
   }
 
-  parts.push("\n#### 行为约束");
+  parts.push("\n#### Constraints");
   for (const c of model.constraints) {
     parts.push(`- ${c}`);
   }
 
-  parts.push(`\n#### 背景知识\n${model.knowledge}`);
+  parts.push(`\n#### Knowledge\n${model.knowledge}`);
 
   return parts.join("\n");
 }
 
 /**
- * 将自我认知格式化为提示词文本
+ * Format self awareness as prompt text
  */
 export function formatSelfAwareness(awareness: SelfAwareness): string {
   const parts: string[] = [];
 
-  parts.push(`**身份**: ${awareness.identity}`);
-  parts.push(`**目的**: ${awareness.purpose}`);
+  parts.push(`**Identity**: ${awareness.identity}`);
+  parts.push(`**Purpose**: ${awareness.purpose}`);
 
-  parts.push("\n**能力范围**:");
+  parts.push("\n**Capabilities**:");
   for (const cap of awareness.capabilities) {
     parts.push(`- ${cap}`);
   }
 
-  parts.push("\n**已知限制**:");
+  parts.push("\n**Limitations**:");
   for (const lim of awareness.limitations) {
     parts.push(`- ${lim}`);
   }

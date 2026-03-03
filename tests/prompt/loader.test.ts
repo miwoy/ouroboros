@@ -46,7 +46,7 @@ describe("loadPromptFile", () => {
   it("应该加载指定类型的提示词文件", async () => {
     const file = await loadPromptFile(TEST_WORKSPACE, "skill");
     expect(file).not.toBeNull();
-    expect(file!.content).toContain("技能注册表");
+    expect(file!.content).toContain("Custom Skills");
   });
 
   it("core 类型应该从源码目录加载", async () => {

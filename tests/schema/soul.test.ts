@@ -1,5 +1,5 @@
 /**
- * 灵魂图式测试
+ * Soul schema tests
  */
 
 import { describe, it, expect } from "vitest";
@@ -26,18 +26,18 @@ describe("getDefaultSoulSchema", () => {
 
 describe("createSoulSchema", () => {
   it("应合并自定义世界模型", () => {
-    const schema = createSoulSchema({ rules: ["自定义规则"] });
+    const schema = createSoulSchema({ rules: ["Custom rule"] });
 
-    expect(schema.worldModel.rules).toEqual(["自定义规则"]);
+    expect(schema.worldModel.rules).toEqual(["Custom rule"]);
     // 其他字段使用默认值
     expect(schema.worldModel.constraints.length).toBeGreaterThan(0);
     expect(schema.selfAwareness.identity).toBeTruthy();
   });
 
   it("应合并自定义自我认知", () => {
-    const schema = createSoulSchema(undefined, { identity: "我是测试 Agent" });
+    const schema = createSoulSchema(undefined, { identity: "I am a test agent" });
 
-    expect(schema.selfAwareness.identity).toBe("我是测试 Agent");
+    expect(schema.selfAwareness.identity).toBe("I am a test agent");
     expect(schema.selfAwareness.purpose).toBeTruthy(); // 默认值
   });
 
@@ -55,9 +55,9 @@ describe("formatWorldModel", () => {
     const schema = getDefaultSoulSchema();
     const text = formatWorldModel(schema.worldModel);
 
-    expect(text).toContain("世界规则");
-    expect(text).toContain("行为约束");
-    expect(text).toContain("背景知识");
+    expect(text).toContain("World Rules");
+    expect(text).toContain("Constraints");
+    expect(text).toContain("Knowledge");
   });
 });
 
@@ -66,9 +66,9 @@ describe("formatSelfAwareness", () => {
     const schema = getDefaultSoulSchema();
     const text = formatSelfAwareness(schema.selfAwareness);
 
-    expect(text).toContain("身份");
-    expect(text).toContain("目的");
-    expect(text).toContain("能力范围");
-    expect(text).toContain("已知限制");
+    expect(text).toContain("Identity");
+    expect(text).toContain("Purpose");
+    expect(text).toContain("Capabilities");
+    expect(text).toContain("Limitations");
   });
 });

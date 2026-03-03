@@ -1,35 +1,27 @@
-# 自我图式
+# Self Schema
 
-## 身体图式
+## Body
 
-<!-- 对运行环境的感知：时间、CPU、内存、磁盘、GPU 等 -->
-
-- 当前时间: {{currentDateTime}}
-- 运行环境: {{platform}}
-- 可用内存: {{availableMemory}}
+- Time: {{currentDateTime}}
+- Platform: {{platform}}
+- Memory: {{availableMemory}}
 - GPU: {{gpu}}
-- 工作目录: {{workspacePath}}
+- Workspace: {{workspacePath}}
 
-## 灵魂图式
+## Soul
 
-### 环境认知
-
-<!-- 世界模型：关于世界的理解，规则与约束 -->
+### World Model
 
 {{worldModel}}
 
-### 自我认知
-
-<!-- 自身的存在意义、能力与目的 -->
+### Self Awareness
 
 {{selfAwareness}}
 
-## 激素系统
+## Hormones
 
-<!-- 激素指标影响模型决策 -->
-
-| 指标 | 描述 | 当前水平 |
-|------|------|----------|
-| 专注度 | 任务聚焦程度 | {{focusLevel}} |
-| 谨慎度 | 风险规避倾向 | {{cautionLevel}} |
-| 创造力 | 发散思维程度 | {{creativityLevel}} |
+| Metric | Level |
+|--------|-------|
+| Focus | {{focusLevel}} |
+| Caution | {{cautionLevel}} |
+| Creativity | {{creativityLevel}} |

@@ -47,12 +47,7 @@ const noopLogger: Logger = {
   error: () => {},
 };
 
-function makeNode(
-  id: string,
-  type: string,
-  summary: string,
-  createdAtOffset = 0,
-): ExecutionNode {
+function makeNode(id: string, type: string, summary: string, createdAtOffset = 0): ExecutionNode {
   return {
     id,
     parentId: "root",
@@ -110,10 +105,10 @@ async function main() {
     if (custom.selfAwareness.identity !== "测试 Agent") throw new Error("自定义身份失败");
 
     const wmText = formatWorldModel(soul.worldModel);
-    if (!wmText.includes("世界规则")) throw new Error("格式化失败");
+    if (!wmText.includes("World Rules")) throw new Error("格式化失败");
 
     const saText = formatSelfAwareness(soul.selfAwareness);
-    if (!saText.includes("身份")) throw new Error("格式化失败");
+    if (!saText.includes("Identity")) throw new Error("格式化失败");
 
     ok("[3] 灵魂图式（世界模型+自我认知+自定义+格式化）");
   } catch (e) {
@@ -144,8 +139,8 @@ async function main() {
     const provider = createSchemaProvider("/tmp/workspace");
     const vars = provider.getVariables();
     if (!vars.platform) throw new Error("缺少 platform");
-    if (!vars.worldModel.includes("世界规则")) throw new Error("缺少世界模型");
-    if (!vars.selfAwareness.includes("身份")) throw new Error("缺少自我认知");
+    if (!vars.worldModel.includes("World Rules")) throw new Error("缺少世界模型");
+    if (!vars.selfAwareness.includes("Identity")) throw new Error("缺少自我认知");
     if (!vars.focusLevel) throw new Error("缺少激素值");
 
     ok("[5] 自我图式变量渲染（供模板使用）");
@@ -292,15 +287,30 @@ async function main() {
         createdAt: new Date().toISOString(),
       },
       steps: [
-        { stepIndex: 0, thought: "读取", toolCalls: [
-          { toolId: "tool:read", requestId: "r1", input: {}, success: true, duration: 100 },
-        ], duration: 200 },
-        { stepIndex: 1, thought: "写入", toolCalls: [
-          { toolId: "tool:write", requestId: "r2", input: {}, success: true, duration: 50 },
-        ], duration: 100 },
-        { stepIndex: 2, thought: "验证", toolCalls: [
-          { toolId: "tool:read", requestId: "r3", input: {}, success: true, duration: 80 },
-        ], duration: 120 },
+        {
+          stepIndex: 0,
+          thought: "读取",
+          toolCalls: [
+            { toolId: "tool:read", requestId: "r1", input: {}, success: true, duration: 100 },
+          ],
+          duration: 200,
+        },
+        {
+          stepIndex: 1,
+          thought: "写入",
+          toolCalls: [
+            { toolId: "tool:write", requestId: "r2", input: {}, success: true, duration: 50 },
+          ],
+          duration: 100,
+        },
+        {
+          stepIndex: 2,
+          thought: "验证",
+          toolCalls: [
+            { toolId: "tool:read", requestId: "r3", input: {}, success: true, duration: 80 },
+          ],
+          duration: 120,
+        },
       ],
       result: "摘要已生成",
       totalDuration: 500,
@@ -319,9 +329,7 @@ async function main() {
   // [10] 清理
   ok("[10] 无需清理");
 
-  console.log(
-    "\n" + (process.exitCode ? "❌ 部分测试失败" : "✅ 阶段十集成测试全部通过") + "\n",
-  );
+  console.log("\n" + (process.exitCode ? "❌ 部分测试失败" : "✅ 阶段十集成测试全部通过") + "\n");
 }
 
 main();

@@ -13,8 +13,8 @@ describe("createSchemaProvider", () => {
     expect(vars.platform).toBeTruthy();
     expect(vars.availableMemory).toContain("GB");
     expect(vars.workspacePath).toBe("/tmp/workspace");
-    expect(vars.worldModel).toContain("世界规则");
-    expect(vars.selfAwareness).toContain("身份");
+    expect(vars.worldModel).toContain("World Rules");
+    expect(vars.selfAwareness).toContain("Identity");
     expect(vars.gpu).toBeTruthy();
     expect(vars.currentDateTime).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
     expect(vars.focusLevel).toBeTruthy();

@@ -414,7 +414,7 @@ async function main(): Promise<void> {
     assert(customSoul.worldModel.rules[0] === "自定义规则", "Soul: 自定义规则生效");
 
     const wmText = formatWorldModel(soul.worldModel);
-    assert(wmText.includes("世界规则"), "Soul: formatWorldModel 正确");
+    assert(wmText.includes("World Rules"), "Soul: formatWorldModel 正确");
 
     // 激素系统
     const hormones = createHormoneManager({
