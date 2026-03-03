@@ -144,14 +144,21 @@ export async function writeProviderConfig(options: {
   await mkdir(dirname(configPath), { recursive: true });
 
   if (existing) {
-    // 合并模式
-    const existingProviders = (existing.providers ?? {}) as Record<string, unknown>;
+    // 合并模式（v2 格式用 provider，兼容读取旧 providers）
+    const existingProvider = (existing.provider ?? existing.providers ?? {}) as Record<
+      string,
+      unknown
+    >;
     const existingAgents = (existing.agents ?? {}) as Record<string, unknown>;
     const existingDefault = (existingAgents.default ?? {}) as Record<string, unknown>;
+
+    // 移除旧的 providers 键（如果存在）
+    const { providers: _removed, ...rest } = existing as Record<string, unknown>;
+
     const merged = {
-      ...existing,
-      providers: {
-        ...existingProviders,
+      ...rest,
+      provider: {
+        ...existingProvider,
         [options.providerName]: providerConfig,
       },
       agents: {
@@ -165,10 +172,10 @@ export async function writeProviderConfig(options: {
     await writeFile(configPath, JSON.stringify(merged, null, 2) + "\n", "utf-8");
     console.log(`\n✅ 已更新 ${configPath} — 默认模型: ${defaultModelRef}`);
   } else {
-    // 新建模式
+    // 新建模式（v2 格式）
     const config = {
       system: {},
-      providers: {
+      provider: {
         [options.providerName]: providerConfig,
       },
       agents: {

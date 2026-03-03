@@ -101,9 +101,7 @@ export async function runInit(): Promise<void> {
   if (await isAlreadyInitialized()) {
     const prompt = createPrompt();
     try {
-      const overwrite = await prompt.ask(
-        `  已检测到 ${USER_CONFIG_PATH}\n  是否覆盖？(y/N): `,
-      );
+      const overwrite = await prompt.ask(`  已检测到 ${USER_CONFIG_PATH}\n  是否覆盖？(y/N): `);
       if (overwrite.toLowerCase() !== "y") {
         console.log("\n  已取消。使用 'ouroboros configure' 修改已有配置。\n");
         return;
@@ -130,18 +128,30 @@ export async function runInit(): Promise<void> {
 
     if (provider.auth === "oauth") {
       console.log("\n  [3/5] OAuth 登录\n");
-      console.log("  即将启动浏览器进行 OAuth 登录...\n");
-      // 关闭 readline 避免与 OAuth 冲突
-      prompt.close();
 
       const store = createAuthStore();
-      const cleanupProxy = await setupGlobalProxy();
-      try {
-        await loginProvider(provider.oauthId!, store);
-      } finally {
-        cleanupProxy();
+      const existingCreds = await store.loadCredentials(provider.oauthId!);
+
+      if (existingCreds && existingCreds.expires > Date.now()) {
+        console.log(`  ✓ 已检测到 ${provider.oauthId} 的有效 OAuth 凭据，跳过登录`);
+        prompt.close();
+      } else {
+        if (existingCreds) {
+          console.log("  ⚠️  OAuth 凭据已过期，重新登录...\n");
+        } else {
+          console.log("  即将启动浏览器进行 OAuth 登录...\n");
+        }
+        // 关闭 readline 避免与 OAuth 冲突
+        prompt.close();
+
+        const cleanupProxy = await setupGlobalProxy();
+        try {
+          await loginProvider(provider.oauthId!, store);
+        } finally {
+          cleanupProxy();
+        }
+        console.log("  ✓ OAuth 登录成功");
       }
-      console.log("  ✓ OAuth 登录成功");
 
       // 重新创建 prompt 用于后续步骤
       const newPrompt = createPrompt();
@@ -181,11 +191,7 @@ async function continueAfterAuth(
 ): Promise<void> {
   try {
     // [4/5] 选择模型
-    const selectedModel = await stepSelectModel(
-      prompt.ask,
-      provider.models,
-      provider.defaultModel,
-    );
+    const selectedModel = await stepSelectModel(prompt.ask, provider.models, provider.defaultModel);
     console.log(`  ✓ 模型: ${selectedModel}`);
 
     // Advanced 模式额外配置

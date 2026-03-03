@@ -94,7 +94,7 @@ describe("readExistingConfig", () => {
   });
 
   it("文件存在时返回解析后的对象", async () => {
-    const mockConfig = { providers: {}, agents: { default: { model: "x/y" } } };
+    const mockConfig = { provider: {}, agents: { default: { model: "x/y" } } };
     vi.mocked(readFile).mockResolvedValue(JSON.stringify(mockConfig));
 
     const result = await readExistingConfig("/tmp/config.json");
@@ -128,15 +128,15 @@ describe("writeProviderConfig", () => {
 
     expect(writeFile).toHaveBeenCalledOnce();
     const written = JSON.parse(vi.mocked(writeFile).mock.calls[0][1] as string);
-    expect(written.providers["openai-codex"].type).toBe("openai-codex");
-    expect(written.providers["openai-codex"].defaultModel).toBe("gpt-5.3-codex");
+    expect(written.provider["openai-codex"].type).toBe("openai-codex");
+    expect(written.provider["openai-codex"].defaultModel).toBe("gpt-5.3-codex");
     expect(written.agents.default.model).toBe("openai-codex/gpt-5.3-codex");
   });
 
   it("有现有配置时合并", async () => {
     const existing = {
       system: { logLevel: "debug" },
-      providers: {
+      provider: {
         other: { type: "openai", apiKey: "sk-xxx" },
       },
       agents: {
@@ -157,9 +157,9 @@ describe("writeProviderConfig", () => {
     expect(writeFile).toHaveBeenCalledOnce();
     const written = JSON.parse(vi.mocked(writeFile).mock.calls[0][1] as string);
     // 保留原有提供商
-    expect(written.providers.other).toBeDefined();
+    expect(written.provider.other).toBeDefined();
     // 新增提供商
-    expect(written.providers.anthropic.type).toBe("anthropic");
+    expect(written.provider.anthropic.type).toBe("anthropic");
     // 默认 Agent 更新
     expect(written.agents.default.model).toBe("anthropic/claude-sonnet-4-20250514");
     // 保留原有 workspacePath
@@ -183,7 +183,7 @@ describe("writeProviderConfig", () => {
     });
 
     const written = JSON.parse(vi.mocked(writeFile).mock.calls[0][1] as string);
-    expect(written.providers.ollama.apiKey).toBe("ollama");
-    expect(written.providers.ollama.baseUrl).toBe("http://localhost:11434/v1");
+    expect(written.provider.ollama.apiKey).toBe("ollama");
+    expect(written.provider.ollama.baseUrl).toBe("http://localhost:11434/v1");
   });
 });

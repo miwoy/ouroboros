@@ -138,12 +138,12 @@ describe("buildConfigObject", () => {
     const config = buildConfigObject(baseData);
 
     expect(config).toHaveProperty("system");
-    expect(config).toHaveProperty("providers");
+    expect(config).toHaveProperty("provider");
     expect(config).toHaveProperty("agents");
 
-    const providers = config.providers as Record<string, Record<string, unknown>>;
-    expect(providers.openai.type).toBe("openai");
-    expect(providers.openai.apiKey).toBe("sk-test-key");
+    const provider = config.provider as Record<string, Record<string, unknown>>;
+    expect(provider.openai.type).toBe("openai");
+    expect(provider.openai.apiKey).toBe("sk-test-key");
 
     const agents = config.agents as Record<string, Record<string, unknown>>;
     expect(agents.default.model).toBe("openai/gpt-4o");
@@ -157,8 +157,8 @@ describe("buildConfigObject", () => {
       providerName: "openai-codex",
     };
     const config = buildConfigObject(data);
-    const providers = config.providers as Record<string, Record<string, unknown>>;
-    expect(providers["openai-codex"].apiKey).toBeUndefined();
+    const provider = config.provider as Record<string, Record<string, unknown>>;
+    expect(provider["openai-codex"].apiKey).toBeUndefined();
   });
 
   it("Advanced 模式包含额外配置", () => {
@@ -175,13 +175,14 @@ describe("buildConfigObject", () => {
     expect(system.proxy).toBe("http://proxy:8080");
     expect(system.logLevel).toBe("debug");
 
-    const api = config.api as Record<string, unknown>;
+    const api = (system.api as Record<string, unknown>) ?? {};
     expect(api.port).toBe(8080);
   });
 
-  it("QuickStart 模式不包含 api 块", () => {
+  it("QuickStart 模式不包含 system.api", () => {
     const config = buildConfigObject(baseData);
-    expect(config.api).toBeUndefined();
+    const system = config.system as Record<string, unknown>;
+    expect(system.api).toBeUndefined();
   });
 
   it("本地提供商包含 baseUrl", () => {
@@ -194,8 +195,8 @@ describe("buildConfigObject", () => {
       selectedModel: "llama3",
     };
     const config = buildConfigObject(data);
-    const providers = config.providers as Record<string, Record<string, unknown>>;
-    expect(providers["openai-compatible"].baseUrl).toBe("http://localhost:11434/v1");
+    const provider = config.provider as Record<string, Record<string, unknown>>;
+    expect(provider["openai-compatible"].baseUrl).toBe("http://localhost:11434/v1");
   });
 });
 

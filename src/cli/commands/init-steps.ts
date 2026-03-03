@@ -124,9 +124,7 @@ export const PROVIDER_OPTIONS: readonly ProviderOption[] = [
 /**
  * [1/5] 选择安装模式
  */
-export async function stepSelectMode(
-  ask: (q: string) => Promise<string>,
-): Promise<InstallMode> {
+export async function stepSelectMode(ask: (q: string) => Promise<string>): Promise<InstallMode> {
   console.log("  [1/5] 安装模式\n");
   console.log("    1. QuickStart — 快速开始（推荐）");
   console.log("    2. Advanced  — 自定义配置\n");
@@ -262,7 +260,7 @@ export async function stepAdvancedConfig(
 }
 
 /**
- * 生成 v1 格式配置对象（Phase 2 后切换为 v2）
+ * 生成 v2 格式配置对象
  */
 export function buildConfigObject(data: InitWizardData): Record<string, unknown> {
   const providerName = data.providerName;
@@ -283,18 +281,15 @@ export function buildConfigObject(data: InitWizardData): Record<string, unknown>
   if (data.logLevel) system.logLevel = data.logLevel;
 
   // 构建 API 配置
-  const api: Record<string, unknown> = {};
-  if (data.apiPort) api.port = data.apiPort;
+  if (data.apiPort) {
+    (system as Record<string, unknown>).api = { port: data.apiPort };
+  }
 
   const config: Record<string, unknown> = {
     system,
-    providers: { [providerName]: providerConfig },
+    provider: { [providerName]: providerConfig },
     agents: { default: { model: modelRef } },
   };
-
-  if (Object.keys(api).length > 0) {
-    config.api = api;
-  }
 
   return config;
 }

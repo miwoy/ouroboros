@@ -147,13 +147,23 @@ export async function runConfigure(): Promise<void> {
     const providerName = selected.oauthId ?? selected.type;
 
     if (selected.auth === "oauth") {
-      console.log("即将启动 OAuth 登录流程...\n");
       const store = createAuthStore();
-      const cleanupProxy = await setupGlobalProxy();
-      try {
-        await loginProvider(selected.oauthId!, store);
-      } finally {
-        cleanupProxy();
+      const existingCreds = await store.loadCredentials(selected.oauthId!);
+
+      if (existingCreds && existingCreds.expires > Date.now()) {
+        console.log(`✓ 已检测到 ${selected.oauthId} 的有效 OAuth 凭据，跳过登录\n`);
+      } else {
+        if (existingCreds) {
+          console.log("⚠️  OAuth 凭据已过期，重新登录...\n");
+        } else {
+          console.log("即将启动 OAuth 登录流程...\n");
+        }
+        const cleanupProxy = await setupGlobalProxy();
+        try {
+          await loginProvider(selected.oauthId!, store);
+        } finally {
+          cleanupProxy();
+        }
       }
     } else if (selected.auth === "apikey") {
       apiKey = await prompt.ask("请输入 API Key: ");
