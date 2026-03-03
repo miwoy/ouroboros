@@ -9,7 +9,8 @@
       "apiKey": "",
       "rateLimitWindowMs": 60000,
       "rateLimitMaxRequests": 60,
-      "corsOrigin": "*"
+      "corsOrigin": "*",
+      "staticDir": ""
     },
     "model": {
       "timeout": 30000,

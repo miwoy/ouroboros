@@ -49,6 +49,7 @@ Ouroboros 使用 JSON 配置文件，支持 JSONC 格式（允许注释）。
 | `rateLimitWindowMs` | `number` | 否 | `60000` | 速率限制时间窗口（毫秒） |
 | `rateLimitMaxRequests` | `number` | 否 | `60` | 窗口内最大请求数 |
 | `corsOrigin` | `string` | 否 | `"*"` | CORS 允许的来源 |
+| `staticDir` | `string` | 否 | — | 静态文件目录（绝对路径）。配置后后端托管 Web UI 静态文件。未配置时自动检测 `web/dist/` 目录 |
 
 ### system.model — 全局模型调用参数
 

@@ -4,7 +4,7 @@
  * 封装与后端 Chat API 的通信。
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:3000";
+const API_BASE = import.meta.env.VITE_API_BASE || "";
 
 /** API 统一响应体 */
 export interface ApiResponse<T = unknown> {

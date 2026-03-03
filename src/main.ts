@@ -5,8 +5,9 @@
  * 注册 SIGINT/SIGTERM 优雅关闭。
  */
 
-import { writeFile, unlink, mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { writeFile, unlink, mkdir, access } from "node:fs/promises";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config/loader.js";
 import { parseModelRef } from "./config/schema.js";
 import { expandTilde, OUROBOROS_HOME } from "./config/resolver.js";
@@ -89,6 +90,20 @@ export async function startServer(): Promise<void> {
   const authStore = createAuthStore();
 
   // 9. 启动 API 服务器配置
+  // 检测静态文件目录：配置项 > 自动检测 web/dist/
+  let staticDir = config.system.api.staticDir;
+  if (!staticDir) {
+    const currentDir = dirname(fileURLToPath(import.meta.url));
+    const autoDetectPath = resolve(currentDir, "../web/dist");
+    try {
+      await access(autoDetectPath);
+      staticDir = autoDetectPath;
+      logger.info("main", `自动检测到 Web UI 构建产物: ${autoDetectPath}`);
+    } catch {
+      // web/dist 不存在，不启用静态文件托管
+    }
+  }
+
   const apiConfig: ApiConfig = {
     port: config.system.api.port,
     host: config.system.api.host,
@@ -98,6 +113,7 @@ export async function startServer(): Promise<void> {
       maxRequests: config.system.api.rateLimitMaxRequests,
     },
     corsOrigin: config.system.api.corsOrigin,
+    staticDir,
   };
 
   // 10. 创建模型提供商注册表（含 OAuth 支持）

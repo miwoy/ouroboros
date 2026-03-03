@@ -30,7 +30,7 @@ const MAX_RECONNECT_DELAY = 30_000;
  * 创建 WS 客户端
  */
 export function createWsClient(baseUrl?: string): WsClient {
-  const wsBase = baseUrl || import.meta.env.VITE_API_BASE || "http://127.0.0.1:3000";
+  const wsBase = baseUrl || import.meta.env.VITE_API_BASE || window.location.origin;
   const wsUrl = wsBase.replace(/^http/, "ws") + "/ws";
 
   let ws: WebSocket | null = null;

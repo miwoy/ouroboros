@@ -68,12 +68,31 @@ ouroboros start
 
 ### 交互界面
 
-```bash
-# Web UI（需另一个终端）
-cd web && npm install && npm run dev
-# 访问 http://localhost:5173
+**生产模式**（推荐）— 后端自动托管 Web UI，单端口运行：
 
-# TUI 终端界面
+```bash
+# 构建 Web UI
+npm run build:web
+
+# 启动服务（自动检测 web/dist/ 并托管）
+npx ouroboros start
+# 访问 http://localhost:3000（API + Web UI 同端口）
+```
+
+**开发模式** — 前后端分离，支持热更新：
+
+```bash
+# 终端 1: 启动后端
+npm run dev
+
+# 终端 2: 启动 Web UI 开发服务器
+cd web && npm install && npm run dev
+# 访问 http://localhost:5173（Vite 代理 /api 到 3000）
+```
+
+**TUI 终端界面**：
+
+```bash
 npm run tui
 ```
 
@@ -95,6 +114,9 @@ npm run dev               # 启动服务（等同 ouroboros start）
 npm run login -- openai    # OAuth 登录
 npm run configure          # 修改配置
 npm run tui                # TUI 终端界面
+
+npm run build:web          # 构建 Web UI 到 web/dist/
+npm run build:all          # 编译后端 + 构建 Web UI
 
 npm test                   # 运行测试
 npm run test:watch         # 监视模式

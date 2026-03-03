@@ -98,6 +98,8 @@ const apiConfigSchema = z.object({
   rateLimitMaxRequests: z.number().int().positive().default(60),
   /** CORS 来源 */
   corsOrigin: z.string().default("*"),
+  /** 静态文件目录（绝对路径），配置后后端托管 Web UI 静态文件 */
+  staticDir: z.string().optional(),
 });
 
 /**

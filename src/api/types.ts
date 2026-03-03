@@ -144,6 +144,8 @@ export interface ApiConfig {
   readonly rateLimit: RateLimitConfig;
   /** CORS 来源 */
   readonly corsOrigin: string;
+  /** 静态文件目录（绝对路径），存在则托管 Web UI 静态文件 */
+  readonly staticDir?: string;
 }
 
 /** 速率限制配置 */

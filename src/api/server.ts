@@ -14,6 +14,7 @@ import { registerHandlers } from "./handlers.js";
 import { internalError } from "./response.js";
 import { createWsServer, type WsServer } from "./ws-server.js";
 import { startBodyPush, type BodyPush } from "./ws-body-push.js";
+import { serveStatic } from "./static.js";
 
 /** 服务器实例 */
 export interface ApiServer {
@@ -45,6 +46,9 @@ export function createApiServer(deps: ApiDeps): ApiServer {
   // 注册路由
   registerHandlers(router, sessionManager, deps);
 
+  // 静态文件目录
+  const staticDir = config.staticDir;
+
   // 创建 HTTP 服务器
   const server = createServer(async (req, res) => {
     // 应用中间件（认证、速率限制、CORS）
@@ -52,7 +56,32 @@ export function createApiServer(deps: ApiDeps): ApiServer {
     if (!canProceed) return;
 
     try {
-      await router.handle(req, res);
+      const method = (req.method || "GET").toUpperCase();
+      const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+      const path = url.pathname;
+
+      // 1. 先尝试 API 路由匹配
+      const matched = router.matchRoute(method as "GET", path);
+      if (matched || method === "OPTIONS") {
+        await router.handle(req, res);
+        return;
+      }
+
+      // 2. 未命中 API → 尝试静态文件（如果配置了 staticDir）
+      if (staticDir) {
+        const served = await serveStatic(req, res, staticDir);
+        if (served) return;
+      }
+
+      // 3. 都未命中 → 404
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          success: false,
+          data: null,
+          error: { code: "NOT_FOUND", message: "路由不存在" },
+        }),
+      );
     } catch (err) {
       deps.logger.error("api", "请求处理异常", { error: err });
       if (!res.headersSent) {
@@ -74,6 +103,10 @@ export function createApiServer(deps: ApiDeps): ApiServer {
     if (deps.schemaProvider) {
       bodyPush = startBodyPush(deps.schemaProvider, wsServer);
       deps.logger.info("api", "身体图式定时推送已启动（5s 间隔）");
+    }
+
+    if (staticDir) {
+      deps.logger.info("api", `静态文件托管已启用: ${staticDir}`);
     }
 
     return new Promise((resolve) => {
