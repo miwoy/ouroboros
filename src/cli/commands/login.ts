@@ -1,6 +1,6 @@
 /**
  * login 命令 — OAuth 登录
- * 支持所有 pi-ai OAuth 提供商
+ * 支持所有 pi-ai OAuth 提供商，自动加载代理配置
  */
 import { createAuthStore } from "../../auth/store.js";
 import {
@@ -8,6 +8,7 @@ import {
   getSupportedOAuthProviders,
   getProviderDisplayName,
 } from "../../auth/login.js";
+import { setupGlobalProxy } from "../../auth/proxy.js";
 
 /**
  * 执行 login 命令
@@ -39,5 +40,11 @@ export async function runLogin(providerId?: string): Promise<void> {
     process.exit(1);
   }
 
-  await loginProvider(providerId, store);
+  // 设置全局代理（从 config.json / 环境变量读取）
+  const cleanupProxy = await setupGlobalProxy();
+  try {
+    await loginProvider(providerId, store);
+  } finally {
+    cleanupProxy();
+  }
 }

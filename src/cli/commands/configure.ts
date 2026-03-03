@@ -7,6 +7,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createAuthStore } from "../../auth/store.js";
 import { loginProvider } from "../../auth/login.js";
+import { setupGlobalProxy } from "../../auth/proxy.js";
 
 /** 提供商选项 */
 interface ProviderOption {
@@ -149,7 +150,12 @@ export async function runConfigure(): Promise<void> {
     if (selected.auth === "oauth") {
       console.log("即将启动 OAuth 登录流程...\n");
       const store = createAuthStore();
-      await loginProvider(selected.oauthId!, store);
+      const cleanupProxy = await setupGlobalProxy();
+      try {
+        await loginProvider(selected.oauthId!, store);
+      } finally {
+        cleanupProxy();
+      }
     } else if (selected.auth === "apikey") {
       apiKey = await prompt.ask("请输入 API Key: ");
       if (!apiKey) {

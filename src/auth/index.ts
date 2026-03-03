@@ -6,3 +6,4 @@ export type { AuthStore, OAuthCredentials, LoginOptions } from "./types.js";
 export { createAuthStore } from "./store.js";
 export { loginProvider, getSupportedOAuthProviders, getProviderDisplayName } from "./login.js";
 export { getApiKey } from "./token-manager.js";
+export { setupGlobalProxy, resolveProxyUrl } from "./proxy.js";
