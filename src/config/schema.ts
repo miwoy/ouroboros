@@ -67,36 +67,51 @@ const modelProviderSchema = z
   );
 
 /**
- * 模型配置 Schema
- * 管理所有模型提供商和全局模型设置
+ * 模型调用配置 Schema
+ * 全局模型调用参数（超时、重试等）
  */
-const modelConfigSchema = z.object({
-  /** 默认使用的提供商名称 */
-  defaultProvider: z.string().min(1),
+const modelCallConfigSchema = z.object({
   /** 模型调用超时时间（毫秒） */
   timeout: z.number().int().positive().default(30000),
   /** 最大重试次数 */
   maxRetries: z.number().int().min(0).max(10).default(3),
   /** 重试基础延迟（毫秒），实际延迟 = baseDelay * 2^attempt */
   retryBaseDelay: z.number().int().positive().default(1000),
-  /** 已注册的提供商列表 */
-  providers: z.record(z.string(), modelProviderSchema),
 });
 
 /**
  * 系统配置 Schema
- * 全局系统级配置
+ * 全局系统级配置（不再包含 workspacePath，已移至 agents）
  */
 const systemConfigSchema = z.object({
   /** 日志级别 */
   logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
-  /** workspace 根目录路径 */
-  workspacePath: z.string().default("./workspace"),
   /** HTTP 代理地址，配置后系统所有对外请求使用此代理 */
   proxy: z
     .union([z.literal(""), z.string().url()])
     .optional()
     .transform((v) => (v === "" ? undefined : v)),
+});
+
+/**
+ * Agent 配置 Schema
+ * 单个 Agent 的配置（支持多 Agent 部署）
+ */
+const agentConfigSchema = z.object({
+  /** 使用的模型，格式: "provider/model"（如 "ollama/llama3"） */
+  model: z.string().min(1),
+  /** workspace 根目录路径 */
+  workspacePath: z.string().default("./workspace"),
+  /** 默认最大交互轮次 */
+  maxTurns: z.number().int().positive().default(50),
+  /** 知识库默认最大 token 数 */
+  knowledgeMaxTokens: z.number().int().positive().default(8000),
+  /** 启用模型 thinking/reasoning 能力（默认关闭） */
+  think: z.boolean().default(false),
+  /** thinking 级别: low | medium | high（默认 medium） */
+  thinkLevel: z.enum(["low", "medium", "high"]).default("medium"),
+  /** 是否记录 Token 消耗统计（默认开启） */
+  trackTokenUsage: z.boolean().default(true),
 });
 
 /**
@@ -156,23 +171,6 @@ const memoryConfigSchema = z.object({
 });
 
 /**
- * Agent 系统配置 Schema
- * 控制 Agent (Solution) 系统的行为参数
- */
-const agentConfigSchema = z.object({
-  /** 默认最大交互轮次 */
-  defaultMaxTurns: z.number().int().positive().default(50),
-  /** 知识库默认最大 token 数 */
-  knowledgeMaxTokens: z.number().int().positive().default(8000),
-  /** 启用模型 thinking/reasoning 能力（默认关闭） */
-  think: z.boolean().default(false),
-  /** thinking 级别: low | medium | high（默认 medium） */
-  thinkLevel: z.enum(["low", "medium", "high"]).default("medium"),
-  /** 是否记录 Token 消耗统计（默认开启） */
-  trackTokenUsage: z.boolean().default(true),
-});
-
-/**
  * 自我图式配置 Schema
  * 控制身体图式、灵魂图式和激素系统
  */
@@ -216,17 +214,6 @@ const reflectionConfigSchema = z.object({
 });
 
 /**
- * Super Agent 系统配置 Schema
- * 控制 Super Agent 协作系统的行为参数
- */
-const superAgentConfigSchema = z.object({
-  /** 默认总执行时间上限（秒） */
-  defaultMaxDuration: z.number().int().positive().default(600),
-  /** 最大并行 Agent 数 */
-  maxParallelAgents: z.number().int().positive().default(5),
-});
-
-/**
  * API 配置 Schema
  * 控制 Chat API 层的行为参数
  */
@@ -267,10 +254,32 @@ const persistenceConfigSchema = z.object({
 /**
  * 顶层配置 Schema
  * Ouroboros 完整配置结构
+ *
+ * 结构变更（相比旧版）：
+ * - providers 提升到根级别（原 model.providers）
+ * - agents 改为 Record<string, AgentConfig>，default 为必须的主 Agent
+ * - agents.default.model 使用 "provider/model" 格式引用模型
+ * - agents.default.workspacePath 原 system.workspacePath
+ * - model 仅保留全局调用参数（timeout/retries）
+ * - 移除 superAgents
  */
 export const configSchema = z.object({
-  system: systemConfigSchema,
-  model: modelConfigSchema,
+  system: systemConfigSchema.default({
+    logLevel: "info",
+    proxy: undefined,
+  }),
+  /** 模型提供商配置（根级别） */
+  providers: z.record(z.string(), modelProviderSchema),
+  /** Agent 配置（default 为主 Agent，必须存在） */
+  agents: z.record(z.string(), agentConfigSchema).refine((agents) => "default" in agents, {
+    message: "agents 中必须包含 'default' Agent 配置",
+  }),
+  /** 全局模型调用参数 */
+  model: modelCallConfigSchema.default({
+    timeout: 30000,
+    maxRetries: 3,
+    retryBaseDelay: 1000,
+  }),
   tools: toolConfigSchema.default({
     defaultTimeout: 30000,
     defaultMaxRetries: 0,
@@ -285,17 +294,6 @@ export const configSchema = z.object({
     shortTerm: true,
     longTerm: true,
     hotSessionMaxTokens: 4000,
-  }),
-  agents: agentConfigSchema.default({
-    defaultMaxTurns: 50,
-    knowledgeMaxTokens: 8000,
-    think: false,
-    thinkLevel: "medium",
-    trackTokenUsage: true,
-  }),
-  superAgents: superAgentConfigSchema.default({
-    defaultMaxDuration: 600,
-    maxParallelAgents: 5,
   }),
   self: selfSchemaConfigSchema.default({
     focusLevel: 60,
@@ -334,14 +332,58 @@ export const configSchema = z.object({
   }),
 });
 
+// ─── 辅助函数 ──────────────────────────────────────────────
+
+/**
+ * 解析 "provider/model" 格式的模型引用
+ * @returns { provider, model } 或 null（格式无效）
+ */
+export function parseModelRef(
+  ref: string,
+): { readonly provider: string; readonly model: string } | null {
+  const slashIdx = ref.indexOf("/");
+  if (slashIdx <= 0 || slashIdx >= ref.length - 1) {
+    return null;
+  }
+  return {
+    provider: ref.slice(0, slashIdx),
+    model: ref.slice(slashIdx + 1),
+  };
+}
+
+/**
+ * 从 providers 配置中提取所有可用模型（虚拟模型列表）
+ * 格式: "provider/model"
+ */
+export function extractAvailableModels(
+  providers: Readonly<Record<string, ModelProviderConfig>>,
+): readonly string[] {
+  const models: string[] = [];
+  for (const [name, config] of Object.entries(providers)) {
+    if (config.models && config.models.length > 0) {
+      for (const m of config.models) {
+        models.push(`${name}/${m}`);
+      }
+    } else if (config.defaultModel) {
+      models.push(`${name}/${config.defaultModel}`);
+    }
+  }
+  return models;
+}
+
+// ─── 类型导出 ──────────────────────────────────────────────
+
 /** 模型提供商配置类型 */
 export type ModelProviderConfig = z.infer<typeof modelProviderSchema>;
 
-/** 模型配置类型 */
-export type ModelConfig = z.infer<typeof modelConfigSchema>;
+/** 全局模型调用配置类型 */
+export type ModelCallConfig = z.infer<typeof modelCallConfigSchema>;
 
 /** 系统配置类型 */
 export type SystemConfig = z.infer<typeof systemConfigSchema>;
+
+/** Agent 配置类型 */
+export type AgentConfig = z.infer<typeof agentConfigSchema>;
 
 /** 工具配置类型 */
 export type ToolConfig = z.infer<typeof toolConfigSchema>;
@@ -351,12 +393,6 @@ export type ReactConfig = z.infer<typeof reactConfigSchema>;
 
 /** 记忆系统配置类型 */
 export type MemorySchemaConfig = z.infer<typeof memoryConfigSchema>;
-
-/** Agent 系统配置类型 */
-export type AgentSchemaConfig = z.infer<typeof agentConfigSchema>;
-
-/** Super Agent 系统配置类型 */
-export type SuperAgentSchemaConfig = z.infer<typeof superAgentConfigSchema>;
 
 /** 自我图式配置类型 */
 export type SelfSchemaSchemaConfig = z.infer<typeof selfSchemaConfigSchema>;

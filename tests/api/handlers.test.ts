@@ -87,7 +87,7 @@ function createDepsWithReact(): ApiDeps {
   };
 
   const providerRegistry = {
-    get: () => mockProvider,
+    get: async () => mockProvider,
     has: () => true,
     names: () => ["test"],
   };

@@ -23,7 +23,12 @@ import { join } from "node:path";
 import { loadConfig } from "../config/index.js";
 import { createProviderRegistry, createCallModel } from "../model/index.js";
 import { initWorkspace } from "../workspace/index.js";
-import { createToolRegistry, createToolExecutor, type ToolCallRequest, type ToolRegistryData } from "../tool/index.js";
+import {
+  createToolRegistry,
+  createToolExecutor,
+  type ToolCallRequest,
+  type ToolRegistryData,
+} from "../tool/index.js";
 import { removeVectorIndex } from "../prompt/vector.js";
 
 /** 格式化打印分隔线 */
@@ -53,20 +58,24 @@ async function main(): Promise<void> {
   // ── 1. 加载配置 + 初始化 workspace ──────────────────────────────
   console.log("[1/11] 加载配置...");
   const config = await loadConfig();
-  console.log(`  默认提供商: ${config.model.defaultProvider}`);
+  console.log(`  默认提供商: ${config.agents.default.model.split("/")[0]}`);
   console.log(`  工具超时: ${config.tools.defaultTimeout}ms`);
 
   console.log("[2/11] 初始化 workspace...");
-  await initWorkspace(config.system.workspacePath);
+  await initWorkspace(config.agents.default.workspacePath);
   console.log("  workspace 初始化完成");
 
   // ── 2. 创建工具注册表 + 执行器 ──────────────────────────────────
   console.log("[3/11] 创建工具注册表 + 执行器...");
-  const providerRegistry = createProviderRegistry(config.model.providers);
-  const callModel = createCallModel(config, providerRegistry);
-  const registry = await createToolRegistry(config.system.workspacePath);
+  const providerRegistry = createProviderRegistry(config.providers);
+  const callModel = createCallModel(
+    config,
+    providerRegistry,
+    config.agents.default.model.split("/")[0],
+  );
+  const registry = await createToolRegistry(config.agents.default.workspacePath);
   const executor = createToolExecutor(registry, {
-    workspacePath: config.system.workspacePath,
+    workspacePath: config.agents.default.workspacePath,
     callModel,
   });
 
@@ -84,9 +93,7 @@ async function main(): Promise<void> {
     requestId: nextReqId(),
     toolId: "tool:call-model",
     input: {
-      messages: [
-        { role: "user", content: "请回复：你好，Ouroboros 工具系统" },
-      ],
+      messages: [{ role: "user", content: "请回复：你好，Ouroboros 工具系统" }],
       temperature: 0,
       maxTokens: 100,
     },
@@ -114,11 +121,22 @@ async function main(): Promise<void> {
     caller: { entityId: "agent:main" },
   };
   const searchRes1 = await executor.execute(searchReq1);
-  const searchOutput1 = searchRes1.output as { tools: readonly { id: string }[]; total: number } | undefined;
+  const searchOutput1 = searchRes1.output as
+    | { tools: readonly { id: string }[]; total: number }
+    | undefined;
   // 排除内置工具的匹配，只看自定义工具
-  const customHits1 = searchOutput1?.tools.filter((t) => !t.id.startsWith("tool:call-") && !t.id.startsWith("tool:run-") && !t.id.startsWith("tool:search-") && !t.id.startsWith("tool:create-")) ?? [];
+  const customHits1 =
+    searchOutput1?.tools.filter(
+      (t) =>
+        !t.id.startsWith("tool:call-") &&
+        !t.id.startsWith("tool:run-") &&
+        !t.id.startsWith("tool:search-") &&
+        !t.id.startsWith("tool:create-"),
+    ) ?? [];
   const noCustomHit = customHits1.length === 0;
-  console.log(`  搜索结果: ${searchOutput1?.total ?? 0} 条（自定义工具: ${customHits1.length} 条）`);
+  console.log(
+    `  搜索结果: ${searchOutput1?.total ?? 0} 条（自定义工具: ${customHits1.length} 条）`,
+  );
   console.log(`  ${noCustomHit ? "✅" : "❌"} 自定义工具未命中（正确）`);
   checks.push({ name: "搜索无自定义工具", passed: noCustomHit });
 
@@ -149,12 +167,18 @@ async function main(): Promise<void> {
   if (generatedCode.startsWith("```")) {
     generatedCode = generatedCode.replace(/^```(?:javascript|js)?\n?/, "").replace(/\n?```$/, "");
   }
-  console.log(`  生成的代码:\n${generatedCode.split("\n").map((l) => `    ${l}`).join("\n")}`);
+  console.log(
+    `  生成的代码:\n${generatedCode
+      .split("\n")
+      .map((l) => `    ${l}`)
+      .join("\n")}`,
+  );
 
   // 如果模型生成的代码不合格，使用备用代码
   if (!generatedCode.includes("export default")) {
     console.log("  ⚠️ 模型生成代码不合格，使用备用代码");
-    generatedCode = "export default async function(input) {\n  return { result: input.a + input.b };\n}";
+    generatedCode =
+      "export default async function(input) {\n  return { result: input.a + input.b };\n}";
   }
 
   // ── 7. tool:create-tool → 注册加法计算器 ────────────────────────
@@ -207,8 +231,11 @@ async function main(): Promise<void> {
     caller: { entityId: "agent:main" },
   };
   const searchRes2 = await executor.execute(searchReq2);
-  const searchOutput2 = searchRes2.output as { tools: readonly { id: string }[]; total: number } | undefined;
-  const hitCalc = searchOutput2?.tools.some((t) => t.id.includes("加法") || t.id.includes("calc")) ?? false;
+  const searchOutput2 = searchRes2.output as
+    | { tools: readonly { id: string }[]; total: number }
+    | undefined;
+  const hitCalc =
+    searchOutput2?.tools.some((t) => t.id.includes("加法") || t.id.includes("calc")) ?? false;
   console.log(`  搜索结果: ${searchOutput2?.total ?? 0} 条`);
   if (searchOutput2?.tools) {
     for (const t of searchOutput2.tools) {
@@ -245,7 +272,7 @@ async function main(): Promise<void> {
   let toolMdOk = false;
 
   try {
-    const registryPath = join(config.system.workspacePath, "tools", "registry.json");
+    const registryPath = join(config.agents.default.workspacePath, "tools", "registry.json");
     const registryContent = await readFile(registryPath, "utf-8");
     const registryData = JSON.parse(registryContent) as ToolRegistryData;
     registryOk = registryData.tools.some((t) => t.id.includes("加法") || t.id.includes("calc"));
@@ -256,7 +283,7 @@ async function main(): Promise<void> {
   }
 
   try {
-    const toolMdPath = join(config.system.workspacePath, "prompts", "tool.md");
+    const toolMdPath = join(config.agents.default.workspacePath, "prompts", "tool.md");
     const toolMdContent = await readFile(toolMdPath, "utf-8");
     toolMdOk = toolMdContent.includes("加法计算器") || toolMdContent.includes("calc");
     console.log(`  ${toolMdOk ? "✅" : "❌"} tool.md 包含新工具条目`);
@@ -270,7 +297,7 @@ async function main(): Promise<void> {
   // ── 11. 清理 ───────────────────────────────────────────────────
   console.log("[11/11] 清理...");
   try {
-    await removeVectorIndex(config.system.workspacePath);
+    await removeVectorIndex(config.agents.default.workspacePath);
     console.log("  向量索引已清理");
   } catch {
     // 忽略

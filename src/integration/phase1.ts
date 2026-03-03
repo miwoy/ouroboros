@@ -80,11 +80,8 @@ function expandProviderModels(
  *   provider:model    → 该提供商的指定模型
  *   （无参数）         → defaultProvider 的 defaultModel
  */
-function resolveTestTargets(
-  args: string[],
-  config: Config,
-): TestTarget[] {
-  const providers = config.model.providers;
+function resolveTestTargets(args: string[], config: Config): TestTarget[] {
+  const providers = config.providers;
   const allNames = Object.keys(providers);
 
   // --all：所有提供商 × 所有模型
@@ -113,7 +110,7 @@ function resolveTestTargets(
   }
 
   // 默认：只测试 defaultProvider 的 defaultModel
-  return [{ provider: config.model.defaultProvider }];
+  return [{ provider: config.agents.default.model.split("/")[0] }];
 }
 
 /** 格式化测试目标显示名 */
@@ -127,7 +124,7 @@ async function main(): Promise<void> {
   // 1. 加载配置
   console.log("[1/4] 加载配置...");
   const config = await loadConfig();
-  const allProviders = Object.keys(config.model.providers);
+  const allProviders = Object.keys(config.providers);
   const args = process.argv.slice(2);
   const targets = resolveTestTargets(args, config);
   console.log(`  已注册提供商: ${allProviders.join(", ")}`);
@@ -135,13 +132,13 @@ async function main(): Promise<void> {
 
   // 2. 初始化 workspace
   console.log("[2/4] 初始化 workspace...");
-  await initWorkspace(config.system.workspacePath);
+  await initWorkspace(config.agents.default.workspacePath);
   console.log("  workspace 初始化完成");
 
   // 3. 创建 callModel
   console.log("[3/4] 创建模型调用接口...");
-  const registry = createProviderRegistry(config.model.providers);
-  const callModel = createCallModel(config, registry);
+  const registry = createProviderRegistry(config.providers);
+  const callModel = createCallModel(config, registry, config.agents.default.model.split("/")[0]);
   console.log("  callModel 就绪");
 
   // 4. 逐个测试
@@ -194,9 +191,7 @@ async function main(): Promise<void> {
 
       console.log(`  模型: ${response.model}`);
       console.log(`  响应: ${response.content}`);
-      console.log(
-        `  Token: ${response.usage.promptTokens} + ${response.usage.completionTokens}`,
-      );
+      console.log(`  Token: ${response.usage.promptTokens} + ${response.usage.completionTokens}`);
       console.log(`  结果: ${passed ? "✅ 通过" : "❌ 失败"}`);
       if (!passed && !containsKeyword) console.log(`  原因: 响应不包含 'Ouroboros'`);
 

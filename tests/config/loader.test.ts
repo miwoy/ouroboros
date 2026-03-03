@@ -27,43 +27,37 @@ describe("loadConfig", () => {
   it("应该成功加载有效配置文件", async () => {
     const path = await writeTestConfig({
       system: {},
-      model: {
-        defaultProvider: "test",
-        providers: { test: { type: "openai", apiKey: "sk-xxx" } },
-      },
+      providers: { test: { type: "openai", apiKey: "sk-xxx" } },
+      agents: { default: { model: "test/gpt-4o" } },
     });
 
     const config = await loadConfig(path);
-    expect(config.model.defaultProvider).toBe("test");
-    expect(config.model.providers.test.apiKey).toBe("sk-xxx");
+    expect(config.providers.test.apiKey).toBe("sk-xxx");
+    expect(config.agents.default.model).toBe("test/gpt-4o");
   });
 
   it("应该替换环境变量", async () => {
     process.env.TEST_API_KEY = "sk-from-env";
     const path = await writeTestConfig({
       system: {},
-      model: {
-        defaultProvider: "test",
-        providers: { test: { type: "openai", apiKey: "${TEST_API_KEY}" } },
-      },
+      providers: { test: { type: "openai", apiKey: "${TEST_API_KEY}" } },
+      agents: { default: { model: "test/gpt-4o" } },
     });
 
     const config = await loadConfig(path);
-    expect(config.model.providers.test.apiKey).toBe("sk-from-env");
+    expect(config.providers.test.apiKey).toBe("sk-from-env");
   });
 
   it("环境变量未设置时应保留原始字符串", async () => {
     delete process.env.NONEXISTENT_VAR;
     const path = await writeTestConfig({
       system: {},
-      model: {
-        defaultProvider: "test",
-        providers: { test: { type: "openai", apiKey: "${NONEXISTENT_VAR}" } },
-      },
+      providers: { test: { type: "openai", apiKey: "${NONEXISTENT_VAR}" } },
+      agents: { default: { model: "test/gpt-4o" } },
     });
 
     const config = await loadConfig(path);
-    expect(config.model.providers.test.apiKey).toBe("${NONEXISTENT_VAR}");
+    expect(config.providers.test.apiKey).toBe("${NONEXISTENT_VAR}");
   });
 
   it("应该在文件不存在时抛出 ConfigError", async () => {
@@ -81,22 +75,18 @@ describe("loadConfig", () => {
   it("应该在验证失败时抛出 ConfigError（含详细信息）", async () => {
     const path = await writeTestConfig({
       system: {},
-      model: {
-        defaultProvider: "",
-        providers: {},
-      },
+      providers: {},
+      agents: {},
     });
 
     await expect(loadConfig(path)).rejects.toThrow(ConfigError);
   });
 
-  it("应该在 defaultProvider 引用不存在的提供商时抛出 ConfigError", async () => {
+  it("应该在 agent model 引用不存在的提供商时抛出 ConfigError", async () => {
     const path = await writeTestConfig({
       system: {},
-      model: {
-        defaultProvider: "nonexistent",
-        providers: { test: { type: "openai", apiKey: "sk-xxx" } },
-      },
+      providers: { test: { type: "openai", apiKey: "sk-xxx" } },
+      agents: { default: { model: "nonexistent/gpt-4o" } },
     });
 
     await expect(loadConfig(path)).rejects.toThrow(ConfigError);
@@ -106,10 +96,8 @@ describe("loadConfig", () => {
   it("返回的配置应该是冻结的（不可变）", async () => {
     const path = await writeTestConfig({
       system: {},
-      model: {
-        defaultProvider: "test",
-        providers: { test: { type: "openai", apiKey: "sk-xxx" } },
-      },
+      providers: { test: { type: "openai", apiKey: "sk-xxx" } },
+      agents: { default: { model: "test/gpt-4o" } },
     });
 
     const config = await loadConfig(path);
@@ -119,10 +107,8 @@ describe("loadConfig", () => {
   it("应该正确填充默认值", async () => {
     const path = await writeTestConfig({
       system: {},
-      model: {
-        defaultProvider: "test",
-        providers: { test: { type: "openai", apiKey: "sk-xxx" } },
-      },
+      providers: { test: { type: "openai", apiKey: "sk-xxx" } },
+      agents: { default: { model: "test/gpt-4o" } },
     });
 
     const config = await loadConfig(path);

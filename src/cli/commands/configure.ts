@@ -181,12 +181,16 @@ export async function runConfigure(): Promise<void> {
     if (apiKey) providerConfig.apiKey = apiKey;
     if (baseUrl) providerConfig.baseUrl = baseUrl;
 
+    // 新配置结构：providers 和 agents 在根级别
+    const defaultModelRef = `${providerName}/${selected.defaultModel}`;
     const config = {
       system: {},
-      model: {
-        defaultProvider: providerName,
-        providers: {
-          [providerName]: providerConfig,
+      providers: {
+        [providerName]: providerConfig,
+      },
+      agents: {
+        default: {
+          model: defaultModelRef,
         },
       },
     };
@@ -204,17 +208,21 @@ export async function runConfigure(): Promise<void> {
     if (existingConfig) {
       const merge = await prompt.ask("发现已有 config.json，是否合并提供商配置？(y/n，默认 y): ");
       if (merge.toLowerCase() !== "n") {
-        // 合并模式：只添加新提供商，不覆盖已有配置
-        const existingModel = (existingConfig.model ?? {}) as Record<string, unknown>;
-        const existingProviders = (existingModel.providers ?? {}) as Record<string, unknown>;
+        // 合并模式：只添加新提供商，更新默认 Agent
+        const existingProviders = (existingConfig.providers ?? {}) as Record<string, unknown>;
+        const existingAgents = (existingConfig.agents ?? {}) as Record<string, unknown>;
+        const existingDefault = (existingAgents.default ?? {}) as Record<string, unknown>;
         const merged = {
           ...existingConfig,
-          model: {
-            ...existingModel,
-            defaultProvider: providerName,
-            providers: {
-              ...existingProviders,
-              [providerName]: providerConfig,
+          providers: {
+            ...existingProviders,
+            [providerName]: providerConfig,
+          },
+          agents: {
+            ...existingAgents,
+            default: {
+              ...existingDefault,
+              model: defaultModelRef,
             },
           },
         };

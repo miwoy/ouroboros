@@ -140,7 +140,7 @@ export function registerHandlers(
 
     const providerNames = deps.providerRegistry.names();
     const providers = providerNames.map((name) => {
-      const config = deps.fullConfig!.model.providers[name];
+      const config = deps.fullConfig!.providers[name];
       return {
         name,
         type: config.type,
@@ -488,7 +488,7 @@ async function processMessage(
 
     sessionManager.setExecutionTree(sessionId, result.executionTree);
     sessionManager.addMessage(sessionId, "agent", result.answer, buildReactMetadata(result));
-    if (deps.fullConfig?.agents?.trackTokenUsage !== false) {
+    if (deps.fullConfig?.agents?.default?.trackTokenUsage !== false) {
       sessionManager.addTokenUsage(sessionId, result.totalUsage);
     }
     writebackMemory(deps, message, result.answer);
@@ -647,7 +647,7 @@ async function* createReactStreamEvents(
       pushEvent({ event: "text_delta", data: JSON.stringify({ text: result.answer }) });
       sessionManager.setExecutionTree(sessionId, result.executionTree);
       sessionManager.addMessage(sessionId, "agent", result.answer, buildReactMetadata(result));
-      if (deps.fullConfig?.agents?.trackTokenUsage !== false) {
+      if (deps.fullConfig?.agents?.default?.trackTokenUsage !== false) {
         sessionManager.addTokenUsage(sessionId, result.totalUsage);
       }
       // WS 完成推送

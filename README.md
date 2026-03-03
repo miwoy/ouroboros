@@ -16,7 +16,7 @@ Ouroboros 是一个分层递归的 Agent 框架。Agent 可以创建工具、技
 
 ## 核心特性
 
-- **四层实体架构** — Tool → Skill → Solution (Agent) → Super Agent，逐层抽象、自指递归
+- **分层实体架构** — Tool → Skill → Agent，逐层抽象、自指递归
 - **ReAct 推理循环** — Thought → Action → Observation，支持并行工具调用、执行树管理、死循环检测
 - **多模型统一接口** — 基于 pi-ai，支持 OpenAI / Anthropic / Google / Mistral / Groq / Bedrock / Ollama / OpenAI Codex / GitHub Copilot 等，OAuth 免密认证
 - **自我图式系统** — 身体图式（环境感知）+ 灵魂图式（世界模型）+ 激素系统（决策倾向）

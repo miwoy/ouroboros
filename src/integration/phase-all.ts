@@ -187,16 +187,14 @@ async function main(): Promise<void> {
     section("[1/16] Config — 配置系统");
 
     const config = configSchema.parse({
-      system: { workspacePath: workDir },
-      model: {
-        defaultProvider: "mock",
-        providers: {
-          mock: { type: "openai", apiKey: "test-key-000" },
-        },
+      system: {},
+      providers: {
+        mock: { type: "openai", apiKey: "test-key-000" },
       },
+      agents: { default: { model: "mock/gpt-4", workspacePath: workDir } },
     });
-    assert(config.system.workspacePath === workDir, "workspacePath 正确");
-    assert(config.model.defaultProvider === "mock", "defaultProvider 正确");
+    assert(config.agents.default.workspacePath === workDir, "workspacePath 正确");
+    assert(config.agents.default.model.startsWith("mock/"), "defaultProvider 正确");
     assert(config.react.maxIterations === 20, "react.maxIterations 默认 20");
     assert(config.memory.hotSessionMaxTokens === 4000, "memory.hotSessionMaxTokens 默认 4000");
     assert(config.tools.defaultTimeout === 30000, "tools.defaultTimeout 默认 30000");

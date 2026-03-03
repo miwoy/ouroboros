@@ -48,7 +48,7 @@ async function main(): Promise<void> {
     // ── 1. 加载配置 + 初始化 workspace ──────────────────────────────
     console.log("[1/8] 加载配置...");
     const config = await loadConfig();
-    console.log(`  默认提供商: ${config.model.defaultProvider}`);
+    console.log(`  默认提供商: ${config.agents.default.model.split("/")[0]}`);
 
     console.log("[2/8] 初始化临时 workspace...");
     await initWorkspace(tmpWorkspace);
@@ -56,8 +56,12 @@ async function main(): Promise<void> {
 
     // ── 2. 创建注册表和执行器 ─────────────────────────────────────
     console.log("[3/8] 创建工具 + 技能注册表...");
-    const providerRegistry = createProviderRegistry(config.model.providers);
-    const callModel = createCallModel(config, providerRegistry);
+    const providerRegistry = createProviderRegistry(config.providers);
+    const callModel = createCallModel(
+      config,
+      providerRegistry,
+      config.agents.default.model.split("/")[0],
+    );
     const toolRegistry = await createToolRegistry(tmpWorkspace);
     const toolExecutor = createToolExecutor(toolRegistry, {
       workspacePath: tmpWorkspace,

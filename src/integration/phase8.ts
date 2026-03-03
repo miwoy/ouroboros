@@ -49,8 +49,7 @@ async function main(): Promise<void> {
     origin: "user",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    identityPrompt:
-      "你是一位代码审查专家。你的职责是分析代码质量、发现潜在问题并提出改进建议。",
+    identityPrompt: "你是一位代码审查专家。你的职责是分析代码质量、发现潜在问题并提出改进建议。",
     skills: ["skill:read-file"],
     additionalTools: [],
     interaction: {
@@ -78,10 +77,7 @@ async function main(): Promise<void> {
     assert(registry.has("solution:code-reviewer"), "应能查到注册的 Solution");
     assert(registry.list().length === 1, "应有 1 个 Solution");
 
-    const regData = await readFile(
-      join(tmpDir, "solutions", "registry.json"),
-      "utf-8",
-    );
+    const regData = await readFile(join(tmpDir, "solutions", "registry.json"), "utf-8");
     const parsed = JSON.parse(regData);
     assert(parsed.solutions.length === 1, "registry.json 应有 1 条");
 
@@ -197,25 +193,20 @@ async function main(): Promise<void> {
     console.log("[7] 配置系统验证...");
     const config = configSchema.parse({
       system: {},
-      model: {
-        defaultProvider: "test",
-        providers: { test: { type: "openai", apiKey: "key" } },
-      },
-      agents: { defaultMaxTurns: 30, knowledgeMaxTokens: 16000 },
+      providers: { test: { type: "openai", apiKey: "key" } },
+      agents: { default: { model: "test/gpt-4", maxTurns: 30, knowledgeMaxTokens: 16000 } },
     });
-    assert(config.agents.defaultMaxTurns === 30, "defaultMaxTurns 应为 30");
-    assert(config.agents.knowledgeMaxTokens === 16000, "knowledgeMaxTokens 应为 16000");
+    assert(config.agents.default.maxTurns === 30, "defaultMaxTurns 应为 30");
+    assert(config.agents.default.knowledgeMaxTokens === 16000, "knowledgeMaxTokens 应为 16000");
 
     const defaultConfig = configSchema.parse({
       system: {},
-      model: {
-        defaultProvider: "test",
-        providers: { test: { type: "openai", apiKey: "key" } },
-      },
+      providers: { test: { type: "openai", apiKey: "key" } },
+      agents: { default: { model: "test/gpt-4" } },
     });
-    assert(defaultConfig.agents.defaultMaxTurns === 50, "默认 defaultMaxTurns 应为 50");
+    assert(defaultConfig.agents.default.maxTurns === 50, "默认 defaultMaxTurns 应为 50");
     assert(
-      defaultConfig.agents.knowledgeMaxTokens === 8000,
+      defaultConfig.agents.default.knowledgeMaxTokens === 8000,
       "默认 knowledgeMaxTokens 应为 8000",
     );
     console.log("  ✓ 配置系统验证通过\n");

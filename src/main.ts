@@ -6,6 +6,7 @@
  */
 
 import { loadConfig } from "./config/loader.js";
+import { parseModelRef } from "./config/schema.js";
 import { initWorkspace } from "./workspace/init.js";
 import { createLogger } from "./logger/logger.js";
 import { createHttpClient, type HttpClient } from "./http/index.js";
@@ -31,18 +32,27 @@ export async function startServer(): Promise<void> {
   // 1. 加载配置
   const config = await loadConfig();
 
-  // 2. 初始化 workspace
-  await initWorkspace(config.system.workspacePath);
+  // 2. 解析默认 Agent 的模型引用
+  const defaultAgent = config.agents.default;
+  const modelRef = parseModelRef(defaultAgent.model);
+  if (!modelRef) {
+    throw new Error(`默认 Agent 的 model 格式无效: "${defaultAgent.model}"`);
+  }
+  const defaultProvider = modelRef.provider;
+  const workspacePath = defaultAgent.workspacePath;
 
-  // 3. 创建日志器
-  const logger = createLogger(config.system.workspacePath, config.system.logLevel);
+  // 3. 初始化 workspace
+  await initWorkspace(workspacePath);
+
+  // 4. 创建日志器
+  const logger = createLogger(workspacePath, config.system.logLevel);
   logger.info("main", "Ouroboros 启动中...");
 
-  // 3.5 初始化 qmd 向量索引（语义搜索）
-  const qmdAvailable = await isQmdAvailable(config.system.workspacePath);
+  // 4.5 初始化 qmd 向量索引（语义搜索）
+  const qmdAvailable = await isQmdAvailable(workspacePath);
   if (qmdAvailable) {
     try {
-      await initVectorIndex(config.system.workspacePath);
+      await initVectorIndex(workspacePath);
       logger.info("main", "qmd 向量索引已初始化（语义搜索可用）");
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -52,7 +62,7 @@ export async function startServer(): Promise<void> {
     logger.info("main", "qmd 不可用，语义搜索将回退到关键词搜索");
   }
 
-  // 4. 创建 HTTP 客户端（含代理支持）
+  // 5. 创建 HTTP 客户端（含代理支持）
   const httpClient: HttpClient = createHttpClient({
     proxyUrl: config.system.proxy,
   });
@@ -60,21 +70,21 @@ export async function startServer(): Promise<void> {
     logger.info("main", `HTTP 代理已配置: ${config.system.proxy}`);
   }
 
-  // 5. 创建自我图式提供者
-  const schemaProvider = await createSchemaProvider(config.system.workspacePath, {
+  // 6. 创建自我图式提供者
+  const schemaProvider = await createSchemaProvider(workspacePath, {
     hormoneDefaults: config.self,
   });
   await schemaProvider.refresh();
   logger.info("main", "自我图式提供者已创建");
 
-  // 6. 创建记忆管理器
-  const memoryManager = createMemoryManager(config.system.workspacePath, config.memory);
+  // 7. 创建记忆管理器
+  const memoryManager = createMemoryManager(workspacePath, config.memory);
   logger.info("main", "记忆管理器已创建");
 
-  // 7. 创建 OAuth 凭据存储
+  // 8. 创建 OAuth 凭据存储
   const authStore = createAuthStore();
 
-  // 8. 启动 API 服务器配置
+  // 9. 启动 API 服务器配置
   const apiConfig: ApiConfig = {
     port: config.api.port,
     host: config.api.host,
@@ -86,26 +96,26 @@ export async function startServer(): Promise<void> {
     corsOrigin: config.api.corsOrigin,
   };
 
-  // 9. 创建模型提供商注册表（含 OAuth 支持）
-  const providerRegistry = createProviderRegistry(config.model.providers, authStore);
+  // 10. 创建模型提供商注册表（含 OAuth 支持）
+  const providerRegistry = createProviderRegistry(config.providers, authStore);
   logger.info("main", `模型提供商已加载: ${providerRegistry.names().join(", ")}`);
 
-  // 10. 创建工具注册表
-  const toolRegistry = await createToolRegistry(config.system.workspacePath);
+  // 11. 创建工具注册表
+  const toolRegistry = await createToolRegistry(workspacePath);
   logger.info("main", `工具注册表已加载: ${toolRegistry.list().length} 个工具`);
 
-  // 11. 创建技能注册表
-  const skillRegistry = await createSkillRegistry(config.system.workspacePath);
+  // 12. 创建技能注册表
+  const skillRegistry = await createSkillRegistry(workspacePath);
   logger.info("main", `技能注册表已加载: ${skillRegistry.list().length} 个技能`);
 
-  // 12. 创建审查程序
+  // 13. 创建审查程序
   const inspector = createInspector(logger);
   logger.info("main", "审查程序已创建");
 
-  // 13. 创建统一 callModel 函数（含超时 + 重试）
-  const callModelFn = createCallModel(config, providerRegistry);
+  // 14. 创建统一 callModel 函数（含超时 + 重试）
+  const callModelFn = createCallModel(config, providerRegistry, defaultProvider);
 
-  // 14. 创建反思器
+  // 15. 创建反思器
   const reflector = createReflector(
     {
       callModel: callModelFn,
@@ -116,10 +126,10 @@ export async function startServer(): Promise<void> {
   );
   logger.info("main", "反思器已创建");
 
-  // 15. 创建持久化管理器
+  // 16. 创建持久化管理器
   const persistenceManager = createPersistenceManager({
     logger,
-    workspacePath: config.system.workspacePath,
+    workspacePath,
     config: config.persistence,
   });
 
@@ -136,10 +146,10 @@ export async function startServer(): Promise<void> {
 
   const server: ApiServer = createApiServer({
     logger,
-    workspacePath: config.system.workspacePath,
+    workspacePath,
     config: apiConfig,
     providerRegistry,
-    defaultProvider: config.model.defaultProvider,
+    defaultProvider,
     toolRegistry,
     reactConfig: config.react,
     httpFetch: httpClient.fetch,

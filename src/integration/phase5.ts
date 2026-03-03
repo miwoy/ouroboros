@@ -53,7 +53,7 @@ async function main(): Promise<void> {
     // ── 1. 加载配置 + 初始化 workspace ──────────────────────────────
     console.log("[1/12] 加载配置...");
     const config = await loadConfig();
-    console.log(`  默认提供商: ${config.model.defaultProvider}`);
+    console.log(`  默认提供商: ${config.agents.default.model.split("/")[0]}`);
 
     console.log("[2/12] 初始化临时 workspace...");
     await initWorkspace(tmpWorkspace);
@@ -61,8 +61,12 @@ async function main(): Promise<void> {
 
     // ── 2. 创建工具注册表 + 执行器 ─────────────────────────────────
     console.log("[3/12] 创建工具注册表 + 执行器...");
-    const providerRegistry = createProviderRegistry(config.model.providers);
-    const callModel = createCallModel(config, providerRegistry);
+    const providerRegistry = createProviderRegistry(config.providers);
+    const callModel = createCallModel(
+      config,
+      providerRegistry,
+      config.agents.default.model.split("/")[0],
+    );
     const registry = await createToolRegistry(tmpWorkspace);
     const executor = createToolExecutor(registry, {
       workspacePath: tmpWorkspace,
@@ -78,10 +82,20 @@ async function main(): Promise<void> {
 
     const expectedIds = [
       // 一级
-      "tool:call-model", "tool:run-agent", "tool:search-tool", "tool:create-tool",
+      "tool:call-model",
+      "tool:run-agent",
+      "tool:search-tool",
+      "tool:create-tool",
       // 二级
-      "tool:bash", "tool:read", "tool:write", "tool:edit", "tool:find",
-      "tool:web-search", "tool:web-fetch", "tool:search-skill", "tool:create-skill",
+      "tool:bash",
+      "tool:read",
+      "tool:write",
+      "tool:edit",
+      "tool:find",
+      "tool:web-search",
+      "tool:web-fetch",
+      "tool:search-skill",
+      "tool:create-skill",
     ];
     const allRegistered = expectedIds.every((id) => toolIds.includes(id));
     console.log(`  ${allRegistered ? "✅" : "❌"} 所有 13 个内置工具已注册`);
@@ -95,7 +109,8 @@ async function main(): Promise<void> {
       input: { command: "echo 'hello ouroboros'" },
       caller: { entityId: "test" },
     });
-    const bashOk = bashResult.success && (bashResult.output?.["stdout"] as string).includes("hello ouroboros");
+    const bashOk =
+      bashResult.success && (bashResult.output?.["stdout"] as string).includes("hello ouroboros");
     console.log(`  stdout: ${(bashResult.output?.["stdout"] as string)?.trim()}`);
     console.log(`  ${bashOk ? "✅" : "❌"} bash 命令执行`);
     checks.push({ name: "bash 命令执行", passed: bashOk });
@@ -202,7 +217,8 @@ async function main(): Promise<void> {
     // ── 11. 验证 core.md 包含二级工具描述 ────────────────────────────
     console.log("[12/12] 验证 core.md 包含二级工具描述...");
     const coreContent = await loadCorePrompt();
-    const coreHasSecondary = coreContent.includes("tool:bash") &&
+    const coreHasSecondary =
+      coreContent.includes("tool:bash") &&
       coreContent.includes("tool:read") &&
       coreContent.includes("tool:write") &&
       coreContent.includes("tool:edit") &&

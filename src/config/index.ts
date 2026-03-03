@@ -1,9 +1,10 @@
 export { loadConfig } from "./loader.js";
-export { configSchema } from "./schema.js";
+export { configSchema, parseModelRef, extractAvailableModels } from "./schema.js";
 export type {
   Config,
-  ModelConfig,
+  ModelCallConfig,
   ModelProviderConfig,
+  AgentConfig,
   SystemConfig,
   ToolConfig,
   ReactConfig,

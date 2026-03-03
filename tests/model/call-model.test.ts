@@ -30,28 +30,32 @@ function createMockProvider(overrides?: Partial<ModelProvider>): ModelProvider {
 /** 创建测试用配置 */
 function createTestConfig(overrides?: Partial<Config["model"]>): Config {
   return {
-    system: { logLevel: "info", workspacePath: "./workspace" },
+    system: { logLevel: "info" },
+    providers: {},
+    agents: {
+      default: {
+        model: "mock/test-model",
+        workspacePath: "./workspace",
+        maxTurns: 50,
+        knowledgeMaxTokens: 8000,
+        think: false,
+        thinkLevel: "medium",
+        trackTokenUsage: true,
+      },
+    },
     model: {
-      defaultProvider: "mock",
       timeout: 5000,
       maxRetries: 1,
       retryBaseDelay: 10,
-      providers: {},
       ...overrides,
     },
-    agents: {
-      defaultMaxTurns: 50,
-      knowledgeMaxTokens: 8000,
-      think: false,
-      thinkLevel: "medium",
-    },
-  };
+  } as Config;
 }
 
 /** 创建 mock 注册表 */
 function createMockRegistry(providers: Record<string, ModelProvider>): ProviderRegistry {
   return {
-    get: (name: string) => {
+    get: async (name: string) => {
       const p = providers[name];
       if (!p) throw new Error(`Provider "${name}" not found`);
       return p;
@@ -73,7 +77,7 @@ describe("createCallModel", () => {
   });
 
   it("应该使用默认提供商进行非流式调用", async () => {
-    const callModel = createCallModel(config, registry);
+    const callModel = createCallModel(config, registry, "mock");
     const result = await callModel({
       messages: [{ role: "user", content: "你好" }],
     });
@@ -94,7 +98,7 @@ describe("createCallModel", () => {
       }),
     });
     registry = createMockRegistry({ mock: mockProvider, another: anotherProvider });
-    const callModel = createCallModel(config, registry);
+    const callModel = createCallModel(config, registry, "mock");
 
     const result = await callModel(
       { messages: [{ role: "user", content: "你好" }] },
@@ -107,7 +111,7 @@ describe("createCallModel", () => {
   });
 
   it("应该支持流式调用", async () => {
-    const callModel = createCallModel(config, registry);
+    const callModel = createCallModel(config, registry, "mock");
     const events: string[] = [];
     const onStream = vi.fn((event) => {
       events.push(event.type);
@@ -141,7 +145,7 @@ describe("createCallModel", () => {
     registry = createMockRegistry({ mock: slowProvider });
     // 设置极短超时
     config = createTestConfig({ timeout: 50, maxRetries: 0 });
-    const callModel = createCallModel(config, registry);
+    const callModel = createCallModel(config, registry, "mock");
 
     await expect(callModel({ messages: [{ role: "user", content: "你好" }] })).rejects.toThrow();
   });
@@ -162,7 +166,7 @@ describe("createCallModel", () => {
       ),
     });
     registry = createMockRegistry({ mock: hangProvider });
-    const callModel = createCallModel(config, registry);
+    const callModel = createCallModel(config, registry, "mock");
 
     // 立即取消
     controller.abort(new Error("user cancel"));
@@ -186,7 +190,7 @@ describe("createCallModel", () => {
     });
     registry = createMockRegistry({ mock: retryProvider });
     config = createTestConfig({ maxRetries: 2, retryBaseDelay: 10 });
-    const callModel = createCallModel(config, registry);
+    const callModel = createCallModel(config, registry, "mock");
 
     const result = await callModel({
       messages: [{ role: "user", content: "你好" }],

@@ -64,27 +64,31 @@ async function main(): Promise<void> {
   // ── 1. 加载配置 + 初始化 workspace ──────────────────────────────
   console.log("[1/11] 加载配置...");
   const config = await loadConfig();
-  console.log(`  默认提供商: ${config.model.defaultProvider}`);
+  console.log(`  默认提供商: ${config.agents.default.model.split("/")[0]}`);
   console.log(
     `  ReAct 配置: maxIterations=${config.react.maxIterations}, stepTimeout=${config.react.stepTimeout}ms`,
   );
 
   console.log("[2/11] 初始化 workspace...");
-  await initWorkspace(config.system.workspacePath);
+  await initWorkspace(config.agents.default.workspacePath);
   // 确保 tmp 目录存在
-  await mkdir(join(config.system.workspacePath, "tmp"), { recursive: true });
+  await mkdir(join(config.agents.default.workspacePath, "tmp"), { recursive: true });
   console.log("  workspace 初始化完成");
 
   // ── 2. 创建工具注册表 + 执行器 + Logger ─────────────────────────
   console.log("[3/11] 创建工具注册表 + 执行器 + Logger...");
-  const providerRegistry = createProviderRegistry(config.model.providers);
-  const callModel = createCallModel(config, providerRegistry);
-  const registry = await createToolRegistry(config.system.workspacePath);
+  const providerRegistry = createProviderRegistry(config.providers);
+  const callModel = createCallModel(
+    config,
+    providerRegistry,
+    config.agents.default.model.split("/")[0],
+  );
+  const registry = await createToolRegistry(config.agents.default.workspacePath);
   const executor = createToolExecutor(registry, {
-    workspacePath: config.system.workspacePath,
+    workspacePath: config.agents.default.workspacePath,
     callModel,
   });
-  const logger = createLogger(config.system.workspacePath, config.system.logLevel);
+  const logger = createLogger(config.agents.default.workspacePath, config.system.logLevel);
   console.log("  注册表 + 执行器 + Logger 创建完成");
 
   // ── 3. 注册测试工具（get-date、write-file） ─────────────────────
@@ -101,7 +105,7 @@ async function main(): Promise<void> {
   return { date: y + "-" + m + "-" + d };
 }`;
 
-  const scriptsDir = join(config.system.workspacePath, "tools", "scripts");
+  const scriptsDir = join(config.agents.default.workspacePath, "tools", "scripts");
   await mkdir(scriptsDir, { recursive: true });
   await fsWriteFile(join(scriptsDir, "get-date.js"), getDateScript, "utf-8");
 
@@ -181,7 +185,7 @@ export default async function(input, context) {
   let contextPrompt = "";
   try {
     const promptFiles = await Promise.all([
-      loadPromptFile(config.system.workspacePath, "self").catch(() => null),
+      loadPromptFile(config.agents.default.workspacePath, "self").catch(() => null),
     ]);
     const validFiles = promptFiles.filter((f) => f !== null);
     if (validFiles.length > 0) {
@@ -212,7 +216,7 @@ export default async function(input, context) {
     toolExecutor: executor,
     toolRegistry: registry,
     logger,
-    workspacePath: config.system.workspacePath,
+    workspacePath: config.agents.default.workspacePath,
   };
 
   const task =
@@ -266,7 +270,7 @@ export default async function(input, context) {
 
   // ── 9. 验证 workspace/tmp/today.txt ────────────────────────────
   console.log("[10/11] 验证 workspace/tmp/today.txt...");
-  const todayPath = join(config.system.workspacePath, "tmp", "today.txt");
+  const todayPath = join(config.agents.default.workspacePath, "tmp", "today.txt");
   let fileOk = false;
   try {
     const content = await readFile(todayPath, "utf-8");
@@ -283,7 +287,7 @@ export default async function(input, context) {
   console.log("[11/11] 验证日志文件...");
   const today = new Date();
   const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  const logPath = join(config.system.workspacePath, "logs", `${dateStr}.log`);
+  const logPath = join(config.agents.default.workspacePath, "logs", `${dateStr}.log`);
 
   // 等待一小段时间确保异步日志写入完成
   await new Promise((r) => setTimeout(r, 500));

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { configSchema, type Config } from "./schema.js";
+import { configSchema, parseModelRef, type Config } from "./schema.js";
 import { ConfigError } from "../errors/index.js";
 
 /** 默认配置文件路径 */
@@ -69,10 +69,32 @@ export async function loadConfig(configPath?: string): Promise<Readonly<Config>>
     throw new ConfigError(`配置验证失败:\n${messages.join("\n")}`);
   }
 
-  // 验证 defaultProvider 引用的提供商是否存在
   const config = result.data;
-  if (!(config.model.defaultProvider in config.model.providers)) {
-    throw new ConfigError(`默认提供商 "${config.model.defaultProvider}" 未在 providers 中定义`);
+
+  // 验证每个 agent 的 model 引用
+  for (const [agentName, agentConfig] of Object.entries(config.agents)) {
+    const ref = parseModelRef(agentConfig.model);
+    if (!ref) {
+      throw new ConfigError(
+        `Agent "${agentName}" 的 model "${agentConfig.model}" 格式无效，应为 "provider/model"`,
+      );
+    }
+    // 验证引用的提供商存在
+    if (!(ref.provider in config.providers)) {
+      throw new ConfigError(
+        `Agent "${agentName}" 引用了不存在的提供商 "${ref.provider}"（model: "${agentConfig.model}"）`,
+      );
+    }
+    // 验证引用的模型在提供商的 models 列表中（如果提供商定义了 models）
+    const providerConfig = config.providers[ref.provider];
+    if (providerConfig.models && providerConfig.models.length > 0) {
+      if (!providerConfig.models.includes(ref.model)) {
+        throw new ConfigError(
+          `Agent "${agentName}" 引用的模型 "${ref.model}" 不在提供商 "${ref.provider}" 的可用模型列表中。` +
+            `\n  可用模型: ${providerConfig.models.join(", ")}`,
+        );
+      }
+    }
   }
 
   return Object.freeze(config);

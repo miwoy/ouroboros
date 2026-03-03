@@ -1,67 +1,76 @@
 {
   "system": {
     "logLevel": "info",
-    "workspacePath": "./workspace",
     "proxy": ""
   },
+  "providers": {
+    "ollama": {
+      "type": "openai-compatible",
+      "apiKey": "ollama",
+      "baseUrl": "http://localhost:11434/v1",
+      "defaultModel": "llama3",
+      "models": ["llama3", "qwen2.5", "deepseek-r1"]
+    },
+    "anthropic": {
+      "type": "anthropic",
+      "apiKey": "your-anthropic-api-key",
+      "defaultModel": "claude-sonnet-4-20250514",
+      "models": ["claude-opus-4-20250514", "claude-sonnet-4-20250514", "claude-haiku-4-5-20251001"]
+    },
+    "openai": {
+      "type": "openai",
+      "apiKey": "your-openai-api-key",
+      "defaultModel": "gpt-4o",
+      "models": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"]
+    },
+    "google": {
+      "type": "google",
+      "apiKey": "your-google-api-key",
+      "defaultModel": "gemini-2.0-flash",
+      "models": ["gemini-2.0-flash", "gemini-2.5-pro"]
+    },
+    "groq": {
+      "type": "groq",
+      "apiKey": "your-groq-api-key",
+      "defaultModel": "llama-3.3-70b-versatile",
+      "models": ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
+    },
+    "openai-codex": {
+      "type": "openai-codex",
+      "defaultModel": "gpt-5.3-codex",
+      "models": ["gpt-5.3-codex", "gpt-5.2-codex", "gpt-5.1-codex-mini"]
+    },
+    "github-copilot": {
+      "type": "github-copilot",
+      "defaultModel": "gpt-4o",
+      "models": ["gpt-4o", "claude-sonnet-4", "gemini-2.5-pro"]
+    },
+    "google-gemini-cli": {
+      "type": "google-gemini-cli",
+      "defaultModel": "gemini-2.5-flash",
+      "models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"]
+    },
+    "google-antigravity": {
+      "type": "google-antigravity",
+      "defaultModel": "gemini-2.5-pro",
+      "models": ["gemini-2.5-pro", "claude-opus-4-5-thinking", "claude-sonnet-4-6-thinking"]
+    }
+  },
+  "agents": {
+    "default": {
+      "model": "ollama/llama3",
+      "workspacePath": "./workspace",
+      "maxTurns": 50,
+      "think": false,
+      "thinkLevel": "medium",
+      "trackTokenUsage": true,
+      "knowledgeMaxTokens": 8000
+    }
+  },
   "model": {
-    "defaultProvider": "ollama",
     "timeout": 30000,
     "maxRetries": 3,
-    "retryBaseDelay": 1000,
-    "providers": {
-      "ollama": {
-        "type": "openai-compatible",
-        "apiKey": "ollama",
-        "baseUrl": "http://localhost:11434/v1",
-        "defaultModel": "llama3",
-        "models": ["llama3", "qwen2.5", "deepseek-r1"]
-      },
-      "anthropic": {
-        "type": "anthropic",
-        "apiKey": "your-anthropic-api-key",
-        "defaultModel": "claude-sonnet-4-20250514",
-        "models": ["claude-opus-4-20250514", "claude-sonnet-4-20250514", "claude-haiku-4-5-20251001"]
-      },
-      "openai": {
-        "type": "openai",
-        "apiKey": "your-openai-api-key",
-        "defaultModel": "gpt-4o",
-        "models": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"]
-      },
-      "google": {
-        "type": "google",
-        "apiKey": "your-google-api-key",
-        "defaultModel": "gemini-2.0-flash",
-        "models": ["gemini-2.0-flash", "gemini-2.5-pro"]
-      },
-      "groq": {
-        "type": "groq",
-        "apiKey": "your-groq-api-key",
-        "defaultModel": "llama-3.3-70b-versatile",
-        "models": ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
-      },
-      "openai-codex": {
-        "type": "openai-codex",
-        "defaultModel": "gpt-5.3-codex",
-        "models": ["gpt-5.3-codex", "gpt-5.2-codex", "gpt-5.1-codex-mini"]
-      },
-      "github-copilot": {
-        "type": "github-copilot",
-        "defaultModel": "gpt-4o",
-        "models": ["gpt-4o", "claude-sonnet-4", "gemini-2.5-pro"]
-      },
-      "google-gemini-cli": {
-        "type": "google-gemini-cli",
-        "defaultModel": "gemini-2.5-flash",
-        "models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"]
-      },
-      "google-antigravity": {
-        "type": "google-antigravity",
-        "defaultModel": "gemini-2.5-pro",
-        "models": ["gemini-2.5-pro", "claude-opus-4-5-thinking", "claude-sonnet-4-6-thinking"]
-      }
-    }
+    "retryBaseDelay": 1000
   },
   "tools": {
     "defaultTimeout": 30000,
@@ -79,17 +88,6 @@
     "shortTerm": true,
     "longTerm": true,
     "hotSessionMaxTokens": 4000
-  },
-  "agents": {
-    "defaultMaxTurns": 50,
-    "knowledgeMaxTokens": 8000,
-    "think": false,
-    "thinkLevel": "medium",
-    "trackTokenUsage": true
-  },
-  "superAgents": {
-    "defaultMaxDuration": 600,
-    "maxParallelAgents": 5
   },
   "self": {
     "focusLevel": 60,

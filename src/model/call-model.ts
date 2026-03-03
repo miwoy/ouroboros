@@ -22,17 +22,20 @@ export interface CallModelOptions {
  *
  * @param config - 全局配置
  * @param registry - 提供商注册表
+ * @param defaultProvider - 默认提供商名称（从 agents.default.model 解析）
  * @returns callModel 函数
  */
 export function createCallModel(
   config: Readonly<Config>,
   registry: ProviderRegistry,
+  defaultProvider: string,
 ): (request: ModelRequest, options?: CallModelOptions) => Promise<ModelResponse> {
-  const { defaultProvider, timeout, maxRetries, retryBaseDelay } = config.model;
+  const { timeout, maxRetries, retryBaseDelay } = config.model;
 
-  // 全局 think 配置
-  const globalThink = config.agents.think;
-  const globalThinkLevel = config.agents.thinkLevel;
+  // 全局 think 配置（从默认 Agent 获取）
+  const defaultAgent = config.agents.default;
+  const globalThink = defaultAgent.think;
+  const globalThinkLevel = defaultAgent.thinkLevel;
 
   return async function callModel(
     request: ModelRequest,

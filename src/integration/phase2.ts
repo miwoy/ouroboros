@@ -55,15 +55,15 @@ async function main(): Promise<void> {
   // ── 1. 加载配置 + 初始化 workspace ──────────────────────────────
   console.log("[1/9] 加载配置...");
   const config = await loadConfig();
-  console.log(`  默认提供商: ${config.model.defaultProvider}`);
+  console.log(`  默认提供商: ${config.agents.default.model.split("/")[0]}`);
 
   console.log("[2/9] 初始化 workspace（模板复制）...");
-  await initWorkspace(config.system.workspacePath);
+  await initWorkspace(config.agents.default.workspacePath);
   console.log("  workspace 初始化完成，默认模板已复制");
 
   // ── 2. 加载 self.md 验证身体图式变量 ────────────────────────────
   console.log("[3/9] 加载 self.md 验证模板变量...");
-  const selfFile = await loadPromptFile(config.system.workspacePath, "self");
+  const selfFile = await loadPromptFile(config.agents.default.workspacePath, "self");
   const selfLoadOk = selfFile !== null;
   console.log(`  ${selfLoadOk ? "✅" : "❌"} self.md 加载成功`);
   checks.push({ name: "self.md 加载", passed: selfLoadOk });
@@ -86,7 +86,7 @@ async function main(): Promise<void> {
   const selfRendered = renderTemplate(selfFile!.content, {
     platform: `${os.platform()} ${os.arch()} (Node.js ${process.version})`,
     availableMemory: memInfo,
-    workspacePath: config.system.workspacePath,
+    workspacePath: config.agents.default.workspacePath,
     focusLevel: "高",
     cautionLevel: "中",
     creativityLevel: "中",
@@ -97,7 +97,7 @@ async function main(): Promise<void> {
 
   const renderOk =
     selfRendered.includes(os.platform()) &&
-    selfRendered.includes(config.system.workspacePath) &&
+    selfRendered.includes(config.agents.default.workspacePath) &&
     !selfRendered.includes("{{platform}}") &&
     selfRendered.includes("自我指涉") &&
     selfRendered.includes("Not yet known.");
@@ -110,7 +110,7 @@ async function main(): Promise<void> {
   console.log("[5/9] 追加自定义技能到 skill.md...");
   const skillEntry =
     "| 文件摘要 | skill:file-summary | 读取指定文件并生成摘要 | workspace/skills/file-summary |";
-  const skillFilePath = getPromptFilePath(config.system.workspacePath, "skill");
+  const skillFilePath = getPromptFilePath(config.agents.default.workspacePath, "skill");
   await appendToPromptFile(skillFilePath, skillEntry);
 
   const skillFile = await readPromptFile(skillFilePath);
@@ -120,22 +120,26 @@ async function main(): Promise<void> {
 
   // ── 5. 关键词 + 向量检索 ────────────────────────────────────────
   console.log("[6/9] 关键词检索 '文件摘要'...");
-  const keywordResults = await searchByKeyword(config.system.workspacePath, "文件摘要");
+  const keywordResults = await searchByKeyword(config.agents.default.workspacePath, "文件摘要");
   const keywordHit = keywordResults.length > 0 && keywordResults[0].fileName === "skill.md";
   console.log(`  ${keywordHit ? "✅" : "❌"} 关键词检索命中 (${keywordResults.length} 条)`);
   checks.push({ name: "关键词检索命中", passed: keywordHit });
 
   console.log("[7/9] 向量语义检索...");
-  const qmdReady = await isQmdAvailable(config.system.workspacePath);
+  const qmdReady = await isQmdAvailable(config.agents.default.workspacePath);
   let vectorHit = false;
 
   if (qmdReady) {
     console.log("  qmd 可用，初始化向量索引...");
     try {
-      await initVectorIndex(config.system.workspacePath);
-      const semanticResults = await searchBySemantic(config.system.workspacePath, "文件摘要", {
-        mode: "query",
-      });
+      await initVectorIndex(config.agents.default.workspacePath);
+      const semanticResults = await searchBySemantic(
+        config.agents.default.workspacePath,
+        "文件摘要",
+        {
+          mode: "query",
+        },
+      );
       vectorHit = semanticResults.length > 0 && semanticResults[0].fileName.includes("skill");
       console.log(`  ${vectorHit ? "✅" : "❌"} 向量检索命中 (${semanticResults.length} 条)`);
     } catch (err) {
@@ -149,7 +153,7 @@ async function main(): Promise<void> {
 
   // ── 6. 装配 core + self 提示词 ──────────────────────────────────
   console.log("[8/9] 装配 core + self 提示词 → callModel...");
-  const coreFile = await loadPromptFile(config.system.workspacePath, "core");
+  const coreFile = await loadPromptFile(config.agents.default.workspacePath, "core");
 
   const parts: RenderedPrompt[] = [
     { fileType: "core", content: coreFile!.content },
@@ -164,8 +168,8 @@ async function main(): Promise<void> {
   checks.push({ name: "提示词装配", passed: assembleOk });
 
   // ── 7. 调用模型验证 ────────────────────────────────────────────
-  const registry = createProviderRegistry(config.model.providers);
-  const callModel = createCallModel(config, registry);
+  const registry = createProviderRegistry(config.providers);
+  const callModel = createCallModel(config, registry, config.agents.default.model.split("/")[0]);
 
   const response = await callModel({
     messages: [
@@ -192,7 +196,7 @@ async function main(): Promise<void> {
   // ── 8. 清理 ────────────────────────────────────────────────────
   console.log("[9/9] 清理...");
   if (qmdReady) {
-    await removeVectorIndex(config.system.workspacePath);
+    await removeVectorIndex(config.agents.default.workspacePath);
     console.log("  向量索引已清理");
   }
 
