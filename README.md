@@ -18,7 +18,7 @@ Ouroboros 是一个分层递归的 Agent 框架。Agent 可以创建工具、技
 
 - **四层实体架构** — Tool → Skill → Solution (Agent) → Super Agent，逐层抽象、自指递归
 - **ReAct 推理循环** — Thought → Action → Observation，支持并行工具调用、执行树管理、死循环检测
-- **多模型统一接口** — 基于 pi-ai，支持 OpenAI / Anthropic / Google / Mistral / Groq / Bedrock / Ollama 等
+- **多模型统一接口** — 基于 pi-ai，支持 OpenAI / Anthropic / Google / Mistral / Groq / Bedrock / Ollama / OpenAI Codex / GitHub Copilot 等，OAuth 免密认证
 - **自我图式系统** — 身体图式（环境感知）+ 灵魂图式（世界模型）+ 激素系统（决策倾向）
 - **分层记忆** — Hot Memory → Cold Memory → 短期记忆 → 长期记忆，四层渐进式持久化
 - **自我审视** — 审查程序（防偏执）+ 反思程序（总结优化）+ 状态持久化与恢复
@@ -32,9 +32,15 @@ Ouroboros 是一个分层递归的 Agent 框架。Agent 可以创建工具、技
 git clone git@github.com:miwoy/ouroboros.git
 cd ouroboros && npm install
 
-# 配置
+# 方式一：交互式配置向导（推荐）
+npm run configure
+
+# 方式二：手动配置
 cp config.example.json config.json
 # 编辑 config.json 配置模型提供商（详见 docs/CONFIGURE.md）
+
+# OAuth 登录（ChatGPT/Copilot/Anthropic/Google 订阅用户）
+npm run login -- openai-codex
 
 # 启动后端
 npm run dev

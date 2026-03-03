@@ -1,0 +1,43 @@
+/**
+ * login 命令 — OAuth 登录
+ * 支持所有 pi-ai OAuth 提供商
+ */
+import { createAuthStore } from "../../auth/store.js";
+import {
+  loginProvider,
+  getSupportedOAuthProviders,
+  getProviderDisplayName,
+} from "../../auth/login.js";
+
+/**
+ * 执行 login 命令
+ *
+ * @param providerId - 要登录的 OAuth 提供商 ID（默认列出可选项）
+ */
+export async function runLogin(providerId?: string): Promise<void> {
+  const store = createAuthStore();
+  const supported = getSupportedOAuthProviders();
+
+  if (!providerId) {
+    // 未指定提供商，打印帮助
+    console.log("\n🐍 Ouroboros OAuth 登录\n");
+    console.log("用法: ouroboros login <provider>\n");
+    console.log("支持的 OAuth 提供商:");
+    for (const id of supported) {
+      const name = getProviderDisplayName(id);
+      const stored = await store.loadCredentials(id);
+      const status = stored ? "✅ 已登录" : "⬚  未登录";
+      console.log(`  ${status}  ${id.padEnd(20)} ${name}`);
+    }
+    console.log("\n示例: npm run login -- openai-codex\n");
+    return;
+  }
+
+  if (!supported.includes(providerId)) {
+    console.error(`❌ 不支持的 OAuth 提供商: ${providerId}`);
+    console.error(`支持的提供商: ${supported.join(", ")}`);
+    process.exit(1);
+  }
+
+  await loginProvider(providerId, store);
+}

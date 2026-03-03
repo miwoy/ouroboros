@@ -7,8 +7,10 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx src/main.ts",
-    "start": "tsx src/main.ts",
+    "dev": "tsx src/cli/index.ts start",
+    "start": "tsx src/cli/index.ts start",
+    "login": "tsx src/cli/index.ts login",
+    "configure": "tsx src/cli/index.ts configure",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

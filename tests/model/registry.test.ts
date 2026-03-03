@@ -8,6 +8,7 @@ vi.mock("@mariozechner/pi-ai", () => ({
   registerBuiltInApiProviders: vi.fn(),
   stream: vi.fn(),
   complete: vi.fn(),
+  getOAuthApiKey: vi.fn(),
 }));
 
 describe("createProviderRegistry", () => {
@@ -37,32 +38,32 @@ describe("createProviderRegistry", () => {
     expect(registry.has("nonexistent")).toBe(false);
   });
 
-  it("get() 应该返回对应的提供商实例", () => {
+  it("get() 应该返回对应的提供商实例", async () => {
     const registry = createProviderRegistry(testProviders);
-    const provider = registry.get("my-openai");
+    const provider = await registry.get("my-openai");
     expect(provider).toBeDefined();
     expect(provider.name).toBe("openai");
   });
 
-  it("get() 多次调用应返回同一实例（懒初始化缓存）", () => {
+  it("get() 多次调用应返回同一实例（懒初始化缓存）", async () => {
     const registry = createProviderRegistry(testProviders);
-    const p1 = registry.get("my-openai");
-    const p2 = registry.get("my-openai");
+    const p1 = await registry.get("my-openai");
+    const p2 = await registry.get("my-openai");
     expect(p1).toBe(p2);
   });
 
-  it("get() 应该为 Anthropic 类型返回正确提供商", () => {
+  it("get() 应该为 Anthropic 类型返回正确提供商", async () => {
     const registry = createProviderRegistry(testProviders);
-    const provider = registry.get("my-anthropic");
+    const provider = await registry.get("my-anthropic");
     expect(provider.name).toBe("anthropic");
   });
 
-  it("get() 应该在提供商不存在时抛出 ProviderNotFoundError", () => {
+  it("get() 应该在提供商不存在时抛出 ProviderNotFoundError", async () => {
     const registry = createProviderRegistry(testProviders);
-    expect(() => registry.get("nonexistent")).toThrow(ProviderNotFoundError);
+    await expect(registry.get("nonexistent")).rejects.toThrow(ProviderNotFoundError);
   });
 
-  it("应该支持 openai-compatible 类型", () => {
+  it("应该支持 openai-compatible 类型", async () => {
     const registry = createProviderRegistry({
       ollama: {
         type: "openai-compatible",
@@ -71,11 +72,11 @@ describe("createProviderRegistry", () => {
         defaultModel: "llama3",
       },
     });
-    const provider = registry.get("ollama");
+    const provider = await registry.get("ollama");
     expect(provider.name).toBe("openai-compatible");
   });
 
-  it("应该支持新增的 provider 类型", () => {
+  it("应该支持新增的 provider 类型", async () => {
     const registry = createProviderRegistry({
       google: {
         type: "google",
@@ -89,10 +90,34 @@ describe("createProviderRegistry", () => {
       },
     });
 
-    const googleProvider = registry.get("google");
+    const googleProvider = await registry.get("google");
     expect(googleProvider.name).toBe("google");
 
-    const groqProvider = registry.get("groq");
+    const groqProvider = await registry.get("groq");
     expect(groqProvider.name).toBe("groq");
+  });
+
+  it("应该支持 openai-codex 类型（带 apiKey）", async () => {
+    const registry = createProviderRegistry({
+      codex: {
+        type: "openai-codex",
+        apiKey: "sk-codex",
+        defaultModel: "gpt-5.3-codex",
+      },
+    });
+    const provider = await registry.get("codex");
+    expect(provider.name).toBe("openai-codex");
+  });
+
+  it("应该支持 github-copilot 类型", async () => {
+    const registry = createProviderRegistry({
+      copilot: {
+        type: "github-copilot",
+        apiKey: "gho-test",
+        defaultModel: "gpt-4o",
+      },
+    });
+    const provider = await registry.get("copilot");
+    expect(provider.name).toBe("github-copilot");
   });
 });

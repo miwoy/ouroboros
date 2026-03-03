@@ -1,29 +1,70 @@
 import { z } from "zod/v4";
 
 /**
+ * 支持 OAuth 认证的提供商类型（无需手动配置 apiKey）
+ */
+export const OAUTH_PROVIDER_TYPES = [
+  "openai-codex",
+  "anthropic",
+  "github-copilot",
+  "google-gemini-cli",
+  "google-antigravity",
+] as const;
+
+/**
+ * 提供商类型 → OAuth Provider ID 映射
+ */
+export const PROVIDER_OAUTH_MAP: Readonly<Record<string, string>> = {
+  "openai-codex": "openai-codex",
+  anthropic: "anthropic",
+  "github-copilot": "github-copilot",
+  "google-gemini-cli": "google-gemini-cli",
+  "google-antigravity": "google-antigravity",
+};
+
+/**
  * 模型提供商配置 Schema
  * 定义单个模型提供商的连接参数
  */
-const modelProviderSchema = z.object({
-  /** 提供商类型标识 */
-  type: z.enum([
-    "openai",
-    "anthropic",
-    "openai-compatible",
-    "google",
-    "mistral",
-    "groq",
-    "bedrock",
-  ]),
-  /** API 密钥（可通过环境变量注入） */
-  apiKey: z.string().min(1, "API 密钥不能为空"),
-  /** API 基础 URL（可选，用于自定义端点或兼容 API） */
-  baseUrl: z.string().url().optional(),
-  /** 默认模型 ID */
-  defaultModel: z.string().min(1).optional(),
-  /** 该提供商可用的模型列表（供 client 展示切换） */
-  models: z.array(z.string().min(1)).optional(),
-});
+const modelProviderSchema = z
+  .object({
+    /** 提供商类型标识 */
+    type: z.enum([
+      "openai",
+      "anthropic",
+      "openai-compatible",
+      "google",
+      "mistral",
+      "groq",
+      "bedrock",
+      "openai-codex",
+      "github-copilot",
+      "google-gemini-cli",
+      "google-antigravity",
+    ]),
+    /** API 密钥（OAuth 类型可选，其他类型必须） */
+    apiKey: z.string().min(1, "API 密钥不能为空").optional(),
+    /** API 基础 URL（可选，用于自定义端点或兼容 API） */
+    baseUrl: z.string().url().optional(),
+    /** 默认模型 ID */
+    defaultModel: z.string().min(1).optional(),
+    /** 该提供商可用的模型列表（供 client 展示切换） */
+    models: z.array(z.string().min(1)).optional(),
+  })
+  .refine(
+    (data) => {
+      // OAuth 类型不要求 apiKey
+      if ((OAUTH_PROVIDER_TYPES as readonly string[]).includes(data.type)) {
+        return true;
+      }
+      // 非 OAuth 类型必须提供 apiKey
+      return data.apiKey !== undefined;
+    },
+    {
+      message: "非 OAuth 类型的提供商必须提供 apiKey",
+      path: ["apiKey"],
+    },
+  );
 
 /**
  * 模型配置 Schema

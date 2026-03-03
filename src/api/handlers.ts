@@ -469,7 +469,7 @@ async function processMessage(
   }
 
   // 第二层：有 provider 无 toolRegistry → 直连模型
-  const provider = deps.providerRegistry.get(deps.defaultProvider);
+  const provider = await deps.providerRegistry.get(deps.defaultProvider);
   const messages = await buildModelMessages(sessionManager, sessionId, deps, message);
   const response = await provider.complete({ messages });
 
@@ -660,7 +660,7 @@ async function* createDirectStreamEvents(
 ): AsyncIterable<SSEEvent> {
   yield { event: "thinking", data: JSON.stringify({ sessionId }) };
 
-  const provider = deps.providerRegistry!.get(deps.defaultProvider!);
+  const provider = await deps.providerRegistry!.get(deps.defaultProvider!);
   const messages = await buildModelMessages(sessionManager, sessionId, deps, message);
   const { pushEvent, waitForEvent, drainQueue } = createEventQueue();
 
@@ -767,8 +767,12 @@ function buildReactMetadata(result: {
 function getCallModelFn(deps: ApiDeps): CallModelFn | null {
   if (!deps.providerRegistry || !deps.defaultProvider) return null;
   if (deps.callModel) return deps.callModel;
-  const provider = deps.providerRegistry.get(deps.defaultProvider);
-  return (request, options) => provider.complete(request, options?.signal);
+  const registry = deps.providerRegistry;
+  const defaultProvider = deps.defaultProvider;
+  return async (request, options) => {
+    const provider = await registry.get(defaultProvider);
+    return provider.complete(request, options?.signal);
+  };
 }
 
 /** 准备 ReAct 循环共享依赖（工具 + 配置） */

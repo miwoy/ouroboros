@@ -163,4 +163,135 @@ describe("configSchema", () => {
     const result = configSchema.safeParse(config);
     expect(result.success).toBe(false);
   });
+
+  // ─── OAuth 提供商类型测试 ──────────────────────────
+
+  it("应该接受 openai-codex 类型且无 apiKey", () => {
+    const config = {
+      system: {},
+      model: {
+        defaultProvider: "codex",
+        providers: {
+          codex: {
+            type: "openai-codex",
+            defaultModel: "gpt-5.3-codex",
+          },
+        },
+      },
+    };
+    const result = configSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
+
+  it("应该接受 github-copilot 类型且无 apiKey", () => {
+    const config = {
+      system: {},
+      model: {
+        defaultProvider: "copilot",
+        providers: {
+          copilot: {
+            type: "github-copilot",
+            defaultModel: "gpt-4o",
+          },
+        },
+      },
+    };
+    const result = configSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
+
+  it("应该接受 anthropic 类型且无 apiKey（OAuth 模式）", () => {
+    const config = {
+      system: {},
+      model: {
+        defaultProvider: "ant",
+        providers: {
+          ant: {
+            type: "anthropic",
+          },
+        },
+      },
+    };
+    const result = configSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
+
+  it("应该接受 google-gemini-cli 类型且无 apiKey", () => {
+    const config = {
+      system: {},
+      model: {
+        defaultProvider: "gemini",
+        providers: {
+          gemini: {
+            type: "google-gemini-cli",
+            defaultModel: "gemini-2.5-flash",
+          },
+        },
+      },
+    };
+    const result = configSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
+
+  it("应该接受 google-antigravity 类型且无 apiKey", () => {
+    const config = {
+      system: {},
+      model: {
+        defaultProvider: "ag",
+        providers: {
+          ag: {
+            type: "google-antigravity",
+          },
+        },
+      },
+    };
+    const result = configSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
+
+  it("应该拒绝非 OAuth 类型缺少 apiKey（openai）", () => {
+    const config = {
+      system: {},
+      model: {
+        defaultProvider: "test",
+        providers: {
+          test: { type: "openai" },
+        },
+      },
+    };
+    const result = configSchema.safeParse(config);
+    expect(result.success).toBe(false);
+  });
+
+  it("应该拒绝非 OAuth 类型缺少 apiKey（google）", () => {
+    const config = {
+      system: {},
+      model: {
+        defaultProvider: "test",
+        providers: {
+          test: { type: "google" },
+        },
+      },
+    };
+    const result = configSchema.safeParse(config);
+    expect(result.success).toBe(false);
+  });
+
+  it("应该接受 OAuth 类型带有 apiKey（也支持 API Key 模式）", () => {
+    const config = {
+      system: {},
+      model: {
+        defaultProvider: "codex",
+        providers: {
+          codex: {
+            type: "openai-codex",
+            apiKey: "sk-explicit-key",
+            defaultModel: "gpt-5.3-codex",
+          },
+        },
+      },
+    };
+    const result = configSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
 });

@@ -45,7 +45,16 @@ const API_TYPE_MAP: Readonly<Record<string, PiApi>> = {
   mistral: "openai-completions",
   groq: "openai-completions",
   bedrock: "bedrock-converse-stream",
+  "openai-codex": "openai-codex-responses",
+  "github-copilot": "openai-completions",
+  "google-gemini-cli": "google-gemini-cli",
+  "google-antigravity": "google-gemini-cli",
 };
+
+/**
+ * GitHub Copilot 中使用 anthropic-messages API 的模型前缀
+ */
+const COPILOT_ANTHROPIC_PREFIXES = ["claude-"] as const;
 
 /**
  * 默认 baseUrl 映射
@@ -56,6 +65,10 @@ const DEFAULT_BASE_URLS: Readonly<Record<string, string>> = {
   google: "https://generativelanguage.googleapis.com",
   mistral: "https://api.mistral.ai/v1",
   groq: "https://api.groq.com/openai/v1",
+  "openai-codex": "https://api.openai.com/v1",
+  "github-copilot": "https://api.individual.githubcopilot.com",
+  "google-gemini-cli": "https://cloudcode-pa.googleapis.com",
+  "google-antigravity": "https://daily-cloudcode-pa.sandbox.googleapis.com",
 };
 
 /**
@@ -69,7 +82,23 @@ const DEFAULT_MODELS: Readonly<Record<string, string>> = {
   mistral: "mistral-large-latest",
   groq: "llama-3.3-70b-versatile",
   bedrock: "anthropic.claude-sonnet-4-20250514-v2:0",
+  "openai-codex": "gpt-5.3-codex",
+  "github-copilot": "gpt-4o",
+  "google-gemini-cli": "gemini-2.5-flash",
+  "google-antigravity": "gemini-2.5-pro",
 };
+
+/**
+ * 推断 GitHub Copilot 的实际 API 类型
+ * Claude 模型使用 anthropic-messages，其他使用 openai-completions
+ */
+function inferCopilotApi(modelId: string): PiApi {
+  const lower = modelId.toLowerCase();
+  if (COPILOT_ANTHROPIC_PREFIXES.some((p) => lower.startsWith(p))) {
+    return "anthropic-messages";
+  }
+  return "openai-completions";
+}
 
 /**
  * 根据配置创建 pi-ai Model 对象
@@ -79,13 +108,18 @@ function createPiModel(
   modelOverride?: string,
   reasoning = false,
 ): PiModel<PiApi> {
-  const api = API_TYPE_MAP[config.type];
+  let api = API_TYPE_MAP[config.type];
   if (!api) {
     throw new ModelError(`不支持的提供商类型: ${config.type}`);
   }
 
   const modelId = modelOverride ?? config.defaultModel ?? DEFAULT_MODELS[config.type] ?? "unknown";
   const baseUrl = config.baseUrl ?? DEFAULT_BASE_URLS[config.type] ?? "";
+
+  // GitHub Copilot 根据模型名称推断 API 类型
+  if (config.type === "github-copilot") {
+    api = inferCopilotApi(modelId);
+  }
 
   return {
     id: modelId,
@@ -251,7 +285,7 @@ function toStreamOptions(
   signal?: AbortSignal,
 ): ProviderStreamOptions {
   const options: Record<string, unknown> & { apiKey: string } = {
-    apiKey: config.apiKey,
+    apiKey: config.apiKey ?? "",
   };
   if (request.temperature !== undefined) {
     options.temperature = request.temperature;
@@ -268,7 +302,12 @@ function toStreamOptions(
   // Thinking/Reasoning 支持
   if (request.think) {
     const level = request.thinkLevel ?? "medium";
-    options.reasoning = level;
+    // openai-codex 使用 reasoningEffort 参数（支持 none|minimal|low|medium|high|xhigh）
+    if (config.type === "openai-codex") {
+      options.reasoningEffort = level;
+    } else {
+      options.reasoning = level;
+    }
   }
 
   return options;

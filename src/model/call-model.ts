@@ -39,7 +39,7 @@ export function createCallModel(
     options?: CallModelOptions,
   ): Promise<ModelResponse> {
     const providerName = options?.provider ?? defaultProvider;
-    const provider = registry.get(providerName);
+    const provider = await registry.get(providerName);
 
     // 注入全局 think 默认值（request 中显式设置时优先）
     const finalRequest: ModelRequest = {

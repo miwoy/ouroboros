@@ -21,8 +21,13 @@ import { createReflector } from "./reflection/reflector.js";
 import { createPersistenceManager } from "./persistence/manager.js";
 import { createSkillRegistry } from "./skill/registry.js";
 import { isQmdAvailable, initVectorIndex } from "./prompt/vector.js";
+import { createAuthStore } from "./auth/store.js";
 
-async function main(): Promise<void> {
+/**
+ * 启动 Ouroboros 服务器
+ * 抽取为独立函数，供 CLI start 命令和直接运行使用
+ */
+export async function startServer(): Promise<void> {
   // 1. 加载配置
   const config = await loadConfig();
 
@@ -66,7 +71,10 @@ async function main(): Promise<void> {
   const memoryManager = createMemoryManager(config.system.workspacePath, config.memory);
   logger.info("main", "记忆管理器已创建");
 
-  // 7. 启动 API 服务器
+  // 7. 创建 OAuth 凭据存储
+  const authStore = createAuthStore();
+
+  // 8. 启动 API 服务器配置
   const apiConfig: ApiConfig = {
     port: config.api.port,
     host: config.api.host,
@@ -78,26 +86,26 @@ async function main(): Promise<void> {
     corsOrigin: config.api.corsOrigin,
   };
 
-  // 6. 创建模型提供商注册表
-  const providerRegistry = createProviderRegistry(config.model.providers);
+  // 9. 创建模型提供商注册表（含 OAuth 支持）
+  const providerRegistry = createProviderRegistry(config.model.providers, authStore);
   logger.info("main", `模型提供商已加载: ${providerRegistry.names().join(", ")}`);
 
-  // 7. 创建工具注册表
+  // 10. 创建工具注册表
   const toolRegistry = await createToolRegistry(config.system.workspacePath);
   logger.info("main", `工具注册表已加载: ${toolRegistry.list().length} 个工具`);
 
-  // 8. 创建技能注册表
+  // 11. 创建技能注册表
   const skillRegistry = await createSkillRegistry(config.system.workspacePath);
   logger.info("main", `技能注册表已加载: ${skillRegistry.list().length} 个技能`);
 
-  // 10. 创建审查程序
+  // 12. 创建审查程序
   const inspector = createInspector(logger);
   logger.info("main", "审查程序已创建");
 
-  // 11. 创建统一 callModel 函数（含超时 + 重试）
+  // 13. 创建统一 callModel 函数（含超时 + 重试）
   const callModelFn = createCallModel(config, providerRegistry);
 
-  // 12. 创建反思器
+  // 14. 创建反思器
   const reflector = createReflector(
     {
       callModel: callModelFn,
@@ -108,7 +116,7 @@ async function main(): Promise<void> {
   );
   logger.info("main", "反思器已创建");
 
-  // 13. 创建持久化管理器
+  // 15. 创建持久化管理器
   const persistenceManager = createPersistenceManager({
     logger,
     workspacePath: config.system.workspacePath,
@@ -166,7 +174,8 @@ async function main(): Promise<void> {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
-main().catch((err) => {
+// 直接运行时启动服务器
+startServer().catch((err) => {
   console.error("[ouroboros] 启动失败:", err);
   process.exit(1);
 });

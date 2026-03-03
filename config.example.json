@@ -40,6 +40,26 @@
         "apiKey": "your-groq-api-key",
         "defaultModel": "llama-3.3-70b-versatile",
         "models": ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
+      },
+      "openai-codex": {
+        "type": "openai-codex",
+        "defaultModel": "gpt-5.3-codex",
+        "models": ["gpt-5.3-codex", "gpt-5.2-codex", "gpt-5.1-codex-mini"]
+      },
+      "github-copilot": {
+        "type": "github-copilot",
+        "defaultModel": "gpt-4o",
+        "models": ["gpt-4o", "claude-sonnet-4", "gemini-2.5-pro"]
+      },
+      "google-gemini-cli": {
+        "type": "google-gemini-cli",
+        "defaultModel": "gemini-2.5-flash",
+        "models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"]
+      },
+      "google-antigravity": {
+        "type": "google-antigravity",
+        "defaultModel": "gemini-2.5-pro",
+        "models": ["gemini-2.5-pro", "claude-opus-4-5-thinking", "claude-sonnet-4-6-thinking"]
       }
     }
   },
