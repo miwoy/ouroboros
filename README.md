@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  自指循环 Agent 框架 — 模型 + 提示词 + 工具 + 程序编排
+  <b>Devour. Reflect. Evolve. </b>
 </p>
 
 ---
