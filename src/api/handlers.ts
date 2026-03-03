@@ -140,7 +140,7 @@ export function registerHandlers(
 
     const providerNames = deps.providerRegistry.names();
     const providers = providerNames.map((name) => {
-      const config = deps.fullConfig!.providers[name];
+      const config = deps.fullConfig!.provider[name];
       return {
         name,
         type: config.type,
@@ -633,7 +633,7 @@ async function* createReactStreamEvents(
           tree,
           bodySchema: deps.schemaProvider.getBodySchema(),
           startTime: loopStartTime,
-          config: deps.fullConfig?.inspector ?? DEFAULT_INSPECTOR_CONFIG,
+          config: deps.fullConfig?.system.inspector ?? DEFAULT_INSPECTOR_CONFIG,
         });
         if (inspectResult.hasAnomalies) {
           deps.logger.warn("api", "Inspector 检测到异常", {
@@ -846,7 +846,7 @@ function prepareReactDeps(
     workspacePath: deps.workspacePath,
     callModel: callModelFn,
     httpFetch: deps.httpFetch,
-    config: deps.fullConfig ? { webSearch: deps.fullConfig.webSearch } : undefined,
+    config: deps.fullConfig ? { webSearch: deps.fullConfig.tools.web.search } : undefined,
   });
   const reactConfig: ReactLoopConfig = {
     maxIterations: deps.reactConfig?.maxIterations ?? 20,

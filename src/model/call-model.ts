@@ -30,12 +30,13 @@ export function createCallModel(
   registry: ProviderRegistry,
   defaultProvider: string,
 ): (request: ModelRequest, options?: CallModelOptions) => Promise<ModelResponse> {
-  const { timeout, maxRetries, retryBaseDelay } = config.model;
+  const { timeout, maxRetries, retryBaseDelay } = config.system.model;
 
   // 全局 think 配置（从默认 Agent 获取）
   const defaultAgent = config.agents.default;
-  const globalThink = defaultAgent.think;
   const globalThinkLevel = defaultAgent.thinkLevel;
+  // thinkLevel !== "off" 表示启用 thinking
+  const globalThink = globalThinkLevel !== "off";
 
   return async function callModel(
     request: ModelRequest,
@@ -45,10 +46,11 @@ export function createCallModel(
     const provider = await registry.get(providerName);
 
     // 注入全局 think 默认值（request 中显式设置时优先）
+    const resolvedThinkLevel = globalThinkLevel !== "off" ? globalThinkLevel : undefined;
     const finalRequest: ModelRequest = {
       ...request,
       think: request.think ?? globalThink,
-      thinkLevel: request.thinkLevel ?? globalThinkLevel,
+      thinkLevel: request.thinkLevel ?? resolvedThinkLevel,
     };
 
     // 创建超时控制

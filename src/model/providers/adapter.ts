@@ -19,7 +19,7 @@ import type {
   AssistantMessageEvent,
   ProviderStreamOptions,
 } from "@mariozechner/pi-ai";
-import type { ModelProviderConfig } from "../../config/schema.js";
+import type { ProviderConfig } from "../../config/schema.js";
 import { ModelError } from "../../errors/index.js";
 import type {
   ModelProvider,
@@ -104,20 +104,21 @@ function inferCopilotApi(modelId: string): PiApi {
  * 根据配置创建 pi-ai Model 对象
  */
 function createPiModel(
-  config: ModelProviderConfig,
+  config: ProviderConfig,
   modelOverride?: string,
   reasoning = false,
 ): PiModel<PiApi> {
-  let api = API_TYPE_MAP[config.type];
+  const providerType = config.type ?? config.api ?? "";
+  let api = API_TYPE_MAP[providerType];
   if (!api) {
-    throw new ModelError(`不支持的提供商类型: ${config.type}`);
+    throw new ModelError(`不支持的提供商类型: ${providerType}`);
   }
 
-  const modelId = modelOverride ?? config.defaultModel ?? DEFAULT_MODELS[config.type] ?? "unknown";
-  const baseUrl = config.baseUrl ?? DEFAULT_BASE_URLS[config.type] ?? "";
+  const modelId = modelOverride ?? config.defaultModel ?? DEFAULT_MODELS[providerType] ?? "unknown";
+  const baseUrl = config.baseUrl ?? DEFAULT_BASE_URLS[providerType] ?? "";
 
   // GitHub Copilot 根据模型名称推断 API 类型
-  if (config.type === "github-copilot") {
+  if (providerType === "github-copilot") {
     api = inferCopilotApi(modelId);
   }
 
@@ -125,7 +126,7 @@ function createPiModel(
     id: modelId,
     name: modelId,
     api,
-    provider: config.type,
+    provider: providerType,
     baseUrl,
     reasoning,
     input: ["text"],
@@ -280,7 +281,7 @@ function toUsage(msg: PiAssistantMessage): TokenUsage {
  * 构建 pi-ai StreamOptions
  */
 function toStreamOptions(
-  config: ModelProviderConfig,
+  config: ProviderConfig,
   request: ModelRequest,
   signal?: AbortSignal,
 ): ProviderStreamOptions {
@@ -303,7 +304,7 @@ function toStreamOptions(
   if (request.think) {
     const level = request.thinkLevel ?? "medium";
     // openai-codex 使用 reasoningEffort 参数（支持 none|minimal|low|medium|high|xhigh）
-    if (config.type === "openai-codex") {
+    if ((config.type ?? config.api) === "openai-codex") {
       options.reasoningEffort = level;
     } else {
       options.reasoning = level;
@@ -319,9 +320,9 @@ function toStreamOptions(
  * @param config - 提供商配置
  * @returns ModelProvider 接口实现
  */
-export function createPiAiProvider(config: ModelProviderConfig): ModelProvider {
+export function createPiAiProvider(config: ProviderConfig): ModelProvider {
   return {
-    name: config.type,
+    name: config.type ?? config.api ?? "unknown",
 
     async complete(request: ModelRequest, signal?: AbortSignal): Promise<ModelResponse> {
       const model = createPiModel(config, request.model, request.think ?? false);

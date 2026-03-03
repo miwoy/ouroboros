@@ -59,7 +59,7 @@ async function main(): Promise<void> {
   console.log("[1/11] 加载配置...");
   const config = await loadConfig();
   console.log(`  默认提供商: ${config.agents.default.model.split("/")[0]}`);
-  console.log(`  工具超时: ${config.tools.defaultTimeout}ms`);
+  console.log(`  工具超时: ${config.system.tool.defaultTimeout}ms`);
 
   console.log("[2/11] 初始化 workspace...");
   await initWorkspace(config.agents.default.workspacePath);
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
 
   // ── 2. 创建工具注册表 + 执行器 ──────────────────────────────────
   console.log("[3/11] 创建工具注册表 + 执行器...");
-  const providerRegistry = createProviderRegistry(config.providers);
+  const providerRegistry = createProviderRegistry(config.provider);
   const callModel = createCallModel(
     config,
     providerRegistry,

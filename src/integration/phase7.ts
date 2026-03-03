@@ -180,9 +180,9 @@ async function main(): Promise<void> {
         hotSessionMaxTokens: 8000,
       },
     });
-    assert(config.memory.shortTerm === false, "shortTerm 应为 false");
-    assert(config.memory.longTerm === true, "longTerm 默认应为 true");
-    assert(config.memory.hotSessionMaxTokens === 8000, "hotSessionMaxTokens 应为 8000");
+    assert(config.system.memory.shortTerm === false, "shortTerm 应为 false");
+    assert(config.system.memory.longTerm === true, "longTerm 默认应为 true");
+    assert(config.system.memory.hotSessionMaxTokens === 8000, "hotSessionMaxTokens 应为 8000");
 
     // 默认值测试
     const defaultConfig = configSchema.parse({
@@ -194,9 +194,12 @@ async function main(): Promise<void> {
         },
       },
     });
-    assert(defaultConfig.memory.shortTerm === true, "默认 shortTerm 为 true");
-    assert(defaultConfig.memory.longTerm === true, "默认 longTerm 为 true");
-    assert(defaultConfig.memory.hotSessionMaxTokens === 4000, "默认 hotSessionMaxTokens 为 4000");
+    assert(defaultConfig.system.memory.shortTerm === true, "默认 shortTerm 为 true");
+    assert(defaultConfig.system.memory.longTerm === true, "默认 longTerm 为 true");
+    assert(
+      defaultConfig.system.memory.hotSessionMaxTokens === 4000,
+      "默认 hotSessionMaxTokens 为 4000",
+    );
     console.log("  ✓ 配置系统工作正常\n");
 
     // ─── 结果汇总 ────────────────────────────────────────────────

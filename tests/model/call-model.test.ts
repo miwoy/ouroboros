@@ -27,27 +27,78 @@ function createMockProvider(overrides?: Partial<ModelProvider>): ModelProvider {
   };
 }
 
-/** 创建测试用配置 */
-function createTestConfig(overrides?: Partial<Config["model"]>): Config {
+/** 创建测试用配置（v2 结构） */
+function createTestConfig(modelOverrides?: Partial<Config["system"]["model"]>): Config {
   return {
-    system: { logLevel: "info" },
-    providers: {},
+    system: {
+      logLevel: "info",
+      cwd: "~/.ouroboros",
+      api: {
+        port: 3000,
+        host: "127.0.0.1",
+        rateLimitWindowMs: 60000,
+        rateLimitMaxRequests: 60,
+        corsOrigin: "*",
+      },
+      model: {
+        timeout: 5000,
+        maxRetries: 1,
+        retryBaseDelay: 10,
+        ...modelOverrides,
+      },
+      tool: { defaultTimeout: 30000, defaultMaxRetries: 0 },
+      react: {
+        maxIterations: 20,
+        stepTimeout: 60000,
+        parallelToolCalls: true,
+        compressionThreshold: 10,
+      },
+      memory: { shortTerm: true, longTerm: true, hotSessionMaxTokens: 4000 },
+      self: { focusLevel: 60, cautionLevel: 50, creativityLevel: 50 },
+      inspector: {
+        enabled: true,
+        checkInterval: 180000,
+        loopDetectionThreshold: 3,
+        maxRetryThreshold: 5,
+        minAvailableMemoryMB: 100,
+        maxExecutionTimeSecs: 3600,
+      },
+      reflection: { enabled: true, minSkillConfidence: 0.7 },
+    },
+    provider: {},
     agents: {
       default: {
         model: "mock/test-model",
         workspacePath: "./workspace",
         maxTurns: 50,
         knowledgeMaxTokens: 8000,
-        think: false,
-        thinkLevel: "medium",
+        thinkLevel: "off",
         trackTokenUsage: true,
       },
     },
-    model: {
-      timeout: 5000,
-      maxRetries: 1,
-      retryBaseDelay: 10,
-      ...overrides,
+    tools: {
+      web: {
+        search: { enabled: true, provider: "bing", maxResults: 5, timeoutSeconds: 30 },
+        fetch: { enabled: true },
+      },
+    },
+    channels: {
+      web: { enabled: true, port: 8517, host: "127.0.0.1" },
+      tui: { enabled: true },
+      telegram: {
+        enabled: false,
+        dmPolicy: "pairing",
+        groupPolicy: "allowlist",
+        streaming: "partial",
+      },
+    },
+    persistence: {
+      enabled: true,
+      checkpointIntervalMs: 60000,
+      snapshotDir: "state",
+      enableAutoRecovery: true,
+      recoveryTTLSecs: 86400,
+      maxSnapshots: 10,
     },
   } as Config;
 }

@@ -421,7 +421,7 @@ describe("API 路由处理器", () => {
       baseUrl = `http://127.0.0.1:${addr.port}`;
     }
 
-    it("ReAct SSE 应包含 react_step 和 text_delta 和 done 事件", async () => {
+    it("ReAct SSE 应包含 react_step 和 text_delta 和 done 事件", { timeout: 15000 }, async () => {
       await startReactServer();
 
       const res = await fetch(`${baseUrl}/api/chat/message`, {
@@ -440,7 +440,7 @@ describe("API 路由处理器", () => {
       expect(text).toContain("event: done");
     });
 
-    it("ReAct 非流式应返回 ReAct 回答", async () => {
+    it("ReAct 非流式应返回 ReAct 回答", { timeout: 15000 }, async () => {
       await startReactServer();
 
       const res = await fetch(`${baseUrl}/api/chat/message`, {

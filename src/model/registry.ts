@@ -1,4 +1,4 @@
-import type { ModelProviderConfig } from "../config/schema.js";
+import type { ProviderConfig } from "../config/schema.js";
 import { PROVIDER_OAUTH_MAP } from "../config/schema.js";
 import { ProviderNotFoundError } from "../errors/index.js";
 import type { AuthStore } from "../auth/types.js";
@@ -24,16 +24,16 @@ export interface ProviderRegistry {
  * 如果配置已有 apiKey 则直接返回；否则从 authStore 获取
  */
 async function resolveConfig(
-  config: ModelProviderConfig,
+  config: ProviderConfig,
   authStore?: AuthStore,
-): Promise<ModelProviderConfig> {
+): Promise<ProviderConfig> {
   // 已有 apiKey，无需 OAuth
   if (config.apiKey) {
     return config;
   }
 
   // 检查是否为 OAuth 类型
-  const oauthId = PROVIDER_OAUTH_MAP[config.type];
+  const oauthId = PROVIDER_OAUTH_MAP[config.type ?? ""];
   if (!oauthId || !authStore) {
     return config;
   }
@@ -57,7 +57,7 @@ async function resolveConfig(
  * @returns 不可变的提供商注册表
  */
 export function createProviderRegistry(
-  providers: Readonly<Record<string, ModelProviderConfig>>,
+  providers: Readonly<Record<string, ProviderConfig>>,
   authStore?: AuthStore,
 ): ProviderRegistry {
   const instances = new Map<string, ModelProvider>();

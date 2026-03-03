@@ -29,8 +29,9 @@ import { createAuthStore } from "./auth/store.js";
  * 抽取为独立函数，供 CLI start 命令和直接运行使用
  */
 export async function startServer(): Promise<void> {
-  // 1. 加载配置
-  const config = await loadConfig();
+  // 1. 加载配置（支持 CLI --config 参数注入）
+  const cliConfigPath = process.env.__OUROBOROS_CLI_CONFIG;
+  const config = await loadConfig(cliConfigPath);
 
   // 2. 解析默认 Agent 的模型引用
   const defaultAgent = config.agents.default;
@@ -72,13 +73,13 @@ export async function startServer(): Promise<void> {
 
   // 6. 创建自我图式提供者
   const schemaProvider = await createSchemaProvider(workspacePath, {
-    hormoneDefaults: config.self,
+    hormoneDefaults: config.system.self,
   });
   await schemaProvider.refresh();
   logger.info("main", "自我图式提供者已创建");
 
   // 7. 创建记忆管理器
-  const memoryManager = createMemoryManager(workspacePath, config.memory);
+  const memoryManager = createMemoryManager(workspacePath, config.system.memory);
   logger.info("main", "记忆管理器已创建");
 
   // 8. 创建 OAuth 凭据存储
@@ -86,18 +87,18 @@ export async function startServer(): Promise<void> {
 
   // 9. 启动 API 服务器配置
   const apiConfig: ApiConfig = {
-    port: config.api.port,
-    host: config.api.host,
-    apiKey: config.api.apiKey,
+    port: config.system.api.port,
+    host: config.system.api.host,
+    apiKey: config.system.api.apiKey,
     rateLimit: {
-      windowMs: config.api.rateLimitWindowMs,
-      maxRequests: config.api.rateLimitMaxRequests,
+      windowMs: config.system.api.rateLimitWindowMs,
+      maxRequests: config.system.api.rateLimitMaxRequests,
     },
-    corsOrigin: config.api.corsOrigin,
+    corsOrigin: config.system.api.corsOrigin,
   };
 
   // 10. 创建模型提供商注册表（含 OAuth 支持）
-  const providerRegistry = createProviderRegistry(config.providers, authStore);
+  const providerRegistry = createProviderRegistry(config.provider, authStore);
   logger.info("main", `模型提供商已加载: ${providerRegistry.names().join(", ")}`);
 
   // 11. 创建工具注册表
@@ -122,7 +123,7 @@ export async function startServer(): Promise<void> {
       longTermMemory: memoryManager.longTerm,
       logger,
     },
-    config.reflection,
+    config.system.reflection,
   );
   logger.info("main", "反思器已创建");
 
@@ -151,7 +152,7 @@ export async function startServer(): Promise<void> {
     providerRegistry,
     defaultProvider,
     toolRegistry,
-    reactConfig: config.react,
+    reactConfig: config.system.react,
     httpFetch: httpClient.fetch,
     schemaProvider,
     memoryManager,

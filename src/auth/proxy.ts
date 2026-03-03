@@ -7,7 +7,7 @@
  */
 import { ProxyAgent, fetch as undiciFetch } from "undici";
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { resolveConfigPath } from "../config/resolver.js";
 
 /**
  * 从多个来源解析代理地址（优先级从高到低）：
@@ -29,14 +29,16 @@ export async function resolveProxyUrl(explicitUrl?: string): Promise<string | un
     process.env.all_proxy;
   if (envProxy) return envProxy;
 
-  // 3. config.json
+  // 3. 配置文件（通过 resolver 查找链）
   try {
-    const configPath = resolve(process.cwd(), "config.json");
-    const raw = await readFile(configPath, "utf-8");
-    const config = JSON.parse(raw) as { system?: { proxy?: string } };
-    if (config.system?.proxy) return config.system.proxy;
+    const resolved = await resolveConfigPath();
+    if (resolved.source !== "none") {
+      const raw = await readFile(resolved.path, "utf-8");
+      const config = JSON.parse(raw) as { system?: { proxy?: string } };
+      if (config.system?.proxy) return config.system.proxy;
+    }
   } catch {
-    // config.json 不存在或解析失败，忽略
+    // 配置文件不存在或解析失败，忽略
   }
 
   return undefined;

@@ -168,7 +168,7 @@ async function main(): Promise<void> {
   checks.push({ name: "提示词装配", passed: assembleOk });
 
   // ── 7. 调用模型验证 ────────────────────────────────────────────
-  const registry = createProviderRegistry(config.providers);
+  const registry = createProviderRegistry(config.provider);
   const callModel = createCallModel(config, registry, config.agents.default.model.split("/")[0]);
 
   const response = await callModel({

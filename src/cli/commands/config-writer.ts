@@ -3,8 +3,9 @@
  * login 和 configure 共用的模型选择 + 配置文件写入逻辑
  */
 import { createInterface } from "node:readline";
-import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
+import { USER_CONFIG_PATH } from "../../config/resolver.js";
 
 /** 提供商模型信息 */
 interface ProviderModelInfo {
@@ -101,7 +102,7 @@ export async function selectModel(
 export async function readExistingConfig(
   configPath?: string,
 ): Promise<Record<string, unknown> | null> {
-  const path = configPath ?? resolve(process.cwd(), "config.json");
+  const path = configPath ?? USER_CONFIG_PATH;
   try {
     const raw = await readFile(path, "utf-8");
     return JSON.parse(raw) as Record<string, unknown>;
@@ -124,7 +125,7 @@ export async function writeProviderConfig(options: {
   readonly baseUrl?: string;
   readonly configPath?: string;
 }): Promise<void> {
-  const configPath = options.configPath ?? resolve(process.cwd(), "config.json");
+  const configPath = options.configPath ?? USER_CONFIG_PATH;
   const defaultModelRef = `${options.providerName}/${options.selectedModel}`;
 
   // 构建提供商配置
@@ -138,6 +139,9 @@ export async function writeProviderConfig(options: {
 
   // 读取现有配置
   const existing = await readExistingConfig(configPath);
+
+  // 确保目录存在
+  await mkdir(dirname(configPath), { recursive: true });
 
   if (existing) {
     // 合并模式
@@ -159,7 +163,7 @@ export async function writeProviderConfig(options: {
       },
     };
     await writeFile(configPath, JSON.stringify(merged, null, 2) + "\n", "utf-8");
-    console.log(`\n✅ 已更新 config.json — 默认模型: ${defaultModelRef}`);
+    console.log(`\n✅ 已更新 ${configPath} — 默认模型: ${defaultModelRef}`);
   } else {
     // 新建模式
     const config = {
@@ -174,6 +178,6 @@ export async function writeProviderConfig(options: {
       },
     };
     await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
-    console.log(`\n✅ 已生成 config.json — 默认模型: ${defaultModelRef}`);
+    console.log(`\n✅ 已生成 ${configPath} — 默认模型: ${defaultModelRef}`);
   }
 }

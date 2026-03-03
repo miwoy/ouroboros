@@ -66,7 +66,7 @@ async function main(): Promise<void> {
   const config = await loadConfig();
   console.log(`  默认提供商: ${config.agents.default.model.split("/")[0]}`);
   console.log(
-    `  ReAct 配置: maxIterations=${config.react.maxIterations}, stepTimeout=${config.react.stepTimeout}ms`,
+    `  ReAct 配置: maxIterations=${config.system.react.maxIterations}, stepTimeout=${config.system.react.stepTimeout}ms`,
   );
 
   console.log("[2/11] 初始化 workspace...");
@@ -77,7 +77,7 @@ async function main(): Promise<void> {
 
   // ── 2. 创建工具注册表 + 执行器 + Logger ─────────────────────────
   console.log("[3/11] 创建工具注册表 + 执行器 + Logger...");
-  const providerRegistry = createProviderRegistry(config.providers);
+  const providerRegistry = createProviderRegistry(config.provider);
   const callModel = createCallModel(
     config,
     providerRegistry,
@@ -205,10 +205,10 @@ export default async function(input, context) {
   console.log("[6/11] 运行 ReAct 循环...");
   const allTools = registry.list();
   const reactConfig: ReactLoopConfig = {
-    maxIterations: config.react.maxIterations,
-    stepTimeout: config.react.stepTimeout,
-    parallelToolCalls: config.react.parallelToolCalls,
-    compressionThreshold: config.react.compressionThreshold,
+    maxIterations: config.system.react.maxIterations,
+    stepTimeout: config.system.react.stepTimeout,
+    parallelToolCalls: config.system.react.parallelToolCalls,
+    compressionThreshold: config.system.react.compressionThreshold,
     agentId: "agent:main",
   };
   const deps: ReactDependencies = {

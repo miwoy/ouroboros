@@ -27,12 +27,12 @@ describe("loadConfig", () => {
   it("应该成功加载有效配置文件", async () => {
     const path = await writeTestConfig({
       system: {},
-      providers: { test: { type: "openai", apiKey: "sk-xxx" } },
+      provider: { test: { type: "openai", apiKey: "sk-xxx" } },
       agents: { default: { model: "test/gpt-4o" } },
     });
 
     const config = await loadConfig(path);
-    expect(config.providers.test.apiKey).toBe("sk-xxx");
+    expect(config.provider.test.apiKey).toBe("sk-xxx");
     expect(config.agents.default.model).toBe("test/gpt-4o");
   });
 
@@ -40,24 +40,24 @@ describe("loadConfig", () => {
     process.env.TEST_API_KEY = "sk-from-env";
     const path = await writeTestConfig({
       system: {},
-      providers: { test: { type: "openai", apiKey: "${TEST_API_KEY}" } },
+      provider: { test: { type: "openai", apiKey: "${TEST_API_KEY}" } },
       agents: { default: { model: "test/gpt-4o" } },
     });
 
     const config = await loadConfig(path);
-    expect(config.providers.test.apiKey).toBe("sk-from-env");
+    expect(config.provider.test.apiKey).toBe("sk-from-env");
   });
 
   it("环境变量未设置时应保留原始字符串", async () => {
     delete process.env.NONEXISTENT_VAR;
     const path = await writeTestConfig({
       system: {},
-      providers: { test: { type: "openai", apiKey: "${NONEXISTENT_VAR}" } },
+      provider: { test: { type: "openai", apiKey: "${NONEXISTENT_VAR}" } },
       agents: { default: { model: "test/gpt-4o" } },
     });
 
     const config = await loadConfig(path);
-    expect(config.providers.test.apiKey).toBe("${NONEXISTENT_VAR}");
+    expect(config.provider.test.apiKey).toBe("${NONEXISTENT_VAR}");
   });
 
   it("应该在文件不存在时抛出 ConfigError", async () => {
@@ -75,7 +75,7 @@ describe("loadConfig", () => {
   it("应该在验证失败时抛出 ConfigError（含详细信息）", async () => {
     const path = await writeTestConfig({
       system: {},
-      providers: {},
+      provider: {},
       agents: {},
     });
 
@@ -85,7 +85,7 @@ describe("loadConfig", () => {
   it("应该在 agent model 引用不存在的提供商时抛出 ConfigError", async () => {
     const path = await writeTestConfig({
       system: {},
-      providers: { test: { type: "openai", apiKey: "sk-xxx" } },
+      provider: { test: { type: "openai", apiKey: "sk-xxx" } },
       agents: { default: { model: "nonexistent/gpt-4o" } },
     });
 
@@ -96,7 +96,7 @@ describe("loadConfig", () => {
   it("返回的配置应该是冻结的（不可变）", async () => {
     const path = await writeTestConfig({
       system: {},
-      providers: { test: { type: "openai", apiKey: "sk-xxx" } },
+      provider: { test: { type: "openai", apiKey: "sk-xxx" } },
       agents: { default: { model: "test/gpt-4o" } },
     });
 
@@ -107,13 +107,28 @@ describe("loadConfig", () => {
   it("应该正确填充默认值", async () => {
     const path = await writeTestConfig({
       system: {},
-      providers: { test: { type: "openai", apiKey: "sk-xxx" } },
+      provider: { test: { type: "openai", apiKey: "sk-xxx" } },
       agents: { default: { model: "test/gpt-4o" } },
     });
 
     const config = await loadConfig(path);
     expect(config.system.logLevel).toBe("info");
-    expect(config.model.timeout).toBe(30000);
-    expect(config.model.maxRetries).toBe(3);
+    expect(config.system.model.timeout).toBe(30000);
+    expect(config.system.model.maxRetries).toBe(3);
+  });
+
+  it("应该自动迁移 v1 格式的配置", async () => {
+    const path = await writeTestConfig({
+      system: {},
+      providers: { test: { type: "openai", apiKey: "sk-v1" } },
+      agents: { default: { model: "test/gpt-4o" } },
+      model: { timeout: 60000 },
+    });
+
+    const config = await loadConfig(path);
+    // v1 的 providers 应该迁移为 provider
+    expect(config.provider.test.apiKey).toBe("sk-v1");
+    // v1 的 model 应该迁移到 system.model
+    expect(config.system.model.timeout).toBe(60000);
   });
 });

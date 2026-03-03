@@ -15,6 +15,7 @@ import {
 vi.mock("node:fs/promises", () => ({
   readFile: vi.fn(),
   writeFile: vi.fn(),
+  mkdir: vi.fn().mockResolvedValue(undefined),
 }));
 
 // mock readline

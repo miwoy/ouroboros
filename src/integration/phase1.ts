@@ -65,7 +65,10 @@ function expandProviderModels(
 ): TestTarget[] {
   const models = providerConfig.models;
   if (models && models.length > 0) {
-    return models.map((model) => ({ provider: providerName, model }));
+    return models.map((model) => ({
+      provider: providerName,
+      model: typeof model === "string" ? model : model.id,
+    }));
   }
   // 没有 models 列表时，使用 defaultModel（或不指定，由 adapter 决定默认值）
   return [{ provider: providerName, model: providerConfig.defaultModel }];
@@ -81,7 +84,7 @@ function expandProviderModels(
  *   （无参数）         → defaultProvider 的 defaultModel
  */
 function resolveTestTargets(args: string[], config: Config): TestTarget[] {
-  const providers = config.providers;
+  const providers = config.provider;
   const allNames = Object.keys(providers);
 
   // --all：所有提供商 × 所有模型
@@ -124,7 +127,7 @@ async function main(): Promise<void> {
   // 1. 加载配置
   console.log("[1/4] 加载配置...");
   const config = await loadConfig();
-  const allProviders = Object.keys(config.providers);
+  const allProviders = Object.keys(config.provider);
   const args = process.argv.slice(2);
   const targets = resolveTestTargets(args, config);
   console.log(`  已注册提供商: ${allProviders.join(", ")}`);
@@ -137,7 +140,7 @@ async function main(): Promise<void> {
 
   // 3. 创建 callModel
   console.log("[3/4] 创建模型调用接口...");
-  const registry = createProviderRegistry(config.providers);
+  const registry = createProviderRegistry(config.provider);
   const callModel = createCallModel(config, registry, config.agents.default.model.split("/")[0]);
   console.log("  callModel 就绪");
 

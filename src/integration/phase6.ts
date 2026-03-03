@@ -56,7 +56,7 @@ async function main(): Promise<void> {
 
     // ── 2. 创建注册表和执行器 ─────────────────────────────────────
     console.log("[3/8] 创建工具 + 技能注册表...");
-    const providerRegistry = createProviderRegistry(config.providers);
+    const providerRegistry = createProviderRegistry(config.provider);
     const callModel = createCallModel(
       config,
       providerRegistry,
