@@ -9,6 +9,7 @@ import type { ExecutionTree } from "../../src/core/types.js";
 import type { ReflectionInput, ReflectionDeps } from "../../src/reflection/types.js";
 import type { Logger } from "../../src/logger/types.js";
 import type { LongTermMemory } from "../../src/memory/types.js";
+import type { SchemaProvider } from "../../src/schema/schema-provider.js";
 
 function makeLogger(): Logger {
   return {
@@ -43,7 +44,22 @@ function makeTree(): ExecutionTree {
   };
 }
 
-function makeDeps(modelResponse?: string): ReflectionDeps {
+function makeSchemaProvider(): SchemaProvider {
+  return {
+    getVariables: vi.fn(),
+    refresh: vi.fn(),
+    getBodySchema: vi.fn(),
+    getSoulSchema: vi.fn().mockReturnValue({
+      worldModel: { principles: ["原则1"], knowledge: "知识" },
+      selfAwareness: { name: "", identity: "test", purpose: "test", capabilities: [], limitations: [] },
+      userModel: { name: "", preferences: [], context: "" },
+    }),
+    getHormoneManager: vi.fn(),
+    updateSoul: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function makeDeps(modelResponse?: string, schemaProvider?: SchemaProvider): ReflectionDeps {
   return {
     callModel: vi.fn().mockResolvedValue({
       content: modelResponse ?? JSON.stringify({
@@ -64,6 +80,7 @@ function makeDeps(modelResponse?: string): ReflectionDeps {
       compressFromShortTerm: vi.fn().mockResolvedValue(""),
     } as unknown as LongTermMemory,
     logger: makeLogger(),
+    schemaProvider,
   };
 }
 
@@ -232,6 +249,94 @@ describe("createReflector", () => {
       "reflection",
       "反思完成",
       expect.any(Object),
+    );
+  });
+
+  // ─── schemaUpdates 相关测试 ──────────────────────────────────
+
+  it("应解析模型返回的 schemaUpdates", async () => {
+    const modelResponse = JSON.stringify({
+      insights: ["发现用户名"],
+      patterns: [],
+      memorySummary: "记录用户信息",
+      schemaUpdates: {
+        identityUpdate: { name: "小助手" },
+        userUpdate: { name: "张三", preferences: ["中文交流"] },
+      },
+    });
+
+    const sp = makeSchemaProvider();
+    const deps = makeDeps(modelResponse, sp);
+    const reflector = createReflector(deps);
+    const output = await reflector.reflect(makeInput());
+
+    expect(output.schemaUpdates).toBeDefined();
+    expect(output.schemaUpdates!.identityUpdate?.name).toBe("小助手");
+    expect(output.schemaUpdates!.userUpdate?.name).toBe("张三");
+    expect(output.schemaUpdates!.userUpdate?.preferences).toEqual(["中文交流"]);
+  });
+
+  it("有 schemaUpdates 时应调用 schemaProvider.updateSoul", async () => {
+    const modelResponse = JSON.stringify({
+      insights: ["用户自称张三"],
+      patterns: [],
+      memorySummary: "记录",
+      schemaUpdates: {
+        userUpdate: { name: "张三" },
+      },
+    });
+
+    const sp = makeSchemaProvider();
+    const deps = makeDeps(modelResponse, sp);
+    const reflector = createReflector(deps);
+    await reflector.reflect(makeInput());
+
+    expect(sp.updateSoul).toHaveBeenCalled();
+  });
+
+  it("无 schemaProvider 时不应报错", async () => {
+    const modelResponse = JSON.stringify({
+      insights: [],
+      patterns: [],
+      memorySummary: "ok",
+      schemaUpdates: { userUpdate: { name: "test" } },
+    });
+
+    const deps = makeDeps(modelResponse); // 无 schemaProvider
+    const reflector = createReflector(deps);
+    await expect(reflector.reflect(makeInput())).resolves.toBeDefined();
+  });
+
+  it("无 schemaUpdates 时不应调用 updateSoul", async () => {
+    const sp = makeSchemaProvider();
+    const deps = makeDeps(undefined, sp);
+    const reflector = createReflector(deps);
+    await reflector.reflect(makeInput());
+
+    expect(sp.updateSoul).not.toHaveBeenCalled();
+  });
+
+  it("worldModelUpdate 应追加新原则", async () => {
+    const modelResponse = JSON.stringify({
+      insights: [],
+      patterns: [],
+      memorySummary: "ok",
+      schemaUpdates: {
+        worldModelUpdate: { newPrinciples: ["新发现的原则"] },
+      },
+    });
+
+    const sp = makeSchemaProvider();
+    const deps = makeDeps(modelResponse, sp);
+    const reflector = createReflector(deps);
+    await reflector.reflect(makeInput());
+
+    expect(sp.updateSoul).toHaveBeenCalledWith(
+      expect.objectContaining({
+        worldModel: expect.objectContaining({
+          principles: ["原则1", "新发现的原则"],
+        }),
+      }),
     );
   });
 });

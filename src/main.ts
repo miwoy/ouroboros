@@ -56,7 +56,7 @@ async function main(): Promise<void> {
   }
 
   // 5. 创建自我图式提供者
-  const schemaProvider = createSchemaProvider(config.system.workspacePath, {
+  const schemaProvider = await createSchemaProvider(config.system.workspacePath, {
     hormoneDefaults: config.self,
   });
   await schemaProvider.refresh();

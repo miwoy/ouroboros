@@ -2,7 +2,7 @@
  * 反思执行器
  *
  * 分析任务执行结果，生成知识摘要、行为模式、Skill 建议，
- * 并将反思结果写入长期记忆。
+ * 评估是否需要更新自我图式，并将反思结果写入长期记忆。
  */
 
 import type {
@@ -11,7 +11,9 @@ import type {
   ReflectionDeps,
   ReflectionConfig,
   SkillSuggestion,
+  SchemaUpdates,
 } from "./types.js";
+import type { SoulUpdate } from "../schema/types.js";
 
 /** 默认反思配置 */
 export const DEFAULT_REFLECTION_CONFIG: ReflectionConfig = {
@@ -44,7 +46,7 @@ export function createReflector(deps: ReflectionDeps, config?: Partial<Reflectio
 
       // 2. 使用模型生成反思摘要
       const reflectionPrompt = buildReflectionPrompt(input, toolPatterns);
-      let modelReflection: string;
+      let modelReflection = "";
 
       try {
         const response = await deps.callModel({
@@ -61,7 +63,6 @@ export function createReflector(deps: ReflectionDeps, config?: Partial<Reflectio
         deps.logger.warn("reflection", "模型反思失败，使用基础分析", {
           error: err instanceof Error ? err.message : String(err),
         });
-        modelReflection = "";
       }
 
       // 3. 解析反思结果
@@ -70,10 +71,16 @@ export function createReflector(deps: ReflectionDeps, config?: Partial<Reflectio
       // 4. 写入长期记忆
       await writeToLongTermMemory(deps, input, output);
 
+      // 5. 应用图式更新
+      if (output.schemaUpdates && deps.schemaProvider) {
+        await applySchemaUpdates(deps, output.schemaUpdates);
+      }
+
       deps.logger.info("reflection", "反思完成", {
         insights: output.insights.length,
         patterns: output.patterns.length,
         skillSuggestions: output.skillSuggestions.length,
+        hasSchemaUpdates: !!output.schemaUpdates,
       });
 
       return output;
@@ -121,6 +128,11 @@ function buildReflectionPrompt(input: ReflectionInput, toolPatterns: readonly st
   parts.push(`1. insights: 从本次执行中学到的知识（数组）`);
   parts.push(`2. patterns: 发现的可复用行为模式（数组）`);
   parts.push(`3. memorySummary: 一句话总结（字符串）`);
+  parts.push(`4. schemaUpdates: 基于对话内容，判断是否需要更新图式（JSON）：`);
+  parts.push(`   - identityUpdate: 用户是否为 Agent 定义了名字/角色/目的？`);
+  parts.push(`   - userUpdate: 用户是否透露了自己的信息（名字/偏好/背景）？`);
+  parts.push(`   - worldModelUpdate: 本次对话是否揭示了新的普适性原则？`);
+  parts.push(`   仅在有明确依据时返回，不要猜测。`);
 
   return parts.join("\n");
 }
@@ -135,6 +147,7 @@ function parseReflectionOutput(
   let insights: string[] = [];
   let patterns: string[] = [];
   let memorySummary = "";
+  let schemaUpdates: SchemaUpdates | undefined;
 
   // 尝试解析 JSON
   try {
@@ -149,6 +162,9 @@ function parseReflectionOutput(
       }
       if (typeof parsed["memorySummary"] === "string") {
         memorySummary = parsed["memorySummary"];
+      }
+      if (parsed["schemaUpdates"] && typeof parsed["schemaUpdates"] === "object") {
+        schemaUpdates = parseSchemaUpdates(parsed["schemaUpdates"] as Record<string, unknown>);
       }
     }
   } catch {
@@ -170,7 +186,108 @@ function parseReflectionOutput(
   // 生成 Skill 建议
   const skillSuggestions = generateSkillSuggestions(input, toolPatterns, config);
 
-  return { insights, patterns, skillSuggestions, memorySummary };
+  return { insights, patterns, skillSuggestions, memorySummary, schemaUpdates };
+}
+
+/** 解析图式更新建议 */
+function parseSchemaUpdates(raw: Record<string, unknown>): SchemaUpdates | undefined {
+  const updates: SchemaUpdates = {};
+  let hasUpdates = false;
+
+  if (raw["identityUpdate"] && typeof raw["identityUpdate"] === "object") {
+    const iu = raw["identityUpdate"] as Record<string, unknown>;
+    const identityUpdate: { name?: string; identity?: string; purpose?: string } = {};
+    if (typeof iu["name"] === "string" && iu["name"]) {
+      identityUpdate.name = iu["name"];
+    }
+    if (typeof iu["identity"] === "string" && iu["identity"]) {
+      identityUpdate.identity = iu["identity"];
+    }
+    if (typeof iu["purpose"] === "string" && iu["purpose"]) {
+      identityUpdate.purpose = iu["purpose"];
+    }
+    if (Object.keys(identityUpdate).length > 0) {
+      (updates as { identityUpdate: typeof identityUpdate }).identityUpdate = identityUpdate;
+      hasUpdates = true;
+    }
+  }
+
+  if (raw["userUpdate"] && typeof raw["userUpdate"] === "object") {
+    const uu = raw["userUpdate"] as Record<string, unknown>;
+    const userUpdate: { name?: string; preferences?: readonly string[]; context?: string } = {};
+    if (typeof uu["name"] === "string" && uu["name"]) {
+      userUpdate.name = uu["name"];
+    }
+    if (Array.isArray(uu["preferences"])) {
+      const prefs = uu["preferences"].filter((p): p is string => typeof p === "string");
+      if (prefs.length > 0) {
+        userUpdate.preferences = prefs;
+      }
+    }
+    if (typeof uu["context"] === "string" && uu["context"]) {
+      userUpdate.context = uu["context"];
+    }
+    if (Object.keys(userUpdate).length > 0) {
+      (updates as { userUpdate: typeof userUpdate }).userUpdate = userUpdate;
+      hasUpdates = true;
+    }
+  }
+
+  if (raw["worldModelUpdate"] && typeof raw["worldModelUpdate"] === "object") {
+    const wmu = raw["worldModelUpdate"] as Record<string, unknown>;
+    if (Array.isArray(wmu["newPrinciples"])) {
+      const principles = wmu["newPrinciples"].filter((p): p is string => typeof p === "string");
+      if (principles.length > 0) {
+        (updates as { worldModelUpdate: { newPrinciples: readonly string[] } }).worldModelUpdate = {
+          newPrinciples: principles,
+        };
+        hasUpdates = true;
+      }
+    }
+  }
+
+  return hasUpdates ? updates : undefined;
+}
+
+/** 将图式更新应用到 SchemaProvider */
+async function applySchemaUpdates(
+  deps: ReflectionDeps,
+  schemaUpdates: SchemaUpdates,
+): Promise<void> {
+  if (!deps.schemaProvider) return;
+
+  try {
+    const update: SoulUpdate = {};
+
+    if (schemaUpdates.identityUpdate) {
+      (update as { selfAwareness: typeof schemaUpdates.identityUpdate }).selfAwareness =
+        schemaUpdates.identityUpdate;
+    }
+
+    if (schemaUpdates.userUpdate) {
+      (update as { userModel: typeof schemaUpdates.userUpdate }).userModel =
+        schemaUpdates.userUpdate;
+    }
+
+    if (schemaUpdates.worldModelUpdate?.newPrinciples) {
+      // 新原则追加到现有原则列表
+      const current = deps.schemaProvider.getSoulSchema();
+      const merged = [
+        ...current.worldModel.principles,
+        ...schemaUpdates.worldModelUpdate.newPrinciples,
+      ];
+      (update as { worldModel: { principles: readonly string[] } }).worldModel = {
+        principles: merged,
+      };
+    }
+
+    await deps.schemaProvider.updateSoul(update);
+    deps.logger.info("reflection", "图式已更新", { schemaUpdates });
+  } catch (err) {
+    deps.logger.warn("reflection", "图式更新失败", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 /** 生成 Skill 封装建议 */

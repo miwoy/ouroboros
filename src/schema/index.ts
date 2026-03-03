@@ -4,7 +4,9 @@ export type {
   DiskInfo,
   WorldModel,
   SelfAwareness,
+  UserModel,
   SoulSchema,
+  SoulUpdate,
   HormoneState,
   HormoneDefaults,
   HormoneManager,
@@ -18,6 +20,7 @@ export {
   createSoulSchema,
   formatWorldModel,
   formatSelfAwareness,
+  formatUserModel,
 } from "./soul.js";
 export { createHormoneManager, adjustHormonesForEvent } from "./hormone.js";
 export { createSchemaProvider, type SchemaProvider } from "./schema-provider.js";

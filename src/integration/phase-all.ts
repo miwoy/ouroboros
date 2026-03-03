@@ -407,14 +407,14 @@ async function main(): Promise<void> {
     assert(bodyText.includes("运行环境"), "Body: 格式化包含运行环境");
 
     const soul = getDefaultSoulSchema();
-    assert(soul.worldModel.rules.length > 0, "Soul: 有默认规则");
+    assert(soul.worldModel.principles.length > 0, "Soul: 有默认原则");
     assert(!!soul.selfAwareness.identity, "Soul: 有身份信息");
 
-    const customSoul = createSoulSchema({ rules: ["自定义规则"] }, { identity: "测试" });
-    assert(customSoul.worldModel.rules[0] === "自定义规则", "Soul: 自定义规则生效");
+    const customSoul = createSoulSchema({ principles: ["自定义原则"] }, { identity: "测试" });
+    assert(customSoul.worldModel.principles[0] === "自定义原则", "Soul: 自定义原则生效");
 
     const wmText = formatWorldModel(soul.worldModel);
-    assert(wmText.includes("World Rules"), "Soul: formatWorldModel 正确");
+    assert(wmText.includes("自我指涉"), "Soul: formatWorldModel 正确");
 
     // 激素系统
     const hormones = createHormoneManager({
@@ -429,7 +429,7 @@ async function main(): Promise<void> {
     assert(hormones.getState().focusLevel === 70, "Hormone: 重置成功");
 
     // SchemaProvider
-    const schemaProvider = createSchemaProvider(workDir);
+    const schemaProvider = await createSchemaProvider(workDir);
     const schemaVars = schemaProvider.getVariables();
     assert(!!schemaVars.platform, "SchemaProvider: platform 变量存在");
     assert(!!schemaVars.focusLevel, "SchemaProvider: focusLevel 变量存在");

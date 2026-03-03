@@ -96,16 +96,17 @@ async function main() {
   // [3] 灵魂图式
   try {
     const soul = getDefaultSoulSchema();
-    if (soul.worldModel.rules.length === 0) throw new Error("无规则");
-    if (soul.worldModel.constraints.length === 0) throw new Error("无约束");
+    if (soul.worldModel.principles.length === 0) throw new Error("无原则");
     if (!soul.selfAwareness.identity) throw new Error("无身份");
+    if (typeof soul.selfAwareness.name !== "string") throw new Error("缺少 name 字段");
+    if (!soul.userModel) throw new Error("缺少 userModel");
 
-    const custom = createSoulSchema({ rules: ["自定义规则"] }, { identity: "测试 Agent" });
-    if (custom.worldModel.rules[0] !== "自定义规则") throw new Error("自定义规则失败");
+    const custom = createSoulSchema({ principles: ["自定义原则"] }, { identity: "测试 Agent" });
+    if (custom.worldModel.principles[0] !== "自定义原则") throw new Error("自定义原则失败");
     if (custom.selfAwareness.identity !== "测试 Agent") throw new Error("自定义身份失败");
 
     const wmText = formatWorldModel(soul.worldModel);
-    if (!wmText.includes("World Rules")) throw new Error("格式化失败");
+    if (!wmText.includes("自我指涉")) throw new Error("格式化失败");
 
     const saText = formatSelfAwareness(soul.selfAwareness);
     if (!saText.includes("Identity")) throw new Error("格式化失败");
@@ -136,12 +137,15 @@ async function main() {
 
   // [5] 自我图式变量
   try {
-    const provider = createSchemaProvider("/tmp/workspace");
+    const provider = await createSchemaProvider("/tmp/workspace");
     const vars = provider.getVariables();
     if (!vars.platform) throw new Error("缺少 platform");
     if (!vars.focusLevel) throw new Error("缺少激素值");
+    if (!vars.worldModel) throw new Error("缺少 worldModel 变量");
+    if (!vars.selfAwareness) throw new Error("缺少 selfAwareness 变量");
+    if (!vars.userModel) throw new Error("缺少 userModel 变量");
 
-    ok("[5] 自我图式变量渲染（供模板使用）");
+    ok("[5] 自我图式变量渲染（含 soul 变量）");
   } catch (e) {
     fail("[5] 变量渲染", e);
   }

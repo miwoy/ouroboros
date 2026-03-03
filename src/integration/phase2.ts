@@ -90,12 +90,17 @@ async function main(): Promise<void> {
     focusLevel: "高",
     cautionLevel: "中",
     creativityLevel: "中",
+    worldModel: "1. 自我指涉 — 测试原则",
+    selfAwareness: "**Identity**: 测试 Agent",
+    userModel: "Not yet known.",
   });
 
   const renderOk =
     selfRendered.includes(os.platform()) &&
     selfRendered.includes(config.system.workspacePath) &&
-    !selfRendered.includes("{{platform}}");
+    !selfRendered.includes("{{platform}}") &&
+    selfRendered.includes("自我指涉") &&
+    selfRendered.includes("Not yet known.");
   console.log(`  运行环境: ${os.platform()} ${os.arch()}`);
   console.log(`  可用内存: ${memInfo}`);
   console.log(`  ${renderOk ? "✅" : "❌"} 身体图式变量替换成功`);
