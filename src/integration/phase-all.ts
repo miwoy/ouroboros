@@ -188,7 +188,7 @@ async function main(): Promise<void> {
 
     const config = configSchema.parse({
       system: {},
-      providers: {
+      provider: {
         mock: { type: "openai", apiKey: "test-key-000" },
       },
       agents: { default: { model: "mock/gpt-4", workspacePath: workDir } },
