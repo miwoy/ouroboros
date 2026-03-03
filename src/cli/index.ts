@@ -35,13 +35,15 @@ Ouroboros CLI — 自指循环 Agent 框架
 
 全局选项:
   --config <path>   指定配置文件路径
+  --cwd <path>      工作目录基准（相对路径基于此解析）
   --verbose         详细输出
   --version, -v     版本号
   --help, -h        帮助
 
 示例:
   ouroboros init                     # 首次安装向导
-  ouroboros start                    # 启动服务器
+  ouroboros start                    # 启动服务器（workspace 在配置文件目录下）
+  ouroboros start --cwd .            # 开发模式（workspace 在当前目录下）
   ouroboros start --config ./my.json # 指定配置启动
   ouroboros stop                     # 停止服务
   ouroboros login openai-codex       # OAuth 登录
@@ -54,17 +56,22 @@ Ouroboros CLI — 自指循环 Agent 框架
 function parseGlobalOptions(rawArgs: readonly string[]): {
   args: string[];
   configPath?: string;
+  cwd?: string;
   verbose: boolean;
 } {
   const args: string[] = [];
   let configPath: string | undefined;
+  let cwd: string | undefined;
   let verbose = false;
 
   for (let i = 0; i < rawArgs.length; i++) {
     const arg = rawArgs[i];
     if (arg === "--config" && i + 1 < rawArgs.length) {
       configPath = rawArgs[i + 1];
-      i++; // 跳过下一个参数
+      i++;
+    } else if (arg === "--cwd" && i + 1 < rawArgs.length) {
+      cwd = rawArgs[i + 1];
+      i++;
     } else if (arg === "--verbose") {
       verbose = true;
     } else {
@@ -72,7 +79,7 @@ function parseGlobalOptions(rawArgs: readonly string[]): {
     }
   }
 
-  return { args, configPath, verbose };
+  return { args, configPath, cwd, verbose };
 }
 
 /**
@@ -90,12 +97,15 @@ async function getVersion(): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const { args, configPath, verbose } = parseGlobalOptions(process.argv.slice(2));
+  const { args, configPath, cwd, verbose } = parseGlobalOptions(process.argv.slice(2));
   const command = args[0] ?? "start";
 
-  // 将 configPath 注入环境变量，供 loadConfig 使用
+  // 将全局选项注入环境变量，供 loadConfig / main 使用
   if (configPath) {
     process.env.__OUROBOROS_CLI_CONFIG = configPath;
+  }
+  if (cwd) {
+    process.env.__OUROBOROS_CLI_CWD = cwd;
   }
   if (verbose) {
     process.env.__OUROBOROS_VERBOSE = "1";

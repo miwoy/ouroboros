@@ -54,7 +54,7 @@ async function main(): Promise<void> {
 
   // ── 1. 加载配置 + 初始化 workspace ──────────────────────────────
   console.log("[1/9] 加载配置...");
-  const config = await loadConfig();
+  const { config } = await loadConfig();
   console.log(`  默认提供商: ${config.agents.default.model.split("/")[0]}`);
 
   console.log("[2/9] 初始化 workspace（模板复制）...");

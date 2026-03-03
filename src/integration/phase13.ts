@@ -269,9 +269,9 @@ async function main(): Promise<void> {
     await writeFile(v2ConfigPath, v2Content, "utf-8");
 
     const loaded = await loadConfig(v2ConfigPath);
-    assert(loaded.system.logLevel === "debug", "Loader: logLevel = debug");
-    assert(loaded.provider.testprov.apiKey === "test-key-123", "Loader: apiKey 正确");
-    assert(loaded.agents.default.model === "testprov/gpt-4o", "Loader: model 引用正确");
+    assert(loaded.config.system.logLevel === "debug", "Loader: logLevel = debug");
+    assert(loaded.config.provider.testprov.apiKey === "test-key-123", "Loader: apiKey 正确");
+    assert(loaded.config.agents.default.model === "testprov/gpt-4o", "Loader: model 引用正确");
 
     // JSONC 支持（带注释）
     const jsoncPath = join(configDir, "jsonc-config.json");
@@ -286,7 +286,7 @@ async function main(): Promise<void> {
 }`;
     await writeFile(jsoncPath, jsoncContent, "utf-8");
     const jsoncLoaded = await loadConfig(jsoncPath);
-    assert(jsoncLoaded.system.logLevel === "warn", "Loader: JSONC 注释正确处理");
+    assert(jsoncLoaded.config.system.logLevel === "warn", "Loader: JSONC 注释正确处理");
 
     // v1 文件自动迁移
     const v1FilePath = join(configDir, "v1-config.json");
@@ -299,9 +299,9 @@ async function main(): Promise<void> {
     });
     await writeFile(v1FilePath, v1Content, "utf-8");
     const v1Loaded = await loadConfig(v1FilePath);
-    assert(v1Loaded.provider.old.apiKey === "old-key", "Loader: v1 自动迁移 — apiKey 保留");
+    assert(v1Loaded.config.provider.old.apiKey === "old-key", "Loader: v1 自动迁移 — apiKey 保留");
     assert(
-      v1Loaded.system.model.timeout === 45000,
+      v1Loaded.config.system.model.timeout === 45000,
       "Loader: v1 自动迁移 — model.timeout 迁移到 system",
     );
 
@@ -317,7 +317,7 @@ async function main(): Promise<void> {
       "utf-8",
     );
     const envLoaded = await loadConfig(envConfigPath);
-    assert(envLoaded.provider.ep.apiKey === "env-replaced-key", "Loader: 环境变量替换");
+    assert(envLoaded.config.provider.ep.apiKey === "env-replaced-key", "Loader: 环境变量替换");
     delete process.env.__TEST_API_KEY;
 
     // ════════════════════════════════════════════════════════════

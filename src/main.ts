@@ -35,7 +35,7 @@ import { createAuthStore } from "./auth/store.js";
 export async function startServer(): Promise<void> {
   // 1. 加载配置（支持 CLI --config 参数注入）
   const cliConfigPath = process.env.__OUROBOROS_CLI_CONFIG;
-  const config = await loadConfig(cliConfigPath);
+  const { config, configDir } = await loadConfig(cliConfigPath);
 
   // 2. 解析默认 Agent 的模型引用
   const defaultAgent = config.agents.default;
@@ -44,7 +44,14 @@ export async function startServer(): Promise<void> {
     throw new Error(`默认 Agent 的 model 格式无效: "${defaultAgent.model}"`);
   }
   const defaultProvider = modelRef.provider;
-  const workspacePath = defaultAgent.workspacePath;
+
+  // 解析 workspacePath：--cwd 覆盖 > 基于 configDir 解析相对路径
+  const cliCwd = process.env.__OUROBOROS_CLI_CWD;
+  const baseDir = cliCwd ? resolve(cliCwd) : configDir;
+  const rawWorkspacePath = defaultAgent.workspacePath;
+  const workspacePath = rawWorkspacePath.startsWith("/")
+    ? rawWorkspacePath
+    : resolve(baseDir, rawWorkspacePath);
 
   // 3. 初始化 workspace
   await initWorkspace(workspacePath);

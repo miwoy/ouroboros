@@ -57,7 +57,7 @@ async function main(): Promise<void> {
 
   // ── 1. 加载配置 + 初始化 workspace ──────────────────────────────
   console.log("[1/11] 加载配置...");
-  const config = await loadConfig();
+  const { config } = await loadConfig();
   console.log(`  默认提供商: ${config.agents.default.model.split("/")[0]}`);
   console.log(`  工具超时: ${config.system.tool.defaultTimeout}ms`);
 

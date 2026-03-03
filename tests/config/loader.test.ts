@@ -31,7 +31,7 @@ describe("loadConfig", () => {
       agents: { default: { model: "test/gpt-4o" } },
     });
 
-    const config = await loadConfig(path);
+    const { config } = await loadConfig(path);
     expect(config.provider.test.apiKey).toBe("sk-xxx");
     expect(config.agents.default.model).toBe("test/gpt-4o");
   });
@@ -44,7 +44,7 @@ describe("loadConfig", () => {
       agents: { default: { model: "test/gpt-4o" } },
     });
 
-    const config = await loadConfig(path);
+    const { config } = await loadConfig(path);
     expect(config.provider.test.apiKey).toBe("sk-from-env");
   });
 
@@ -56,7 +56,7 @@ describe("loadConfig", () => {
       agents: { default: { model: "test/gpt-4o" } },
     });
 
-    const config = await loadConfig(path);
+    const { config } = await loadConfig(path);
     expect(config.provider.test.apiKey).toBe("${NONEXISTENT_VAR}");
   });
 
@@ -100,7 +100,7 @@ describe("loadConfig", () => {
       agents: { default: { model: "test/gpt-4o" } },
     });
 
-    const config = await loadConfig(path);
+    const { config } = await loadConfig(path);
     expect(Object.isFrozen(config)).toBe(true);
   });
 
@@ -111,7 +111,7 @@ describe("loadConfig", () => {
       agents: { default: { model: "test/gpt-4o" } },
     });
 
-    const config = await loadConfig(path);
+    const { config } = await loadConfig(path);
     expect(config.system.logLevel).toBe("info");
     expect(config.system.model.timeout).toBe(30000);
     expect(config.system.model.maxRetries).toBe(3);
@@ -125,7 +125,7 @@ describe("loadConfig", () => {
       model: { timeout: 60000 },
     });
 
-    const config = await loadConfig(path);
+    const { config } = await loadConfig(path);
     // v1 的 providers 应该迁移为 provider
     expect(config.provider.test.apiKey).toBe("sk-v1");
     // v1 的 model 应该迁移到 system.model

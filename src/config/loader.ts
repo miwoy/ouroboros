@@ -1,8 +1,17 @@
 import { readFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { configSchema, parseModelRef, getModelIds, type Config } from "./schema/index.js";
 import { ConfigError } from "../errors/index.js";
 import { resolveConfigPath, type ResolvedConfig } from "./resolver.js";
 import { isV1Config, migrateV1ToV2 } from "./migration.js";
+
+/** loadConfig 返回结果 */
+export interface LoadConfigResult {
+  /** 经过验证的配置对象 */
+  readonly config: Readonly<Config>;
+  /** 配置文件所在目录（绝对路径），用于解析相对路径 */
+  readonly configDir: string;
+}
 
 /**
  * 替换字符串中的环境变量引用
@@ -49,7 +58,7 @@ function resolveEnvVarsInObject(obj: unknown): unknown {
  * @param configPath - 配置文件路径（显式指定则跳过查找链）
  * @returns 经过验证的配置对象（不可变）
  */
-export async function loadConfig(configPath?: string): Promise<Readonly<Config>> {
+export async function loadConfig(configPath?: string): Promise<LoadConfigResult> {
   const resolved: ResolvedConfig = await resolveConfigPath(configPath);
   const filePath = resolved.path;
 
@@ -121,5 +130,5 @@ export async function loadConfig(configPath?: string): Promise<Readonly<Config>>
     }
   }
 
-  return Object.freeze(config);
+  return { config: Object.freeze(config), configDir: dirname(filePath) };
 }

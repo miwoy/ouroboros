@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx src/cli/index.ts start",
+    "dev": "tsx src/cli/index.ts start --cwd .",
     "start": "tsx src/cli/index.ts start",
     "login": "tsx src/cli/index.ts login",
     "configure": "tsx src/cli/index.ts configure",

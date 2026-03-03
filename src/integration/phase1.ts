@@ -126,7 +126,7 @@ async function main(): Promise<void> {
 
   // 1. 加载配置
   console.log("[1/4] 加载配置...");
-  const config = await loadConfig();
+  const { config } = await loadConfig();
   const allProviders = Object.keys(config.provider);
   const args = process.argv.slice(2);
   const targets = resolveTestTargets(args, config);
