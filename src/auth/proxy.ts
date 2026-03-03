@@ -1,8 +1,11 @@
 /**
  * 全局代理设置
- * 在调用 pi-ai OAuth 前设置全局代理，使 pi-ai 内部的 fetch 也走代理
+ *
+ * Node.js v21+ 的 globalThis.fetch 不再使用 undici 的 global dispatcher，
+ * 因此 setGlobalDispatcher 无法让 pi-ai 内部的 fetch 走代理。
+ * 解决方案：直接替换 globalThis.fetch 为走代理的 undici fetch。
  */
-import { ProxyAgent, setGlobalDispatcher } from "undici";
+import { ProxyAgent, fetch as undiciFetch } from "undici";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -40,18 +43,36 @@ export async function resolveProxyUrl(explicitUrl?: string): Promise<string | un
 }
 
 /**
- * 设置全局代理（影响 Node.js 内置 fetch 和 undici）
- * 返回清理函数
+ * 设置全局代理
+ *
+ * 替换 globalThis.fetch 为使用 ProxyAgent 的 undici fetch，
+ * 确保所有第三方库（如 pi-ai）的 fetch 调用都走代理。
+ * 返回清理函数（恢复原始 fetch）。
  */
 export async function setupGlobalProxy(proxyUrl?: string): Promise<() => void> {
   const resolved = await resolveProxyUrl(proxyUrl);
   if (!resolved) return () => {};
 
   const agent = new ProxyAgent(resolved);
-  setGlobalDispatcher(agent);
+  const originalFetch = globalThis.fetch;
+
+  // 替换全局 fetch
+  globalThis.fetch = ((
+    input: Parameters<typeof globalThis.fetch>[0],
+    init?: Parameters<typeof globalThis.fetch>[1],
+  ) =>
+    undiciFetch(
+      input as Parameters<typeof undiciFetch>[0],
+      {
+        ...init,
+        dispatcher: agent,
+      } as Parameters<typeof undiciFetch>[1],
+    )) as typeof globalThis.fetch;
+
   console.log(`  代理已启用: ${resolved}`);
 
   return () => {
+    globalThis.fetch = originalFetch;
     agent.close();
   };
 }
