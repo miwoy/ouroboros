@@ -256,17 +256,16 @@ export function registerHandlers(
 
   // ─── 自我图式 / 技能 / 工具 ──────────────────────────────────
 
-  // 获取自我图式数据
+  // 获取自我图式数据（body + hormones，灵魂内容在 self.md 中）
   router.get("/api/self-schema", async (ctx) => {
     if (!deps.schemaProvider) {
-      ctx.respond(200, successResponse({ body: null, soul: null, hormones: null }));
+      ctx.respond(200, successResponse({ body: null, hormones: null }));
       return;
     }
     const body = deps.schemaProvider.getBodySchema();
-    const soul = deps.schemaProvider.getSoulSchema();
     const hormoneManager = deps.schemaProvider.getHormoneManager();
     const hormones = hormoneManager.getState();
-    ctx.respond(200, successResponse({ body, soul, hormones }));
+    ctx.respond(200, successResponse({ body, hormones }));
   });
 
   // 获取已注册技能列表

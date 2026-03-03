@@ -2,7 +2,7 @@
  * 反思执行器
  *
  * 分析任务执行结果，生成知识摘要、行为模式、Skill 建议，
- * 评估是否需要更新自我图式，并将反思结果写入长期记忆。
+ * 评估是否需要更新 self.md 章节，并将反思结果写入长期记忆。
  */
 
 import type {
@@ -11,9 +11,9 @@ import type {
   ReflectionDeps,
   ReflectionConfig,
   SkillSuggestion,
-  SchemaUpdates,
+  SelfUpdates,
 } from "./types.js";
-import type { SoulUpdate } from "../schema/types.js";
+import { getPromptFilePath, readSection, replaceSection } from "../prompt/store.js";
 
 /** 默认反思配置 */
 export const DEFAULT_REFLECTION_CONFIG: ReflectionConfig = {
@@ -71,16 +71,16 @@ export function createReflector(deps: ReflectionDeps, config?: Partial<Reflectio
       // 4. 写入长期记忆
       await writeToLongTermMemory(deps, input, output);
 
-      // 5. 应用图式更新
-      if (output.schemaUpdates && deps.schemaProvider) {
-        await applySchemaUpdates(deps, output.schemaUpdates);
+      // 5. 应用 self.md 章节更新
+      if (output.selfUpdates) {
+        await applySelfUpdates(deps, output.selfUpdates);
       }
 
       deps.logger.info("reflection", "反思完成", {
         insights: output.insights.length,
         patterns: output.patterns.length,
         skillSuggestions: output.skillSuggestions.length,
-        hasSchemaUpdates: !!output.schemaUpdates,
+        hasSelfUpdates: !!output.selfUpdates,
       });
 
       return output;
@@ -128,10 +128,10 @@ function buildReflectionPrompt(input: ReflectionInput, toolPatterns: readonly st
   parts.push(`1. insights: 从本次执行中学到的知识（数组）`);
   parts.push(`2. patterns: 发现的可复用行为模式（数组）`);
   parts.push(`3. memorySummary: 一句话总结（字符串）`);
-  parts.push(`4. schemaUpdates: 基于对话内容，判断是否需要更新图式（JSON）：`);
-  parts.push(`   - identityUpdate: 用户是否为 Agent 定义了名字/角色/目的？`);
-  parts.push(`   - userUpdate: 用户是否透露了自己的信息（名字/偏好/背景）？`);
-  parts.push(`   - worldModelUpdate: 本次对话是否揭示了新的普适性原则？`);
+  parts.push(`4. selfUpdates: 基于对话内容，判断是否需要更新 self.md 章节（JSON）：`);
+  parts.push(`   - identityUpdate: 用户是否为 Agent 定义了新的身份描述？（完整 markdown 文本）`);
+  parts.push(`   - userUpdate: 用户是否透露了自己的信息？（完整 markdown 文本）`);
+  parts.push(`   - worldModelUpdate: 本次对话是否揭示了新的普适性原则？（追加内容）`);
   parts.push(`   仅在有明确依据时返回，不要猜测。`);
 
   return parts.join("\n");
@@ -147,7 +147,7 @@ function parseReflectionOutput(
   let insights: string[] = [];
   let patterns: string[] = [];
   let memorySummary = "";
-  let schemaUpdates: SchemaUpdates | undefined;
+  let selfUpdates: SelfUpdates | undefined;
 
   // 尝试解析 JSON
   try {
@@ -163,8 +163,8 @@ function parseReflectionOutput(
       if (typeof parsed["memorySummary"] === "string") {
         memorySummary = parsed["memorySummary"];
       }
-      if (parsed["schemaUpdates"] && typeof parsed["schemaUpdates"] === "object") {
-        schemaUpdates = parseSchemaUpdates(parsed["schemaUpdates"] as Record<string, unknown>);
+      if (parsed["selfUpdates"] && typeof parsed["selfUpdates"] === "object") {
+        selfUpdates = parseSelfUpdates(parsed["selfUpdates"] as Record<string, unknown>);
       }
     }
   } catch {
@@ -186,105 +186,67 @@ function parseReflectionOutput(
   // 生成 Skill 建议
   const skillSuggestions = generateSkillSuggestions(input, toolPatterns, config);
 
-  return { insights, patterns, skillSuggestions, memorySummary, schemaUpdates };
+  return { insights, patterns, skillSuggestions, memorySummary, selfUpdates };
 }
 
-/** 解析图式更新建议 */
-function parseSchemaUpdates(raw: Record<string, unknown>): SchemaUpdates | undefined {
-  const updates: SchemaUpdates = {};
+/** 解析 self.md 章节更新建议 */
+function parseSelfUpdates(raw: Record<string, unknown>): SelfUpdates | undefined {
+  const updates: {
+    identityUpdate?: string;
+    userUpdate?: string;
+    worldModelUpdate?: string;
+  } = {};
   let hasUpdates = false;
 
-  if (raw["identityUpdate"] && typeof raw["identityUpdate"] === "object") {
-    const iu = raw["identityUpdate"] as Record<string, unknown>;
-    const identityUpdate: { name?: string; identity?: string; purpose?: string } = {};
-    if (typeof iu["name"] === "string" && iu["name"]) {
-      identityUpdate.name = iu["name"];
-    }
-    if (typeof iu["identity"] === "string" && iu["identity"]) {
-      identityUpdate.identity = iu["identity"];
-    }
-    if (typeof iu["purpose"] === "string" && iu["purpose"]) {
-      identityUpdate.purpose = iu["purpose"];
-    }
-    if (Object.keys(identityUpdate).length > 0) {
-      (updates as { identityUpdate: typeof identityUpdate }).identityUpdate = identityUpdate;
-      hasUpdates = true;
-    }
+  if (typeof raw["identityUpdate"] === "string" && raw["identityUpdate"]) {
+    updates.identityUpdate = raw["identityUpdate"];
+    hasUpdates = true;
   }
 
-  if (raw["userUpdate"] && typeof raw["userUpdate"] === "object") {
-    const uu = raw["userUpdate"] as Record<string, unknown>;
-    const userUpdate: { name?: string; preferences?: readonly string[]; context?: string } = {};
-    if (typeof uu["name"] === "string" && uu["name"]) {
-      userUpdate.name = uu["name"];
-    }
-    if (Array.isArray(uu["preferences"])) {
-      const prefs = uu["preferences"].filter((p): p is string => typeof p === "string");
-      if (prefs.length > 0) {
-        userUpdate.preferences = prefs;
-      }
-    }
-    if (typeof uu["context"] === "string" && uu["context"]) {
-      userUpdate.context = uu["context"];
-    }
-    if (Object.keys(userUpdate).length > 0) {
-      (updates as { userUpdate: typeof userUpdate }).userUpdate = userUpdate;
-      hasUpdates = true;
-    }
+  if (typeof raw["userUpdate"] === "string" && raw["userUpdate"]) {
+    updates.userUpdate = raw["userUpdate"];
+    hasUpdates = true;
   }
 
-  if (raw["worldModelUpdate"] && typeof raw["worldModelUpdate"] === "object") {
-    const wmu = raw["worldModelUpdate"] as Record<string, unknown>;
-    if (Array.isArray(wmu["newPrinciples"])) {
-      const principles = wmu["newPrinciples"].filter((p): p is string => typeof p === "string");
-      if (principles.length > 0) {
-        (updates as { worldModelUpdate: { newPrinciples: readonly string[] } }).worldModelUpdate = {
-          newPrinciples: principles,
-        };
-        hasUpdates = true;
-      }
-    }
+  if (typeof raw["worldModelUpdate"] === "string" && raw["worldModelUpdate"]) {
+    updates.worldModelUpdate = raw["worldModelUpdate"];
+    hasUpdates = true;
   }
 
   return hasUpdates ? updates : undefined;
 }
 
-/** 将图式更新应用到 SchemaProvider */
-async function applySchemaUpdates(
-  deps: ReflectionDeps,
-  schemaUpdates: SchemaUpdates,
-): Promise<void> {
-  if (!deps.schemaProvider) return;
+/**
+ * 将 self.md 章节更新应用到 workspace/prompts/self.md
+ *
+ * - identityUpdate → 替换 ### Identity 章节
+ * - userUpdate → 替换 ### User 章节
+ * - worldModelUpdate → 追加到 ### World Model 章节
+ */
+async function applySelfUpdates(deps: ReflectionDeps, selfUpdates: SelfUpdates): Promise<void> {
+  const selfPath = getPromptFilePath(deps.workspacePath, "self");
 
   try {
-    const update: SoulUpdate = {};
-
-    if (schemaUpdates.identityUpdate) {
-      (update as { selfAwareness: typeof schemaUpdates.identityUpdate }).selfAwareness =
-        schemaUpdates.identityUpdate;
+    if (selfUpdates.identityUpdate) {
+      await replaceSection(selfPath, "Identity", selfUpdates.identityUpdate, 3);
     }
 
-    if (schemaUpdates.userUpdate) {
-      (update as { userModel: typeof schemaUpdates.userUpdate }).userModel =
-        schemaUpdates.userUpdate;
+    if (selfUpdates.userUpdate) {
+      await replaceSection(selfPath, "User", selfUpdates.userUpdate, 3);
     }
 
-    if (schemaUpdates.worldModelUpdate?.newPrinciples) {
-      // 新原则追加到现有原则列表
-      const current = deps.schemaProvider.getSoulSchema();
-      const merged = [
-        ...current.worldModel.principles,
-        ...schemaUpdates.worldModelUpdate.newPrinciples,
-      ];
-      (update as { worldModel: { principles: readonly string[] } }).worldModel = {
-        principles: merged,
-      };
+    if (selfUpdates.worldModelUpdate) {
+      // worldModelUpdate 是追加内容，先读现有再合并
+      const existing = await readSection(selfPath, "World Model", 3);
+      const merged = existing
+        ? `${existing.trimEnd()}\n${selfUpdates.worldModelUpdate}`
+        : selfUpdates.worldModelUpdate;
+      await replaceSection(selfPath, "World Model", merged, 3);
     }
 
-    await deps.schemaProvider.updateSoul(update);
-    deps.logger.info("reflection", "图式已更新", { schemaUpdates });
+    deps.logger.info("reflection", "self.md 章节已更新", { selfUpdates });
   } catch (err) {
-    deps.logger.warn("reflection", "图式更新失败", {
+    deps.logger.warn("reflection", "self.md 章节更新失败", {
       error: err instanceof Error ? err.message : String(err),
     });
   }

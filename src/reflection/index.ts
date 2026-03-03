@@ -2,7 +2,7 @@ export type {
   ReflectionInput,
   ReflectionOutput,
   SkillSuggestion,
-  SchemaUpdates,
+  SelfUpdates,
   Reflector,
   ReflectionDeps,
   ReflectionConfig,

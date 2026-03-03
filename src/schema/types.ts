@@ -1,7 +1,9 @@
 /**
  * 自我图式类型定义
  *
- * 包含身体图式（系统资源）、灵魂图式（世界模型+自我认知+用户模型）、激素系统。
+ * 包含身体图式（系统资源）和激素系统。
+ * 灵魂内容（世界模型/身份/用户模型）已内联到 self.md 模板中，
+ * 通过 replaceSection() 直接编辑，不再作为变量注入。
  */
 
 // ─── 身体图式 ──────────────────────────────────────────────────
@@ -39,46 +41,6 @@ export interface BodySchema {
   readonly timestamp: string;
 }
 
-// ─── 灵魂图式 ──────────────────────────────────────────────────
-
-/** 世界模型 — 普适性逻辑规律，作为决策基础公理 */
-export interface WorldModel {
-  readonly principles: readonly string[];
-  readonly knowledge: string;
-}
-
-/** 自我认知 */
-export interface SelfAwareness {
-  readonly name: string;
-  readonly identity: string;
-  readonly purpose: string;
-  readonly capabilities: readonly string[];
-  readonly limitations: readonly string[];
-}
-
-/** 用户模型 — 通过对话逐步了解用户 */
-export interface UserModel {
-  readonly name: string;
-  readonly preferences: readonly string[];
-  readonly context: string;
-}
-
-/** 灵魂图式 */
-export interface SoulSchema {
-  readonly worldModel: WorldModel;
-  readonly selfAwareness: SelfAwareness;
-  readonly userModel: UserModel;
-}
-
-// ─── 灵魂图式更新 ──────────────────────────────────────────────
-
-/** 灵魂图式更新请求 */
-export interface SoulUpdate {
-  readonly worldModel?: Partial<WorldModel>;
-  readonly selfAwareness?: Partial<SelfAwareness>;
-  readonly userModel?: Partial<UserModel>;
-}
-
 // ─── 激素系统 ──────────────────────────────────────────────────
 
 /** 激素状态 */
@@ -106,7 +68,16 @@ export interface HormoneManager {
 
 // ─── 自我图式总览 ──────────────────────────────────────────────
 
-/** 自我图式变量（供模板渲染） */
+/**
+ * 自我图式变量（供模板渲染）
+ *
+ * 仅包含外部动态属性（8 个变量）：
+ * - Body: 时间、平台、内存、GPU、工作空间路径
+ * - Hormones: 专注度、谨慎度、创造力
+ *
+ * 灵魂内容（世界模型、身份、用户模型）直接写在 self.md 中，
+ * 不再作为模板变量注入。
+ */
 export interface SelfSchemaVariables {
   readonly platform: string;
   readonly availableMemory: string;
@@ -116,9 +87,6 @@ export interface SelfSchemaVariables {
   readonly focusLevel: string;
   readonly cautionLevel: string;
   readonly creativityLevel: string;
-  readonly worldModel: string;
-  readonly selfAwareness: string;
-  readonly userModel: string;
 }
 
 /** 自我图式配置 */

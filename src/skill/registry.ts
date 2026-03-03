@@ -63,8 +63,8 @@ export async function createSkillRegistry(workspacePath: string): Promise<SkillR
       // 内置技能不持久化
       if (skill.origin === "system") return;
 
-      // 追加 skill.md 条目
-      const skillEntry = `| ${skill.name} | ${skill.id} | ${skill.description} | skills/${extractFileName(skill.id)}.md |`;
+      // 追加 skill.md 条目（列表格式）
+      const skillEntry = `- **${skill.id}** — ${skill.name}: ${skill.description}`;
       const skillMdPath = getPromptFilePath(workspacePath, "skill");
       try {
         await appendToPromptFile(skillMdPath, skillEntry);
@@ -162,9 +162,4 @@ function parseSkillFile(raw: string, fileName: string): SkillDefinition | null {
     inputDescription: "",
     outputDescription: "",
   };
-}
-
-/** 从 skill ID 提取文件名部分 */
-function extractFileName(skillId: string): string {
-  return skillId.replace(/^skill:/, "");
 }

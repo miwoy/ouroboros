@@ -15,12 +15,8 @@
  */
 
 import { getBodySchema, getFullBodySchema, formatBodySchema } from "../schema/body.js";
-import {
-  getDefaultSoulSchema,
-  createSoulSchema,
-  formatWorldModel,
-  formatSelfAwareness,
-} from "../schema/soul.js";
+// soul.ts 已删除 — 灵魂内容内联到 self.md 模板中
+import { getPromptFilePath } from "../prompt/store.js";
 import { createHormoneManager, adjustHormonesForEvent } from "../schema/hormone.js";
 import { createSchemaProvider } from "../schema/schema-provider.js";
 import { createInspector, DEFAULT_INSPECTOR_CONFIG } from "../inspector/inspector.js";
@@ -93,27 +89,20 @@ async function main() {
     fail("[2] 格式化", e);
   }
 
-  // [3] 灵魂图式
+  // [3] 灵魂内容（内联在 self.md 模板中）
   try {
-    const soul = getDefaultSoulSchema();
-    if (soul.worldModel.principles.length === 0) throw new Error("无原则");
-    if (!soul.selfAwareness.identity) throw new Error("无身份");
-    if (typeof soul.selfAwareness.name !== "string") throw new Error("缺少 name 字段");
-    if (!soul.userModel) throw new Error("缺少 userModel");
+    // 灵魂内容已内联到 self.md
+    const selfPath = getPromptFilePath("/tmp/workspace", "self");
+    // self.md 模板中应包含 World Model 和 Identity 章节
+    const { readFile } = await import("node:fs/promises");
+    const templateContent = await readFile(selfPath, "utf-8");
+    if (!templateContent.includes("### World Model")) throw new Error("缺少 World Model 章节");
+    if (!templateContent.includes("### Identity")) throw new Error("缺少 Identity 章节");
+    if (!templateContent.includes("自我指涉")) throw new Error("缺少世界模型原则");
 
-    const custom = createSoulSchema({ principles: ["自定义原则"] }, { identity: "测试 Agent" });
-    if (custom.worldModel.principles[0] !== "自定义原则") throw new Error("自定义原则失败");
-    if (custom.selfAwareness.identity !== "测试 Agent") throw new Error("自定义身份失败");
-
-    const wmText = formatWorldModel(soul.worldModel);
-    if (!wmText.includes("自我指涉")) throw new Error("格式化失败");
-
-    const saText = formatSelfAwareness(soul.selfAwareness);
-    if (!saText.includes("Identity")) throw new Error("格式化失败");
-
-    ok("[3] 灵魂图式（世界模型+自我认知+自定义+格式化）");
+    ok("[3] 灵魂内容内联在 self.md 模板中");
   } catch (e) {
-    fail("[3] 灵魂图式", e);
+    fail("[3] 灵魂内容", e);
   }
 
   // [4] 激素系统
@@ -135,17 +124,19 @@ async function main() {
     fail("[4] 激素系统", e);
   }
 
-  // [5] 自我图式变量
+  // [5] 自我图式变量（8 个动态变量，不含 soul）
   try {
     const provider = await createSchemaProvider("/tmp/workspace");
     const vars = provider.getVariables();
     if (!vars.platform) throw new Error("缺少 platform");
     if (!vars.focusLevel) throw new Error("缺少激素值");
-    if (!vars.worldModel) throw new Error("缺少 worldModel 变量");
-    if (!vars.selfAwareness) throw new Error("缺少 selfAwareness 变量");
-    if (!vars.userModel) throw new Error("缺少 userModel 变量");
+    if (!vars.currentDateTime) throw new Error("缺少 currentDateTime");
+    if (!vars.workspacePath) throw new Error("缺少 workspacePath");
+    // soul 变量已移除
+    if ("worldModel" in vars) throw new Error("不应存在 worldModel 变量");
+    if ("selfAwareness" in vars) throw new Error("不应存在 selfAwareness 变量");
 
-    ok("[5] 自我图式变量渲染（含 soul 变量）");
+    ok("[5] 自我图式变量渲染（8 个动态变量，无 soul）");
   } catch (e) {
     fail("[5] 变量渲染", e);
   }
@@ -274,6 +265,7 @@ async function main() {
         compressFromShortTerm: async () => "",
       } as any,
       logger: noopLogger,
+      workspacePath: "/tmp/workspace",
     });
 
     const output = await reflector.reflect({

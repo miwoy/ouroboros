@@ -2,9 +2,9 @@
  * 自我图式提供者测试
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createSchemaProvider } from "../../src/schema/schema-provider.js";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -19,22 +19,26 @@ afterEach(async () => {
 });
 
 describe("createSchemaProvider", () => {
-  it("应返回完整的模板变量（含 soul 变量）", async () => {
+  it("应返回 8 个动态模板变量", async () => {
     const provider = await createSchemaProvider(tempDir);
     const vars = provider.getVariables();
 
+    // Body 变量
     expect(vars.platform).toBeTruthy();
     expect(vars.availableMemory).toContain("GB");
     expect(vars.workspacePath).toBe(tempDir);
     expect(vars.gpu).toBeTruthy();
     expect(vars.currentDateTime).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
+
+    // Hormones 变量
     expect(vars.focusLevel).toBeTruthy();
     expect(vars.cautionLevel).toBeTruthy();
     expect(vars.creativityLevel).toBeTruthy();
-    // soul 变量
-    expect(vars.worldModel).toContain("自我指涉");
-    expect(vars.selfAwareness).toContain("Identity");
-    expect(vars.userModel).toBe("Not yet known.");
+
+    // 不应存在 soul 变量
+    expect(vars).not.toHaveProperty("worldModel");
+    expect(vars).not.toHaveProperty("selfAwareness");
+    expect(vars).not.toHaveProperty("userModel");
   });
 
   it("应使用自定义激素默认值", async () => {
@@ -56,16 +60,6 @@ describe("createSchemaProvider", () => {
     expect(body.cpuCores).toBeGreaterThan(0);
   });
 
-  it("getSoulSchema 应返回灵魂图式", async () => {
-    const provider = await createSchemaProvider(tempDir);
-    const soul = provider.getSoulSchema();
-
-    expect(soul.worldModel.principles.length).toBe(5);
-    expect(soul.selfAwareness.identity).toBeTruthy();
-    expect(soul.selfAwareness.name).toBe("");
-    expect(soul.userModel.name).toBe("");
-  });
-
   it("getHormoneManager 应返回激素管理器", async () => {
     const provider = await createSchemaProvider(tempDir);
     const manager = provider.getHormoneManager();
@@ -84,57 +78,10 @@ describe("createSchemaProvider", () => {
     await expect(provider.refresh()).resolves.toBeUndefined();
   });
 
-  it("updateSoul 应更新灵魂图式并持久化", async () => {
+  it("不再提供 getSoulSchema 和 updateSoul 方法", async () => {
     const provider = await createSchemaProvider(tempDir);
 
-    await provider.updateSoul({
-      selfAwareness: { name: "小助手" },
-      userModel: { name: "张三", preferences: ["简洁"] },
-    });
-
-    // 内存态更新
-    const soul = provider.getSoulSchema();
-    expect(soul.selfAwareness.name).toBe("小助手");
-    expect(soul.userModel.name).toBe("张三");
-    expect(soul.userModel.preferences).toEqual(["简洁"]);
-
-    // 变量更新
-    const vars = provider.getVariables();
-    expect(vars.selfAwareness).toContain("**Name**: 小助手");
-    expect(vars.userModel).toContain("**Name**: 张三");
-
-    // 持久化验证
-    const raw = await readFile(join(tempDir, "schema", "soul.json"), "utf-8");
-    const persisted = JSON.parse(raw);
-    expect(persisted.selfAwareness.name).toBe("小助手");
-    expect(persisted.userModel.name).toBe("张三");
-  });
-
-  it("updateSoul 应只更新指定字段，保留其他字段", async () => {
-    const provider = await createSchemaProvider(tempDir);
-
-    // 第一次更新 name
-    await provider.updateSoul({ selfAwareness: { name: "小明" } });
-    expect(provider.getSoulSchema().selfAwareness.name).toBe("小明");
-
-    // 第二次更新 purpose，name 应保留
-    await provider.updateSoul({ selfAwareness: { purpose: "帮助用户" } });
-    const soul = provider.getSoulSchema();
-    expect(soul.selfAwareness.name).toBe("小明");
-    expect(soul.selfAwareness.purpose).toBe("帮助用户");
-  });
-
-  it("重新创建 provider 应从 soul.json 加载持久化数据", async () => {
-    const provider1 = await createSchemaProvider(tempDir);
-    await provider1.updateSoul({
-      selfAwareness: { name: "持久化测试" },
-      userModel: { name: "用户A" },
-    });
-
-    // 重新创建 provider
-    const provider2 = await createSchemaProvider(tempDir);
-    const soul = provider2.getSoulSchema();
-    expect(soul.selfAwareness.name).toBe("持久化测试");
-    expect(soul.userModel.name).toBe("用户A");
+    expect(provider).not.toHaveProperty("getSoulSchema");
+    expect(provider).not.toHaveProperty("updateSoul");
   });
 });

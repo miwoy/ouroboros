@@ -12,6 +12,8 @@ import {
   getCorePath,
   parseFrontmatter,
   serializeFrontmatter,
+  readSection,
+  replaceSection,
 } from "../../src/prompt/store.js";
 import { initWorkspace } from "../../src/workspace/init.js";
 import type { PromptFile } from "../../src/prompt/types.js";
@@ -307,6 +309,139 @@ variables:
     expect(result.metadata.variables![0].name).toBe("platform");
     expect(result.metadata.variables![0].required).toBe(true);
     expect(result.metadata.variables![1].defaultValue).toBe("你好");
+  });
+});
+
+describe("readSection", () => {
+  beforeEach(async () => {
+    await initWorkspace(TEST_WORKSPACE);
+  });
+
+  afterEach(async () => {
+    await rm(TEST_WORKSPACE, { recursive: true, force: true });
+  });
+
+  it("应该读取指定标题下的内容", async () => {
+    const filePath = join(TEST_WORKSPACE, "prompts", "test.md");
+    await writeFile(
+      filePath,
+      "# Title\n\n## Section A\n\n内容A\n\n## Section B\n\n内容B\n",
+      "utf-8",
+    );
+
+    const content = await readSection(filePath, "Section A");
+    expect(content).toBe("内容A");
+  });
+
+  it("三级标题也能读取", async () => {
+    const filePath = join(TEST_WORKSPACE, "prompts", "test.md");
+    await writeFile(
+      filePath,
+      "## Soul\n\n### World Model\n\n原则1\n原则2\n\n### Identity\n\n身份\n",
+      "utf-8",
+    );
+
+    const content = await readSection(filePath, "World Model", 3);
+    expect(content).toBe("原则1\n原则2");
+  });
+
+  it("section 不存在时返回 null", async () => {
+    const filePath = join(TEST_WORKSPACE, "prompts", "test.md");
+    await writeFile(filePath, "# Title\n\n## Section A\n\n内容A\n", "utf-8");
+
+    const content = await readSection(filePath, "Not Exist");
+    expect(content).toBeNull();
+  });
+
+  it("文件不存在时返回 null", async () => {
+    const content = await readSection(join(TEST_WORKSPACE, "nonexistent.md"), "X");
+    expect(content).toBeNull();
+  });
+
+  it("最后一个 section 读取到文件末尾", async () => {
+    const filePath = join(TEST_WORKSPACE, "prompts", "test.md");
+    await writeFile(filePath, "## First\n\n内容1\n\n## Last\n\n最后内容\n", "utf-8");
+
+    const content = await readSection(filePath, "Last");
+    expect(content).toBe("最后内容");
+  });
+});
+
+describe("replaceSection", () => {
+  beforeEach(async () => {
+    await initWorkspace(TEST_WORKSPACE);
+  });
+
+  afterEach(async () => {
+    await rm(TEST_WORKSPACE, { recursive: true, force: true });
+  });
+
+  it("应该替换指定 section 的内容", async () => {
+    const filePath = join(TEST_WORKSPACE, "prompts", "test.md");
+    await writeFile(
+      filePath,
+      "# Title\n\n## Section A\n\n旧内容\n\n## Section B\n\n内容B\n",
+      "utf-8",
+    );
+
+    await replaceSection(filePath, "Section A", "新内容");
+
+    const raw = await readFile(filePath, "utf-8");
+    expect(raw).toContain("## Section A");
+    expect(raw).toContain("新内容");
+    expect(raw).not.toContain("旧内容");
+    expect(raw).toContain("## Section B");
+    expect(raw).toContain("内容B");
+  });
+
+  it("section 不存在时追加新章节", async () => {
+    const filePath = join(TEST_WORKSPACE, "prompts", "test.md");
+    await writeFile(filePath, "# Title\n\n## Existing\n\n内容\n", "utf-8");
+
+    await replaceSection(filePath, "New Section", "新章节内容");
+
+    const raw = await readFile(filePath, "utf-8");
+    expect(raw).toContain("## Existing");
+    expect(raw).toContain("## New Section");
+    expect(raw).toContain("新章节内容");
+  });
+
+  it("替换三级标题 section", async () => {
+    const filePath = join(TEST_WORKSPACE, "prompts", "test.md");
+    await writeFile(filePath, "## Soul\n\n### Identity\n\n旧身份\n\n### User\n\n用户\n", "utf-8");
+
+    await replaceSection(filePath, "Identity", "新身份描述", 3);
+
+    const raw = await readFile(filePath, "utf-8");
+    expect(raw).toContain("### Identity");
+    expect(raw).toContain("新身份描述");
+    expect(raw).not.toContain("旧身份");
+    expect(raw).toContain("### User");
+    expect(raw).toContain("用户");
+  });
+
+  it("文件不存在时抛出错误", async () => {
+    await expect(
+      replaceSection(join(TEST_WORKSPACE, "nonexistent.md"), "X", "内容"),
+    ).rejects.toThrow("文件不存在");
+  });
+
+  it("替换后 readSection 能正确读取", async () => {
+    const filePath = join(TEST_WORKSPACE, "prompts", "test.md");
+    await writeFile(
+      filePath,
+      "## Soul\n\n### World Model\n\n旧原则\n\n### Identity\n\n身份\n",
+      "utf-8",
+    );
+
+    await replaceSection(filePath, "World Model", "新原则1\n新原则2", 3);
+
+    const content = await readSection(filePath, "World Model", 3);
+    expect(content).toBe("新原则1\n新原则2");
+
+    // Identity 不受影响
+    const identity = await readSection(filePath, "Identity", 3);
+    expect(identity).toBe("身份");
   });
 });
 

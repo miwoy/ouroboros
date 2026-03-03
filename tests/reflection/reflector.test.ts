@@ -2,14 +2,28 @@
  * 反思器测试
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createReflector } from "../../src/reflection/reflector.js";
 import { TreeState, TaskState, NodeType } from "../../src/core/types.js";
 import type { ExecutionTree } from "../../src/core/types.js";
 import type { ReflectionInput, ReflectionDeps } from "../../src/reflection/types.js";
 import type { Logger } from "../../src/logger/types.js";
 import type { LongTermMemory } from "../../src/memory/types.js";
-import type { SchemaProvider } from "../../src/schema/schema-provider.js";
+import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { initWorkspace } from "../../src/workspace/init.js";
+
+let tempDir: string;
+
+beforeEach(async () => {
+  tempDir = await mkdtemp(join(tmpdir(), "reflector-test-"));
+  await initWorkspace(tempDir);
+});
+
+afterEach(async () => {
+  await rm(tempDir, { recursive: true, force: true });
+});
 
 function makeLogger(): Logger {
   return {
@@ -44,22 +58,7 @@ function makeTree(): ExecutionTree {
   };
 }
 
-function makeSchemaProvider(): SchemaProvider {
-  return {
-    getVariables: vi.fn(),
-    refresh: vi.fn(),
-    getBodySchema: vi.fn(),
-    getSoulSchema: vi.fn().mockReturnValue({
-      worldModel: { principles: ["原则1"], knowledge: "知识" },
-      selfAwareness: { name: "", identity: "test", purpose: "test", capabilities: [], limitations: [] },
-      userModel: { name: "", preferences: [], context: "" },
-    }),
-    getHormoneManager: vi.fn(),
-    updateSoul: vi.fn().mockResolvedValue(undefined),
-  };
-}
-
-function makeDeps(modelResponse?: string, schemaProvider?: SchemaProvider): ReflectionDeps {
+function makeDeps(modelResponse?: string): ReflectionDeps {
   return {
     callModel: vi.fn().mockResolvedValue({
       content: modelResponse ?? JSON.stringify({
@@ -80,7 +79,7 @@ function makeDeps(modelResponse?: string, schemaProvider?: SchemaProvider): Refl
       compressFromShortTerm: vi.fn().mockResolvedValue(""),
     } as unknown as LongTermMemory,
     logger: makeLogger(),
-    schemaProvider,
+    workspacePath: tempDir,
   };
 }
 
@@ -159,7 +158,7 @@ describe("createReflector", () => {
 
   it("模型反思失败时应使用基础分析", async () => {
     const deps = makeDeps();
-    (deps.callModel as any).mockRejectedValue(new Error("模型不可用"));
+    (deps.callModel as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("模型不可用"));
 
     const reflector = createReflector(deps);
     const output = await reflector.reflect(makeInput());
@@ -214,7 +213,9 @@ describe("createReflector", () => {
 
   it("长期记忆写入失败不应影响反思", async () => {
     const deps = makeDeps();
-    (deps.longTermMemory.appendKnowledge as any).mockRejectedValue(new Error("写入失败"));
+    (deps.longTermMemory.appendKnowledge as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("写入失败"),
+    );
 
     const reflector = createReflector(deps);
     const output = await reflector.reflect(makeInput());
@@ -252,91 +253,89 @@ describe("createReflector", () => {
     );
   });
 
-  // ─── schemaUpdates 相关测试 ──────────────────────────────────
+  // ─── selfUpdates 相关测试 ──────────────────────────────────
 
-  it("应解析模型返回的 schemaUpdates", async () => {
+  it("应解析模型返回的 selfUpdates 并编辑 self.md", async () => {
     const modelResponse = JSON.stringify({
       insights: ["发现用户名"],
       patterns: [],
       memorySummary: "记录用户信息",
-      schemaUpdates: {
-        identityUpdate: { name: "小助手" },
-        userUpdate: { name: "张三", preferences: ["中文交流"] },
+      selfUpdates: {
+        identityUpdate: "我是小助手，专注于代码审查",
+        userUpdate: "**Name**: 张三\n偏好中文交流",
       },
     });
 
-    const sp = makeSchemaProvider();
-    const deps = makeDeps(modelResponse, sp);
+    const deps = makeDeps(modelResponse);
     const reflector = createReflector(deps);
     const output = await reflector.reflect(makeInput());
 
-    expect(output.schemaUpdates).toBeDefined();
-    expect(output.schemaUpdates!.identityUpdate?.name).toBe("小助手");
-    expect(output.schemaUpdates!.userUpdate?.name).toBe("张三");
-    expect(output.schemaUpdates!.userUpdate?.preferences).toEqual(["中文交流"]);
+    expect(output.selfUpdates).toBeDefined();
+    expect(output.selfUpdates!.identityUpdate).toBe("我是小助手，专注于代码审查");
+    expect(output.selfUpdates!.userUpdate).toContain("张三");
+
+    // 验证 self.md 被编辑
+    const selfContent = await readFile(join(tempDir, "prompts", "self.md"), "utf-8");
+    expect(selfContent).toContain("我是小助手，专注于代码审查");
+    expect(selfContent).toContain("张三");
   });
 
-  it("有 schemaUpdates 时应调用 schemaProvider.updateSoul", async () => {
-    const modelResponse = JSON.stringify({
-      insights: ["用户自称张三"],
-      patterns: [],
-      memorySummary: "记录",
-      schemaUpdates: {
-        userUpdate: { name: "张三" },
-      },
-    });
-
-    const sp = makeSchemaProvider();
-    const deps = makeDeps(modelResponse, sp);
-    const reflector = createReflector(deps);
-    await reflector.reflect(makeInput());
-
-    expect(sp.updateSoul).toHaveBeenCalled();
-  });
-
-  it("无 schemaProvider 时不应报错", async () => {
+  it("worldModelUpdate 应追加到现有 World Model 内容", async () => {
     const modelResponse = JSON.stringify({
       insights: [],
       patterns: [],
       memorySummary: "ok",
-      schemaUpdates: { userUpdate: { name: "test" } },
-    });
-
-    const deps = makeDeps(modelResponse); // 无 schemaProvider
-    const reflector = createReflector(deps);
-    await expect(reflector.reflect(makeInput())).resolves.toBeDefined();
-  });
-
-  it("无 schemaUpdates 时不应调用 updateSoul", async () => {
-    const sp = makeSchemaProvider();
-    const deps = makeDeps(undefined, sp);
-    const reflector = createReflector(deps);
-    await reflector.reflect(makeInput());
-
-    expect(sp.updateSoul).not.toHaveBeenCalled();
-  });
-
-  it("worldModelUpdate 应追加新原则", async () => {
-    const modelResponse = JSON.stringify({
-      insights: [],
-      patterns: [],
-      memorySummary: "ok",
-      schemaUpdates: {
-        worldModelUpdate: { newPrinciples: ["新发现的原则"] },
+      selfUpdates: {
+        worldModelUpdate: "- **新原则** — 新发现的原则",
       },
     });
 
-    const sp = makeSchemaProvider();
-    const deps = makeDeps(modelResponse, sp);
+    const deps = makeDeps(modelResponse);
     const reflector = createReflector(deps);
     await reflector.reflect(makeInput());
 
-    expect(sp.updateSoul).toHaveBeenCalledWith(
-      expect.objectContaining({
-        worldModel: expect.objectContaining({
-          principles: ["原则1", "新发现的原则"],
-        }),
-      }),
+    // 验证 self.md 的 World Model 章节包含原有内容 + 新追加
+    const selfContent = await readFile(join(tempDir, "prompts", "self.md"), "utf-8");
+    expect(selfContent).toContain("自我指涉"); // 原有内容保留
+    expect(selfContent).toContain("新发现的原则"); // 新内容追加
+  });
+
+  it("无 selfUpdates 时不应修改 self.md", async () => {
+    const deps = makeDeps();
+    const reflector = createReflector(deps);
+
+    // 记录原始内容
+    const originalContent = await readFile(join(tempDir, "prompts", "self.md"), "utf-8");
+
+    await reflector.reflect(makeInput());
+
+    const afterContent = await readFile(join(tempDir, "prompts", "self.md"), "utf-8");
+    expect(afterContent).toBe(originalContent);
+  });
+
+  it("self.md 编辑失败不应影响反思输出", async () => {
+    const modelResponse = JSON.stringify({
+      insights: ["ok"],
+      patterns: [],
+      memorySummary: "ok",
+      selfUpdates: {
+        identityUpdate: "新身份",
+      },
+    });
+
+    // 使用不存在的 workspacePath
+    const deps = makeDeps(modelResponse);
+    (deps as { workspacePath: string }).workspacePath = "/nonexistent/path";
+
+    const reflector = createReflector(deps);
+    const output = await reflector.reflect(makeInput());
+
+    // 反思仍应成功
+    expect(output.insights.length).toBeGreaterThan(0);
+    expect(deps.logger.warn).toHaveBeenCalledWith(
+      "reflection",
+      "self.md 章节更新失败",
+      expect.any(Object),
     );
   });
 });

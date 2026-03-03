@@ -62,7 +62,7 @@ import { createLongTermMemory } from "../memory/long-term.js";
 
 // ─── Schema ───
 import { getBodySchema, formatBodySchema } from "../schema/body.js";
-import { getDefaultSoulSchema, createSoulSchema, formatWorldModel } from "../schema/soul.js";
+// soul.ts 已删除 — 灵魂内容内联到 self.md 模板中
 import { createHormoneManager, adjustHormonesForEvent } from "../schema/hormone.js";
 import { createSchemaProvider } from "../schema/schema-provider.js";
 
@@ -407,15 +407,8 @@ async function main(): Promise<void> {
     const bodyText = formatBodySchema(body);
     assert(bodyText.includes("运行环境"), "Body: 格式化包含运行环境");
 
-    const soul = getDefaultSoulSchema();
-    assert(soul.worldModel.principles.length > 0, "Soul: 有默认原则");
-    assert(!!soul.selfAwareness.identity, "Soul: 有身份信息");
-
-    const customSoul = createSoulSchema({ principles: ["自定义原则"] }, { identity: "测试" });
-    assert(customSoul.worldModel.principles[0] === "自定义原则", "Soul: 自定义原则生效");
-
-    const wmText = formatWorldModel(soul.worldModel);
-    assert(wmText.includes("自我指涉"), "Soul: formatWorldModel 正确");
+    // Soul 已内联到 self.md — 通过 readSection 验证
+    // （集成测试在 phase-prompt.ts 中覆盖）
 
     // 激素系统
     const hormones = createHormoneManager({
@@ -510,6 +503,7 @@ async function main(): Promise<void> {
       }),
       longTermMemory: longTerm as any,
       logger: noopLogger,
+      workspacePath: workDir,
     });
     const reflectOutput = await reflector.reflect({
       taskDescription: "全系统集成测试",

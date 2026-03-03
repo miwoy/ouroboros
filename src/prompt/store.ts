@@ -396,6 +396,124 @@ function isNodeError(err: unknown): err is NodeJS.ErrnoException {
   return err instanceof Error && "code" in err;
 }
 
+// ─── Section 编辑 ─────────────────────────────────────────────────
+
+/**
+ * 读取 markdown 文件中指定标题下的内容
+ *
+ * 搜索 `#{level} {sectionName}` 标题，返回到下一个同级/更高级标题之间的内容。
+ * 不包含标题行本身。
+ *
+ * @param filePath - .md 文件的完整路径
+ * @param sectionName - 标题名称（不含 # 前缀）
+ * @param headingLevel - 标题级别（默认 2，即 ##）
+ * @returns section 内容，不存在返回 null
+ */
+export async function readSection(
+  filePath: string,
+  sectionName: string,
+  headingLevel = 2,
+): Promise<string | null> {
+  let raw: string;
+  try {
+    raw = await readFile(filePath, "utf-8");
+  } catch (err) {
+    if (isNodeError(err) && err.code === "ENOENT") {
+      return null;
+    }
+    throw new PromptStoreError(`读取文件失败: ${filePath}`, err);
+  }
+
+  const { start, end } = findSectionRange(raw, sectionName, headingLevel);
+  if (start === -1) return null;
+
+  return raw.slice(start, end).trim();
+}
+
+/**
+ * 替换 markdown 文件中指定标题下的内容
+ *
+ * 搜索 `#{level} {sectionName}` 标题，替换到下一个同级/更高级标题之间的内容。
+ * 保留标题行，只替换正文。如果标题不存在，在文件末尾追加新章节。
+ *
+ * @param filePath - .md 文件的完整路径
+ * @param sectionName - 标题名称（不含 # 前缀）
+ * @param newContent - 新内容
+ * @param headingLevel - 标题级别（默认 2，即 ##）
+ */
+export async function replaceSection(
+  filePath: string,
+  sectionName: string,
+  newContent: string,
+  headingLevel = 2,
+): Promise<void> {
+  let raw: string;
+  try {
+    raw = await readFile(filePath, "utf-8");
+  } catch (err) {
+    if (isNodeError(err) && err.code === "ENOENT") {
+      throw new PromptStoreError(`文件不存在: ${filePath}`, err);
+    }
+    throw new PromptStoreError(`读取文件失败: ${filePath}`, err);
+  }
+
+  const { start, end } = findSectionRange(raw, sectionName, headingLevel);
+  const prefix = "#".repeat(headingLevel);
+
+  let updated: string;
+  if (start === -1) {
+    // 标题不存在 → 追加到文件末尾
+    const suffix = raw.endsWith("\n") ? "" : "\n";
+    updated = `${raw}${suffix}\n${prefix} ${sectionName}\n\n${newContent}\n`;
+  } else {
+    // 替换 section 正文（保留标题行前后结构）
+    const before = raw.slice(0, start);
+    const after = raw.slice(end);
+    updated = `${before}\n${newContent}\n${after}`;
+  }
+
+  await writeFile(filePath, updated, "utf-8");
+}
+
+/**
+ * 在 markdown 文本中查找 section 正文的字符范围
+ *
+ * @returns { start, end } 正文起止位置（不含标题行），未找到返回 { start: -1, end: -1 }
+ */
+function findSectionRange(
+  raw: string,
+  sectionName: string,
+  headingLevel: number,
+): { readonly start: number; readonly end: number } {
+  const prefix = "#".repeat(headingLevel);
+  // 匹配标题行（行首 #{level} sectionName，后跟换行或 EOF）
+  const headingPattern = new RegExp(
+    `^${escapeRegex(prefix)} ${escapeRegex(sectionName)}[ \\t]*$`,
+    "m",
+  );
+  const match = headingPattern.exec(raw);
+  if (!match) return { start: -1, end: -1 };
+
+  // 正文开始位置：标题行结束后
+  const contentStart = match.index + match[0].length;
+  // 跳过标题行后的换行符
+  const actualStart = raw[contentStart] === "\n" ? contentStart + 1 : contentStart;
+
+  // 正文结束位置：下一个同级或更高级标题行开始前
+  // 匹配 1~headingLevel 个 # 开头的标题
+  const nextHeadingPattern = new RegExp(`^#{1,${headingLevel}} [^#]`, "m");
+  const remaining = raw.slice(actualStart);
+  const nextMatch = nextHeadingPattern.exec(remaining);
+
+  const end = nextMatch ? actualStart + nextMatch.index : raw.length;
+  return { start: actualStart, end };
+}
+
+/** 转义正则特殊字符 */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /** 提示词存储错误 */
 export class PromptStoreError extends OuroborosError {
   constructor(message: string, cause?: unknown) {

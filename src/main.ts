@@ -125,6 +125,7 @@ export async function startServer(): Promise<void> {
       callModel: callModelFn,
       longTermMemory: memoryManager.longTerm,
       logger,
+      workspacePath,
     },
     config.system.reflection,
   );

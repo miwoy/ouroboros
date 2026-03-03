@@ -76,8 +76,8 @@ export async function createToolRegistry(workspacePath: string): Promise<ToolReg
       // 持久化到 registry.json
       await saveRegistryFile(workspacePath, registry.listCustom());
 
-      // 追加 tool.md 条目
-      const toolMdEntry = `| ${tool.name} | ${tool.id} | ${tool.description} | ${tool.entrypoint} |`;
+      // 追加 tool.md 条目（列表格式）
+      const toolMdEntry = `- **${tool.id}** — ${tool.name}: ${tool.description}`;
       const toolMdPath = getPromptFilePath(workspacePath, "tool");
       try {
         await appendToPromptFile(toolMdPath, toolMdEntry);

@@ -5,14 +5,13 @@
  * - 提取知识和行为模式
  * - 建议 Skill/Solution 封装
  * - 更新长期记忆
- * - 评估是否需要更新自我图式
+ * - 评估是否需要更新 self.md 章节
  */
 
 import type { ExecutionTree, ReactStep } from "../core/types.js";
 import type { CallModelFn } from "../tool/types.js";
 import type { LongTermMemory } from "../memory/types.js";
 import type { Logger } from "../logger/types.js";
-import type { SchemaProvider } from "../schema/schema-provider.js";
 
 /** 反思输入 */
 export interface ReflectionInput {
@@ -34,21 +33,19 @@ export interface SkillSuggestion {
   readonly confidence: number;
 }
 
-/** 图式更新建议 */
-export interface SchemaUpdates {
-  readonly identityUpdate?: {
-    readonly name?: string;
-    readonly identity?: string;
-    readonly purpose?: string;
-  };
-  readonly userUpdate?: {
-    readonly name?: string;
-    readonly preferences?: readonly string[];
-    readonly context?: string;
-  };
-  readonly worldModelUpdate?: {
-    readonly newPrinciples?: readonly string[];
-  };
+/**
+ * self.md 章节更新（反思系统产出）
+ *
+ * 反思通过 replaceSection() 直接编辑 self.md 对应章节，
+ * 不再通过 soul.json 间接影响提示词。
+ */
+export interface SelfUpdates {
+  /** ### Identity 新内容 */
+  readonly identityUpdate?: string;
+  /** ### User 新内容 */
+  readonly userUpdate?: string;
+  /** ### World Model 追加内容 */
+  readonly worldModelUpdate?: string;
 }
 
 /** 反思输出 */
@@ -57,7 +54,7 @@ export interface ReflectionOutput {
   readonly patterns: readonly string[];
   readonly skillSuggestions: readonly SkillSuggestion[];
   readonly memorySummary: string;
-  readonly schemaUpdates?: SchemaUpdates;
+  readonly selfUpdates?: SelfUpdates;
 }
 
 /** 反思器接口 */
@@ -70,7 +67,8 @@ export interface ReflectionDeps {
   readonly callModel: CallModelFn;
   readonly longTermMemory: LongTermMemory;
   readonly logger: Logger;
-  readonly schemaProvider?: SchemaProvider;
+  /** workspace 路径，用于定位 self.md 进行 section 编辑 */
+  readonly workspacePath: string;
 }
 
 /** 反思配置 */
