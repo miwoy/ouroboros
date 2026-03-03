@@ -19,7 +19,7 @@ export function Header({ currentView, onViewChange, onNewChat, connected }: Head
     <header className="header">
       <div className="header-left">
         <div className="header-brand">
-          <img src="/logo.png" alt="Ouroboros" className="header-logo-img" />
+          <img src="/icon.jpg" alt="Ouroboros" className="header-logo-img" />
           <h1 className="header-logo">Ouroboros</h1>
         </div>
         <nav className="header-nav">
