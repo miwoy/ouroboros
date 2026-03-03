@@ -48,6 +48,10 @@ export interface SendMessageRequest {
   readonly message: string;
   readonly agentId?: string;
   readonly stream?: boolean;
+  /** 指定使用的提供商名称（覆盖 config 中的 defaultProvider） */
+  readonly provider?: string;
+  /** 指定使用的模型 ID（覆盖提供商的 defaultModel） */
+  readonly model?: string;
 }
 
 /** 创建会话请求 */

@@ -129,6 +129,36 @@ export function registerHandlers(
     ctx.respond(200, successResponse(usage));
   });
 
+  // ─── 模型 ──────────────────────────────────
+
+  // 获取可用模型列表
+  router.get("/api/models", async (ctx) => {
+    if (!deps.providerRegistry || !deps.fullConfig) {
+      ctx.respond(200, successResponse({ providers: [], defaultProvider: null }));
+      return;
+    }
+
+    const providerNames = deps.providerRegistry.names();
+    const providers = providerNames.map((name) => {
+      const config = deps.fullConfig!.model.providers[name];
+      return {
+        name,
+        type: config.type,
+        defaultModel: config.defaultModel ?? null,
+        models: config.models ?? [],
+        isDefault: name === deps.defaultProvider,
+      };
+    });
+
+    ctx.respond(
+      200,
+      successResponse({
+        providers,
+        defaultProvider: deps.defaultProvider,
+      }),
+    );
+  });
+
   // ─── 消息 ──────────────────────────────────
 
   // 发送消息
@@ -155,16 +185,19 @@ export function registerHandlers(
     // 记录用户消息
     sessionManager.addMessage(sessionId, "user", body.message);
 
+    // 构建请求级覆盖的 deps（provider/model）
+    const effectiveDeps = applyModelOverrides(deps, body.provider, body.model);
+
     // 流式响应
     if (body.stream) {
-      const events = createStreamEvents(sessionId, body.message, deps, sessionManager);
+      const events = createStreamEvents(sessionId, body.message, effectiveDeps, sessionManager);
       ctx.respondSSE(events);
       return;
     }
 
     // 非流式
     try {
-      const response = await processMessage(sessionId, body.message, sessionManager, deps);
+      const response = await processMessage(sessionId, body.message, sessionManager, effectiveDeps);
       ctx.respond(200, successResponse(response));
     } catch (err) {
       deps.logger.error("api", "消息处理失败", { error: err });
@@ -761,6 +794,30 @@ function buildReactMetadata(result: {
     totalUsage: result.totalUsage,
     stopReason: result.stopReason,
   };
+}
+
+/**
+ * 构建请求级别的 deps 覆盖（provider/model）
+ * 不修改原始 deps，返回新的浅拷贝
+ */
+function applyModelOverrides(deps: ApiDeps, provider?: string, model?: string): ApiDeps {
+  if (!provider && !model) return deps;
+
+  let result: ApiDeps = {
+    ...deps,
+    defaultProvider: provider ?? deps.defaultProvider,
+  };
+
+  // 如果指定了 model，包装 callModel 注入 model 参数
+  if (model && deps.callModel) {
+    const originalCallModel = deps.callModel;
+    result = {
+      ...result,
+      callModel: async (request, options) => originalCallModel({ ...request, model }, options),
+    };
+  }
+
+  return result;
 }
 
 /** 从 provider 获取 callModel 函数 */
