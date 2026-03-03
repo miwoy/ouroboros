@@ -70,7 +70,10 @@ async function main(): Promise<void> {
 
   const selfVars = extractVariables(selfFile!.content);
   console.log(`  提取到变量: ${selfVars.join(", ")}`);
-  const hasBodyVars = selfVars.includes("platform") && selfVars.includes("availableMemory") && selfVars.includes("workspacePath");
+  const hasBodyVars =
+    selfVars.includes("platform") &&
+    selfVars.includes("availableMemory") &&
+    selfVars.includes("workspacePath");
   console.log(`  ${hasBodyVars ? "✅" : "❌"} 身体图式变量完整`);
   checks.push({ name: "身体图式变量提取", passed: hasBodyVars });
 
@@ -84,14 +87,15 @@ async function main(): Promise<void> {
     platform: `${os.platform()} ${os.arch()} (Node.js ${process.version})`,
     availableMemory: memInfo,
     workspacePath: config.system.workspacePath,
-    worldModel: "遵循安全边界，合理使用资源",
-    selfAwareness: "我是 Ouroboros Agent 核心，具备自指循环能力",
     focusLevel: "高",
     cautionLevel: "中",
     creativityLevel: "中",
   });
 
-  const renderOk = selfRendered.includes(os.platform()) && selfRendered.includes(config.system.workspacePath) && !selfRendered.includes("{{platform}}");
+  const renderOk =
+    selfRendered.includes(os.platform()) &&
+    selfRendered.includes(config.system.workspacePath) &&
+    !selfRendered.includes("{{platform}}");
   console.log(`  运行环境: ${os.platform()} ${os.arch()}`);
   console.log(`  可用内存: ${memInfo}`);
   console.log(`  ${renderOk ? "✅" : "❌"} 身体图式变量替换成功`);
@@ -99,7 +103,8 @@ async function main(): Promise<void> {
 
   // ── 4. 追加自定义技能条目到 skill.md ────────────────────────────
   console.log("[5/9] 追加自定义技能到 skill.md...");
-  const skillEntry = "| 文件摘要 | skill:file-summary | 读取指定文件并生成摘要 | workspace/skills/file-summary |";
+  const skillEntry =
+    "| 文件摘要 | skill:file-summary | 读取指定文件并生成摘要 | workspace/skills/file-summary |";
   const skillFilePath = getPromptFilePath(config.system.workspacePath, "skill");
   await appendToPromptFile(skillFilePath, skillEntry);
 
@@ -123,7 +128,9 @@ async function main(): Promise<void> {
     console.log("  qmd 可用，初始化向量索引...");
     try {
       await initVectorIndex(config.system.workspacePath);
-      const semanticResults = await searchBySemantic(config.system.workspacePath, "文件摘要", { mode: "query" });
+      const semanticResults = await searchBySemantic(config.system.workspacePath, "文件摘要", {
+        mode: "query",
+      });
       vectorHit = semanticResults.length > 0 && semanticResults[0].fileName.includes("skill");
       console.log(`  ${vectorHit ? "✅" : "❌"} 向量检索命中 (${semanticResults.length} 条)`);
     } catch (err) {
@@ -145,7 +152,8 @@ async function main(): Promise<void> {
   ];
 
   const assembled = assemblePrompt(parts);
-  const assembleOk = assembled.systemPrompt.includes("Ouroboros") && assembled.systemPrompt.includes(os.platform());
+  const assembleOk =
+    assembled.systemPrompt.includes("Ouroboros") && assembled.systemPrompt.includes(os.platform());
   console.log(`  systemPrompt 长度: ${assembled.systemPrompt.length}`);
   console.log(`  ${assembleOk ? "✅" : "❌"} 装配成功（包含 core + 身体图式）`);
   checks.push({ name: "提示词装配", passed: assembleOk });
@@ -169,7 +177,10 @@ async function main(): Promise<void> {
 
   // 验证模型响应包含身体图式信息（平台或工作目录）
   const platformStr = os.platform();
-  const containsBodyInfo = response.content.includes(platformStr) || response.content.toLowerCase().includes("linux") || response.content.includes("workspace");
+  const containsBodyInfo =
+    response.content.includes(platformStr) ||
+    response.content.toLowerCase().includes("linux") ||
+    response.content.includes("workspace");
   console.log(`  ${containsBodyInfo ? "✅" : "❌"} 模型感知到身体图式信息`);
   checks.push({ name: "模型感知身体图式", passed: containsBodyInfo });
 

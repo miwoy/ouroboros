@@ -6,7 +6,7 @@
  */
 
 import { getBodySchema, getFullBodySchema } from "./body.js";
-import { getDefaultSoulSchema, formatWorldModel, formatSelfAwareness } from "./soul.js";
+import { getDefaultSoulSchema } from "./soul.js";
 import { createHormoneManager } from "./hormone.js";
 import type {
   SelfSchemaVariables,
@@ -73,8 +73,6 @@ export function createSchemaProvider(
         gpu: gpuText,
         workspacePath: bodySchema.workspacePath,
         currentDateTime: formatCurrentDateTime(),
-        worldModel: formatWorldModel(soulSchema.worldModel),
-        selfAwareness: formatSelfAwareness(soulSchema.selfAwareness),
         focusLevel: String(hormones.focusLevel),
         cautionLevel: String(hormones.cautionLevel),
         creativityLevel: String(hormones.creativityLevel),

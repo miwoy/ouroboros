@@ -139,8 +139,6 @@ async function main() {
     const provider = createSchemaProvider("/tmp/workspace");
     const vars = provider.getVariables();
     if (!vars.platform) throw new Error("缺少 platform");
-    if (!vars.worldModel.includes("World Rules")) throw new Error("缺少世界模型");
-    if (!vars.selfAwareness.includes("Identity")) throw new Error("缺少自我认知");
     if (!vars.focusLevel) throw new Error("缺少激素值");
 
     ok("[5] 自我图式变量渲染（供模板使用）");
