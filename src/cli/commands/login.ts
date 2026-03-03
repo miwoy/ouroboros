@@ -1,6 +1,7 @@
 /**
  * login 命令 — OAuth 登录
  * 支持所有 pi-ai OAuth 提供商，自动加载代理配置
+ * 登录成功后自动选择模型并写入 config.json
  */
 import { createAuthStore } from "../../auth/store.js";
 import {
@@ -9,6 +10,7 @@ import {
   getProviderDisplayName,
 } from "../../auth/login.js";
 import { setupGlobalProxy } from "../../auth/proxy.js";
+import { PROVIDER_MODELS, selectModel, writeProviderConfig } from "./config-writer.js";
 
 /**
  * 执行 login 命令
@@ -47,4 +49,20 @@ export async function runLogin(providerId?: string): Promise<void> {
   } finally {
     cleanupProxy();
   }
+
+  // 登录成功后，自动选择模型并写入配置
+  const modelInfo = PROVIDER_MODELS[providerId];
+  if (!modelInfo) {
+    console.log("\n⚠️  未找到该提供商的模型列表，跳过配置写入");
+    return;
+  }
+
+  const selectedModel = await selectModel(modelInfo.models, modelInfo.defaultModel);
+
+  await writeProviderConfig({
+    providerName: providerId,
+    providerType: providerId,
+    selectedModel,
+    models: modelInfo.models,
+  });
 }

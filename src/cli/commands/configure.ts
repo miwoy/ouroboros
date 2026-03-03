@@ -1,13 +1,12 @@
 /**
  * configure 命令 — 交互式配置向导
- * 引导用户选择提供商、完成认证、生成 config.json
+ * 引导用户选择提供商、完成认证、选择模型、生成 config.json
  */
 import { createInterface } from "node:readline";
-import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { createAuthStore } from "../../auth/store.js";
 import { loginProvider } from "../../auth/login.js";
 import { setupGlobalProxy } from "../../auth/proxy.js";
+import { selectModel, writeProviderConfig } from "./config-writer.js";
 
 /** 提供商选项 */
 interface ProviderOption {
@@ -15,8 +14,8 @@ interface ProviderOption {
   readonly type: string;
   readonly auth: "oauth" | "apikey" | "local";
   readonly oauthId?: string;
-  readonly defaultModel?: string;
-  readonly models?: readonly string[];
+  readonly defaultModel: string;
+  readonly models: readonly string[];
   readonly baseUrl?: string;
 }
 
@@ -122,8 +121,8 @@ export async function runConfigure(): Promise<void> {
   const prompt = createPrompt();
 
   try {
-    // [1/3] 选择提供商
-    console.log("[1/3] 选择默认模型提供商\n");
+    // [1/4] 选择提供商
+    console.log("[1/4] 选择默认模型提供商\n");
     PROVIDER_OPTIONS.forEach((opt, i) => {
       console.log(`  ${i + 1}. ${opt.label}`);
     });
@@ -140,8 +139,8 @@ export async function runConfigure(): Promise<void> {
     const selected = PROVIDER_OPTIONS[choiceIdx];
     console.log(`\n✓ 已选择: ${selected.label}\n`);
 
-    // [2/3] 认证
-    console.log("[2/3] 认证配置\n");
+    // [2/4] 认证
+    console.log("[2/4] 认证配置\n");
 
     let apiKey: string | undefined;
     let baseUrl: string | undefined;
@@ -170,73 +169,30 @@ export async function runConfigure(): Promise<void> {
       apiKey = "ollama"; // Ollama 不需要真正的 key
     }
 
-    // [3/3] 生成配置文件
-    console.log("\n[3/3] 生成配置\n");
+    // [3/4] 选择模型
+    console.log("\n[3/4] 选择默认模型");
 
-    const providerConfig: Record<string, unknown> = {
-      type: selected.type,
-      defaultModel: selected.defaultModel,
-      models: selected.models ? [...selected.models] : undefined,
-    };
-    if (apiKey) providerConfig.apiKey = apiKey;
-    if (baseUrl) providerConfig.baseUrl = baseUrl;
-
-    // 新配置结构：providers 和 agents 在根级别
-    const defaultModelRef = `${providerName}/${selected.defaultModel}`;
-    const config = {
-      system: {},
-      providers: {
-        [providerName]: providerConfig,
-      },
-      agents: {
-        default: {
-          model: defaultModelRef,
-        },
-      },
-    };
-
-    // 检查现有配置
-    const configPath = resolve(process.cwd(), "config.json");
-    let existingConfig: Record<string, unknown> | null = null;
-    try {
-      const raw = await readFile(configPath, "utf-8");
-      existingConfig = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      // 文件不存在
-    }
-
-    if (existingConfig) {
-      const merge = await prompt.ask("发现已有 config.json，是否合并提供商配置？(y/n，默认 y): ");
-      if (merge.toLowerCase() !== "n") {
-        // 合并模式：只添加新提供商，更新默认 Agent
-        const existingProviders = (existingConfig.providers ?? {}) as Record<string, unknown>;
-        const existingAgents = (existingConfig.agents ?? {}) as Record<string, unknown>;
-        const existingDefault = (existingAgents.default ?? {}) as Record<string, unknown>;
-        const merged = {
-          ...existingConfig,
-          providers: {
-            ...existingProviders,
-            [providerName]: providerConfig,
-          },
-          agents: {
-            ...existingAgents,
-            default: {
-              ...existingDefault,
-              model: defaultModelRef,
-            },
-          },
-        };
-        await writeFile(configPath, JSON.stringify(merged, null, 2) + "\n", "utf-8");
-        console.log(`✅ 已更新 config.json（合并模式）`);
-        prompt.close();
-        return;
-      }
-    }
-
-    await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
-    console.log(`✅ 已生成 config.json`);
-    console.log("\n启动: npm run dev\n");
-  } finally {
+    // 关闭当前 readline 避免与 selectModel 的 readline 冲突
     prompt.close();
+
+    const selectedModel = await selectModel(selected.models, selected.defaultModel);
+    console.log(`\n✓ 已选择模型: ${selectedModel}`);
+
+    // [4/4] 生成配置文件
+    console.log("\n[4/4] 生成配置\n");
+
+    await writeProviderConfig({
+      providerName,
+      providerType: selected.type,
+      selectedModel,
+      models: selected.models,
+      apiKey,
+      baseUrl,
+    });
+
+    console.log("\n启动: npm run dev\n");
+  } catch (err) {
+    prompt.close();
+    throw err;
   }
 }
