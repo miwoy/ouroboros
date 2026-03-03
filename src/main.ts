@@ -5,8 +5,11 @@
  * 注册 SIGINT/SIGTERM 优雅关闭。
  */
 
+import { writeFile, unlink, mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { loadConfig } from "./config/loader.js";
 import { parseModelRef } from "./config/schema.js";
+import { expandTilde, OUROBOROS_HOME } from "./config/resolver.js";
 import { initWorkspace } from "./workspace/init.js";
 import { createLogger } from "./logger/logger.js";
 import { createHttpClient, type HttpClient } from "./http/index.js";
@@ -165,10 +168,27 @@ export async function startServer(): Promise<void> {
 
   await server.start();
 
+  // 写入 PID 文件
+  const pidDir = expandTilde(OUROBOROS_HOME);
+  const pidPath = join(pidDir, "ouroboros.pid");
+  try {
+    await mkdir(pidDir, { recursive: true });
+    await writeFile(pidPath, String(process.pid));
+    logger.info("main", `PID 文件已写入: ${pidPath}`);
+  } catch (err) {
+    logger.warn("main", "PID 文件写入失败", { error: err });
+  }
+
   // 优雅关闭
   const shutdown = async (signal: string) => {
     logger.info("main", `收到 ${signal} 信号，正在关闭...`);
     try {
+      // 清理 PID 文件
+      try {
+        await unlink(pidPath);
+      } catch {
+        /* ignore */
+      }
       inspector.stop();
       await persistenceManager.cleanup();
       await server.stop();

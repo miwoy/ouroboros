@@ -23,11 +23,15 @@ Ouroboros CLI — 自指循环 Agent 框架
 
 用法: ouroboros <command> [options]
 
-命令:
+初始化与配置:
   init              首次安装向导
-  start             启动 API 服务器（默认）
-  login [provider]  OAuth 登录指定提供商
   configure         修改已有配置
+  login [provider]  OAuth 登录指定提供商
+  doctor            环境诊断
+
+服务管理:
+  start             启动 API 服务器（默认）
+  stop              停止正在运行的服务
 
 全局选项:
   --config <path>   指定配置文件路径
@@ -39,8 +43,9 @@ Ouroboros CLI — 自指循环 Agent 框架
   ouroboros init                     # 首次安装向导
   ouroboros start                    # 启动服务器
   ouroboros start --config ./my.json # 指定配置启动
+  ouroboros stop                     # 停止服务
   ouroboros login openai-codex       # OAuth 登录
-  ouroboros configure                # 修改配置
+  ouroboros doctor                   # 环境诊断
 `;
 
 /**
@@ -118,6 +123,18 @@ async function main(): Promise<void> {
     case "configure": {
       const { runConfigure } = await import("./commands/configure.js");
       await runConfigure();
+      break;
+    }
+
+    case "doctor": {
+      const { runDoctor } = await import("./commands/doctor.js");
+      await runDoctor();
+      break;
+    }
+
+    case "stop": {
+      const { runStop } = await import("./commands/stop.js");
+      await runStop();
       break;
     }
 
