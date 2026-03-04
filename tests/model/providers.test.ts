@@ -13,6 +13,8 @@ vi.mock("@mariozechner/pi-ai", () => {
     registerBuiltInApiProviders: vi.fn(),
     stream: vi.fn(),
     complete: vi.fn(),
+    streamSimple: vi.fn(),
+    completeSimple: vi.fn(),
   };
 });
 
@@ -85,7 +87,7 @@ describe("createPiAiProvider", () => {
   describe("complete()", () => {
     it("应该将 ModelRequest 转换为 pi-ai 格式并返回 ModelResponse", async () => {
       const mockMsg = createMockAssistantMessage();
-      vi.mocked(piAi.complete).mockResolvedValue(mockMsg as any);
+      vi.mocked(piAi.completeSimple).mockResolvedValue(mockMsg as any);
 
       const provider = createPiAiProvider(config);
       const result = await provider.complete({
@@ -102,7 +104,7 @@ describe("createPiAiProvider", () => {
       expect(result.model).toBe("test-model");
 
       // 验证传给 pi-ai 的参数
-      const [model, context, options] = vi.mocked(piAi.complete).mock.calls[0];
+      const [model, context, options] = vi.mocked(piAi.completeSimple).mock.calls[0];
       expect(model.id).toBe("test-model");
       expect(model.api).toBe("openai-completions");
       expect(model.baseUrl).toBe("https://api.test.com/v1");
@@ -114,7 +116,7 @@ describe("createPiAiProvider", () => {
     });
 
     it("应该正确提取 system 消息为 systemPrompt", async () => {
-      vi.mocked(piAi.complete).mockResolvedValue(createMockAssistantMessage() as any);
+      vi.mocked(piAi.completeSimple).mockResolvedValue(createMockAssistantMessage() as any);
 
       const provider = createPiAiProvider(config);
       await provider.complete({
@@ -124,7 +126,7 @@ describe("createPiAiProvider", () => {
         ],
       });
 
-      const [, context] = vi.mocked(piAi.complete).mock.calls[0];
+      const [, context] = vi.mocked(piAi.completeSimple).mock.calls[0];
       expect(context.systemPrompt).toBe("你是助手");
       expect(context.messages).toHaveLength(1);
       expect(context.messages[0].role).toBe("user");
@@ -138,7 +140,7 @@ describe("createPiAiProvider", () => {
         ],
         stopReason: "toolUse",
       });
-      vi.mocked(piAi.complete).mockResolvedValue(mockMsg as any);
+      vi.mocked(piAi.completeSimple).mockResolvedValue(mockMsg as any);
 
       const provider = createPiAiProvider(config);
       const result = await provider.complete({
@@ -159,13 +161,13 @@ describe("createPiAiProvider", () => {
       expect(JSON.parse(result.toolCalls[0].arguments)).toEqual({ q: "test" });
 
       // 验证工具定义传递
-      const [, context] = vi.mocked(piAi.complete).mock.calls[0];
+      const [, context] = vi.mocked(piAi.completeSimple).mock.calls[0];
       expect(context.tools).toHaveLength(1);
       expect(context.tools![0].name).toBe("search");
     });
 
     it("应该正确处理 tool 结果消息", async () => {
-      vi.mocked(piAi.complete).mockResolvedValue(createMockAssistantMessage() as any);
+      vi.mocked(piAi.completeSimple).mockResolvedValue(createMockAssistantMessage() as any);
 
       const provider = createPiAiProvider(config);
       await provider.complete({
@@ -176,7 +178,7 @@ describe("createPiAiProvider", () => {
         ],
       });
 
-      const [, context] = vi.mocked(piAi.complete).mock.calls[0];
+      const [, context] = vi.mocked(piAi.completeSimple).mock.calls[0];
       expect(context.messages).toHaveLength(3);
       const toolMsg = context.messages[2] as any;
       expect(toolMsg.role).toBe("toolResult");
@@ -185,7 +187,7 @@ describe("createPiAiProvider", () => {
     });
 
     it("应该在错误时抛出 ModelError", async () => {
-      vi.mocked(piAi.complete).mockRejectedValue(new Error("API 错误"));
+      vi.mocked(piAi.completeSimple).mockRejectedValue(new Error("API 错误"));
 
       const provider = createPiAiProvider(config);
       await expect(
@@ -194,21 +196,18 @@ describe("createPiAiProvider", () => {
     });
 
     it("应该传递 AbortSignal", async () => {
-      vi.mocked(piAi.complete).mockResolvedValue(createMockAssistantMessage() as any);
+      vi.mocked(piAi.completeSimple).mockResolvedValue(createMockAssistantMessage() as any);
 
       const controller = new AbortController();
       const provider = createPiAiProvider(config);
-      await provider.complete(
-        { messages: [{ role: "user", content: "你好" }] },
-        controller.signal,
-      );
+      await provider.complete({ messages: [{ role: "user", content: "你好" }] }, controller.signal);
 
-      const [, , options] = vi.mocked(piAi.complete).mock.calls[0];
+      const [, , options] = vi.mocked(piAi.completeSimple).mock.calls[0];
       expect((options as any).signal).toBe(controller.signal);
     });
 
     it("应该使用 request.model 覆盖默认模型", async () => {
-      vi.mocked(piAi.complete).mockResolvedValue(createMockAssistantMessage() as any);
+      vi.mocked(piAi.completeSimple).mockResolvedValue(createMockAssistantMessage() as any);
 
       const provider = createPiAiProvider(config);
       await provider.complete({
@@ -216,12 +215,12 @@ describe("createPiAiProvider", () => {
         model: "gpt-4o-mini",
       });
 
-      const [model] = vi.mocked(piAi.complete).mock.calls[0];
+      const [model] = vi.mocked(piAi.completeSimple).mock.calls[0];
       expect(model.id).toBe("gpt-4o-mini");
     });
 
     it("应该正确映射 max_tokens 停止原因", async () => {
-      vi.mocked(piAi.complete).mockResolvedValue(
+      vi.mocked(piAi.completeSimple).mockResolvedValue(
         createMockAssistantMessage({ stopReason: "length" }) as any,
       );
 
@@ -246,13 +245,12 @@ describe("createPiAiProvider", () => {
         { type: "done", reason: "stop", message: mockMsg },
       ];
 
-      vi.mocked(piAi.stream).mockReturnValue(createMockEventStream(events) as any);
+      vi.mocked(piAi.streamSimple).mockReturnValue(createMockEventStream(events) as any);
 
       const provider = createPiAiProvider(config);
       const streamEvents: StreamEvent[] = [];
-      const result = await provider.stream(
-        { messages: [{ role: "user", content: "你好" }] },
-        (e) => streamEvents.push(e),
+      const result = await provider.stream({ messages: [{ role: "user", content: "你好" }] }, (e) =>
+        streamEvents.push(e),
       );
 
       expect(result.content).toBe("你好，Ouroboros"); // 从 done message 提取
@@ -262,9 +260,7 @@ describe("createPiAiProvider", () => {
 
     it("应该处理工具调用流", async () => {
       const toolCallMsg = createMockAssistantMessage({
-        content: [
-          { type: "toolCall", id: "call_1", name: "search", arguments: { q: "test" } },
-        ],
+        content: [{ type: "toolCall", id: "call_1", name: "search", arguments: { q: "test" } }],
         stopReason: "toolUse",
       });
 
@@ -287,13 +283,12 @@ describe("createPiAiProvider", () => {
         { type: "done", reason: "toolUse", message: toolCallMsg },
       ];
 
-      vi.mocked(piAi.stream).mockReturnValue(createMockEventStream(events) as any);
+      vi.mocked(piAi.streamSimple).mockReturnValue(createMockEventStream(events) as any);
 
       const provider = createPiAiProvider(config);
       const streamEvents: StreamEvent[] = [];
-      const result = await provider.stream(
-        { messages: [{ role: "user", content: "搜索" }] },
-        (e) => streamEvents.push(e),
+      const result = await provider.stream({ messages: [{ role: "user", content: "搜索" }] }, (e) =>
+        streamEvents.push(e),
       );
 
       expect(result.stopReason).toBe("tool_use");
@@ -309,41 +304,31 @@ describe("createPiAiProvider", () => {
         stopReason: "error",
         errorMessage: "Rate limited",
       });
-      const events = [
-        { type: "error", reason: "error", error: errorMsg },
-      ];
+      const events = [{ type: "error", reason: "error", error: errorMsg }];
 
-      vi.mocked(piAi.stream).mockReturnValue(createMockEventStream(events) as any);
+      vi.mocked(piAi.streamSimple).mockReturnValue(createMockEventStream(events) as any);
 
       const provider = createPiAiProvider(config);
       await expect(
-        provider.stream(
-          { messages: [{ role: "user", content: "你好" }] },
-          () => {},
-        ),
+        provider.stream({ messages: [{ role: "user", content: "你好" }] }, () => {}),
       ).rejects.toThrow(ModelError);
     });
 
     it("应该在 pi-ai 抛出异常时转换为 ModelError", async () => {
-      vi.mocked(piAi.stream).mockImplementation(() => {
+      vi.mocked(piAi.streamSimple).mockImplementation(() => {
         throw new Error("Connection failed");
       });
 
       const provider = createPiAiProvider(config);
       await expect(
-        provider.stream(
-          { messages: [{ role: "user", content: "你好" }] },
-          () => {},
-        ),
+        provider.stream({ messages: [{ role: "user", content: "你好" }] }, () => {}),
       ).rejects.toThrow(ModelError);
     });
 
     it("应该传递 AbortSignal", async () => {
       const mockMsg = createMockAssistantMessage();
-      const events = [
-        { type: "done", reason: "stop", message: mockMsg },
-      ];
-      vi.mocked(piAi.stream).mockReturnValue(createMockEventStream(events) as any);
+      const events = [{ type: "done", reason: "stop", message: mockMsg }];
+      vi.mocked(piAi.streamSimple).mockReturnValue(createMockEventStream(events) as any);
 
       const controller = new AbortController();
       const provider = createPiAiProvider(config);
@@ -353,7 +338,7 @@ describe("createPiAiProvider", () => {
         controller.signal,
       );
 
-      const [, , options] = vi.mocked(piAi.stream).mock.calls[0];
+      const [, , options] = vi.mocked(piAi.streamSimple).mock.calls[0];
       expect((options as any).signal).toBe(controller.signal);
     });
   });
@@ -373,7 +358,7 @@ describe("provider type 映射", () => {
     ["groq", "openai-completions"],
     ["bedrock", "bedrock-converse-stream"],
   ] as const)("类型 %s 应该映射到 pi-ai API %s", async (type, expectedApi) => {
-    vi.mocked(piAi.complete).mockResolvedValue(createMockAssistantMessage() as any);
+    vi.mocked(piAi.completeSimple).mockResolvedValue(createMockAssistantMessage() as any);
 
     const provider = createPiAiProvider({
       type: type as any,
@@ -384,7 +369,7 @@ describe("provider type 映射", () => {
       messages: [{ role: "user", content: "test" }],
     });
 
-    const [model] = vi.mocked(piAi.complete).mock.calls[0];
+    const [model] = vi.mocked(piAi.completeSimple).mock.calls[0];
     expect(model.api).toBe(expectedApi);
   });
 });
@@ -400,7 +385,7 @@ describe("stopReason 映射", () => {
     ["toolUse", "tool_use"],
     ["unknown", "end_turn"],
   ] as const)("pi-ai '%s' 应该映射为 '%s'", async (piReason, expectedReason) => {
-    vi.mocked(piAi.complete).mockResolvedValue(
+    vi.mocked(piAi.completeSimple).mockResolvedValue(
       createMockAssistantMessage({ stopReason: piReason }) as any,
     );
 

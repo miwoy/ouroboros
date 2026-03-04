@@ -1,10 +1,18 @@
 /**
  * pi-ai 适配器
  * 将 Ouroboros 的 ModelProvider 接口适配到 @mariozechner/pi-ai 的统一 API
+ *
+ * 使用 pi-ai 的 completeSimple / streamSimple 统一接口，
+ * 通过 reasoning 选项和 model.compat 自动适配不同提供商的 thinking/reasoning 协议：
+ * - OpenAI: reasoning_effort
+ * - Anthropic: thinkingEnabled + thinkingBudgetTokens（或 adaptive）
+ * - Google: thinking.enabled + thinking.budgetTokens
+ * - Qwen (openai-compatible): enable_thinking: boolean
+ * - Codex: reasoningEffort
  */
 import {
-  stream as piStream,
-  complete as piComplete,
+  streamSimple as piStream,
+  completeSimple as piComplete,
   registerBuiltInApiProviders,
 } from "@mariozechner/pi-ai";
 import type {
@@ -17,7 +25,7 @@ import type {
   TextContent,
   ToolCall as PiToolCall,
   AssistantMessageEvent,
-  ProviderStreamOptions,
+  SimpleStreamOptions,
 } from "@mariozechner/pi-ai";
 import type { ProviderConfig } from "../../config/schema.js";
 import { ModelError } from "../../errors/index.js";
@@ -55,20 +63,6 @@ const API_TYPE_MAP: Readonly<Record<string, PiApi>> = {
  * GitHub Copilot 中使用 anthropic-messages API 的模型前缀
  */
 const COPILOT_ANTHROPIC_PREFIXES = ["claude-"] as const;
-
-/**
- * 原生支持 reasoning/thinking 参数的提供商类型
- * openai-compatible / mistral / groq 等第三方兼容 API 不支持该参数
- */
-const REASONING_SUPPORTED_PROVIDERS: ReadonlySet<string> = new Set([
-  "openai",
-  "anthropic",
-  "google",
-  "bedrock",
-  "github-copilot",
-  "google-gemini-cli",
-  "google-antigravity",
-]);
 
 /**
  * 默认 baseUrl 映射
@@ -116,6 +110,9 @@ function inferCopilotApi(modelId: string): PiApi {
 
 /**
  * 根据配置创建 pi-ai Model 对象
+ *
+ * model.reasoning 标记告诉 pi-ai 该模型支持 thinking/reasoning 能力，
+ * pi-ai 据此决定是否发送 thinking 相关参数（enable_thinking / reasoning_effort 等）
  */
 function createPiModel(
   config: ProviderConfig,
@@ -136,11 +133,22 @@ function createPiModel(
     api = inferCopilotApi(modelId);
   }
 
-  // 仅原生支持 reasoning 的提供商启用 model.reasoning 标记
-  // openai-compatible / mistral / groq 等自行处理 thinking（如 qwen3 的 <think> 标签）
-  const effectiveReasoning =
-    reasoning &&
-    (REASONING_SUPPORTED_PROVIDERS.has(providerType) || providerType === "openai-codex");
+  // openai-compatible / mistral / groq：不发送 reasoning 参数
+  // 这些提供商的模型自行处理 thinking（如 qwen3 的 <think> 标签 / reasoning 字段），
+  // pi-ai 会自动解析响应中的 reasoning 字段为 thinking block，无需额外参数
+  const NATIVE_REASONING_PROVIDERS = new Set([
+    "openai",
+    "anthropic",
+    "google",
+    "bedrock",
+    "openai-codex",
+    "github-copilot",
+    "google-gemini-cli",
+    "google-antigravity",
+  ]);
+  if (!NATIVE_REASONING_PROVIDERS.has(providerType)) {
+    reasoning = false;
+  }
 
   return {
     id: modelId,
@@ -148,7 +156,7 @@ function createPiModel(
     api,
     provider: providerType,
     baseUrl,
-    reasoning: effectiveReasoning,
+    reasoning,
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 128000,
@@ -313,16 +321,21 @@ function toUsage(msg: PiAssistantMessage): TokenUsage {
 }
 
 /**
- * 构建 pi-ai StreamOptions
+ * 构建 pi-ai SimpleStreamOptions
+ *
+ * 使用 SimpleStreamOptions 的 reasoning 字段作为统一接口，
+ * pi-ai 内部根据 model.api 和 model.compat 自动映射到各提供商的具体参数
  */
-function toStreamOptions(
+function toSimpleOptions(
   config: ProviderConfig,
   request: ModelRequest,
   signal?: AbortSignal,
-): ProviderStreamOptions {
-  const options: Record<string, unknown> & { apiKey: string } = {
+): SimpleStreamOptions {
+  const options: SimpleStreamOptions = {
     apiKey: config.apiKey ?? "",
+    maxRetryDelayMs: 0, // 禁用 pi-ai 内部重试，由 Ouroboros retry.ts 处理
   };
+
   if (request.temperature !== undefined) {
     options.temperature = request.temperature;
   }
@@ -332,22 +345,14 @@ function toStreamOptions(
   if (signal) {
     options.signal = signal;
   }
-  // 禁用 pi-ai 内部重试，由 Ouroboros retry.ts 处理
-  options.maxRetryDelayMs = 0;
 
-  // Thinking/Reasoning 支持（仅原生支持的提供商发送参数）
+  // 统一 reasoning 接口 — pi-ai 根据 model.compat.thinkingFormat 自动映射
+  // qwen: enable_thinking: true
+  // openai: reasoning_effort: level
+  // anthropic: thinkingEnabled + thinkingBudgetTokens
+  // codex: reasoningEffort
   if (request.think) {
-    const level = request.thinkLevel ?? "medium";
-    const providerType = config.type ?? config.api ?? "";
-
-    if (providerType === "openai-codex") {
-      // Codex 使用 reasoningEffort 参数
-      options.reasoningEffort = level;
-    } else if (REASONING_SUPPORTED_PROVIDERS.has(providerType)) {
-      // 原生支持 reasoning 的提供商
-      options.reasoning = level;
-    }
-    // openai-compatible / mistral / groq 等不支持 reasoning 参数，静默跳过
+    options.reasoning = request.thinkLevel ?? "medium";
   }
 
   return options;
@@ -366,11 +371,10 @@ export function createPiAiProvider(config: ProviderConfig): ModelProvider {
     async complete(request: ModelRequest, signal?: AbortSignal): Promise<ModelResponse> {
       const model = createPiModel(config, request.model, request.think ?? false);
       const context = toContext(request);
-      const options = toStreamOptions(config, request, signal);
+      const options = toSimpleOptions(config, request, signal);
 
       try {
         const assistantMsg = await piComplete(model, context, options);
-
         const { content, toolCalls } = extractFromAssistantMessage(assistantMsg);
         const usage = toUsage(assistantMsg);
 
@@ -396,7 +400,7 @@ export function createPiAiProvider(config: ProviderConfig): ModelProvider {
     ): Promise<ModelResponse> {
       const model = createPiModel(config, request.model, request.think ?? false);
       const context = toContext(request);
-      const options = toStreamOptions(config, request, signal);
+      const options = toSimpleOptions(config, request, signal);
 
       let fullContent = "";
       const toolCalls: ToolCall[] = [];
