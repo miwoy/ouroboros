@@ -4,7 +4,7 @@
  * 全局共享一个 WsClient 实例，组件卸载时不关闭。
  */
 
-import { useRef, useEffect } from "react";
+import { useRef } from "react";
 import { createWsClient, type WsClient } from "../services/ws";
 
 /** 全局单例 */

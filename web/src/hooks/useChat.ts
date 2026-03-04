@@ -77,7 +77,7 @@ export function useChat() {
       const treeRes = await api.getExecutionTree(sid).catch(() => null);
       if (treeRes?.success && treeRes.data) {
         setMessages((prev) => {
-          const lastAgentIdx = prev.findLastIndex((m) => m.role === "agent");
+          const lastAgentIdx = prev.findLastIndex((m: DisplayMessage) => m.role === "agent");
           if (lastAgentIdx < 0) return prev;
           return prev.map((m, i) => (i === lastAgentIdx ? { ...m, executionTree: treeRes.data! } : m));
         });

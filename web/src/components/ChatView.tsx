@@ -160,9 +160,9 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
             </span>
           ) : null}
         </div>
-        {!isUser && message.metadata?.totalUsage && (
+        {!isUser && message.metadata?.totalUsage != null && (
           <div className="message-token-usage">
-            {(message.metadata.totalUsage as { totalTokens: number }).totalTokens.toLocaleString()} tokens
+            {String((message.metadata.totalUsage as { totalTokens: number }).totalTokens.toLocaleString())} tokens
           </div>
         )}
       </div>
