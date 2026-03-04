@@ -23,4 +23,4 @@ export interface SearchProvider {
 }
 
 /** 支持的搜索引擎类型 */
-export type SearchProviderType = "bing" | "brave";
+export type SearchProviderType = "bing" | "brave" | "duckduckgo";

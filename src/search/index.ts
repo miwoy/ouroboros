@@ -5,10 +5,12 @@
 export type { SearchResult, SearchResponse, SearchProvider, SearchProviderType } from "./types.js";
 export { createBingProvider } from "./bing.js";
 export { createBraveProvider } from "./brave.js";
+export { createDuckDuckGoProvider } from "./duckduckgo.js";
 
 import type { SearchProvider, SearchProviderType } from "./types.js";
 import { createBingProvider } from "./bing.js";
 import { createBraveProvider } from "./brave.js";
+import { createDuckDuckGoProvider } from "./duckduckgo.js";
 
 /** 创建搜索 Provider 的选项 */
 export interface CreateSearchProviderOptions {
@@ -34,6 +36,8 @@ export function createSearchProvider(options: CreateSearchProviderOptions): Sear
       }
       return createBraveProvider(options.fetchFn, options.apiKey, options.baseUrl);
     }
+    case "duckduckgo":
+      return createDuckDuckGoProvider(options.fetchFn);
     default:
       throw new Error(`不支持的搜索引擎: ${options.provider as string}`);
   }

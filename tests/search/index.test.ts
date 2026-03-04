@@ -22,10 +22,15 @@ describe("createSearchProvider", () => {
     expect(provider.name).toBe("brave");
   });
 
+  it("provider=duckduckgo 应创建 DuckDuckGo Provider", () => {
+    const provider = createSearchProvider({ provider: "duckduckgo", fetchFn: mockFetch });
+    expect(provider.name).toBe("duckduckgo");
+  });
+
   it("provider=brave 缺少 apiKey 应抛出异常", () => {
-    expect(() =>
-      createSearchProvider({ provider: "brave", fetchFn: mockFetch }),
-    ).toThrow("Brave 搜索需要 apiKey 配置");
+    expect(() => createSearchProvider({ provider: "brave", fetchFn: mockFetch })).toThrow(
+      "Brave 搜索需要 apiKey 配置",
+    );
   });
 
   it("不支持的 provider 应抛出异常", () => {

@@ -11,8 +11,8 @@ const webSearchConfigSchema = z.object({
   /** 是否启用搜索 */
   enabled: z.boolean().default(true),
   /** 搜索引擎提供商 */
-  provider: z.enum(["bing", "brave"]).default("bing"),
-  /** API Key（Brave 必须，Bing 不需要） */
+  provider: z.enum(["bing", "brave", "duckduckgo"]).default("bing"),
+  /** API Key（Brave 必须，其他不需要） */
   apiKey: z.string().optional(),
   /** 自定义搜索 API 地址 */
   baseUrl: z.string().url().optional(),

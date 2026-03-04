@@ -261,8 +261,8 @@ npm run configure
 | 字段 | 类型 | 必须 | 默认值 | 描述 |
 |------|------|------|--------|------|
 | `enabled` | `boolean` | 否 | `true` | 是否启用 Web 搜索 |
-| `provider` | `"bing" \| "brave"` | 否 | `"bing"` | 搜索引擎提供商。Bing 通过 HTML 抓取无需密钥，Brave 需要 API Key |
-| `apiKey` | `string` | 否 | — | 搜索 API Key（Brave 必须配置，Bing 不需要） |
+| `provider` | `"bing" \| "brave" \| "duckduckgo"` | 否 | `"bing"` | 搜索引擎提供商。Bing/DuckDuckGo 通过 HTML 抓取无需密钥，Brave 需要 API Key。DuckDuckGo 需要代理（`system.proxy`） |
+| `apiKey` | `string` | 否 | — | 搜索 API Key（Brave 必须配置，其他不需要） |
 | `baseUrl` | `string` (URL) | 否 | — | 自定义搜索 API 地址 |
 | `maxResults` | `number` | 否 | `5` | 最大返回结果数 |
 | `timeoutSeconds` | `number` | 否 | `30` | 搜索超时时间（秒） |

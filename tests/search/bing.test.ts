@@ -19,7 +19,11 @@ function makeBingHtml(items: Array<{ title: string; url: string; snippet: string
 describe("createBingProvider", () => {
   it("应解析 Bing HTML 并返回搜索结果", async () => {
     const html = makeBingHtml([
-      { title: "TypeScript 官网", url: "https://typescriptlang.org", snippet: "TypeScript 是一种语言" },
+      {
+        title: "TypeScript 官网",
+        url: "https://typescriptlang.org",
+        snippet: "TypeScript 是一种语言",
+      },
       { title: "MDN", url: "https://mdn.org", snippet: "Web 开发文档" },
     ]);
     const mockFetch = vi.fn().mockResolvedValue(new Response(html, { status: 200 }));
@@ -100,6 +104,6 @@ describe("createBingProvider", () => {
     await provider.search("hello world", 3);
 
     const url = mockFetch.mock.calls[0][0] as string;
-    expect(url).toBe("https://www.bing.com/search?q=hello%20world&count=3");
+    expect(url).toBe("https://www.bing.com/search?q=hello%20world&count=3&ensearch=1");
   });
 });

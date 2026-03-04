@@ -59,7 +59,7 @@ export function createBingProvider(fetchFn: typeof globalThis.fetch): SearchProv
   return {
     name: "bing",
     async search(query: string, limit: number, signal?: AbortSignal): Promise<SearchResponse> {
-      const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}&count=${limit}`;
+      const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}&count=${limit}&ensearch=1`;
       const response = await fetchFn(url, {
         signal,
         headers: {
