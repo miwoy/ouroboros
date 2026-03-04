@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { configSchema, parseModelRef, getModelIds, type Config } from "./schema/index.js";
 import { ConfigError } from "../errors/index.js";
@@ -144,10 +144,16 @@ export async function loadConfig(configPath?: string): Promise<LoadConfigResult>
   // 替换环境变量
   let resolvedJson = resolveEnvVarsInObject(rawJson) as Record<string, unknown>;
 
-  // 自动检测 v1 格式并迁移
+  // 自动检测 v1 格式并迁移，迁移后写回文件（仅一次）
   if (isV1Config(resolvedJson)) {
     console.log(`  [config] 检测到 v1 格式配置，自动迁移为 v2...`);
     resolvedJson = migrateV1ToV2(resolvedJson);
+    try {
+      await writeFile(filePath, JSON.stringify(resolvedJson, null, 2) + "\n", "utf-8");
+      console.log(`  [config] 已将 v2 格式写回 ${filePath}`);
+    } catch {
+      console.warn(`  [config] v2 写回失败（只读文件？），仅在内存中使用迁移后的配置`);
+    }
   }
 
   // 使用 Zod 验证

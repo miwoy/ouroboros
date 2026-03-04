@@ -5,7 +5,7 @@
  * 注册 SIGINT/SIGTERM 优雅关闭。
  */
 
-import { writeFile, unlink, mkdir, access } from "node:fs/promises";
+import { readFile, writeFile, unlink, mkdir, access } from "node:fs/promises";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config/loader.js";
@@ -35,6 +35,32 @@ import { createAuthStore } from "./auth/store.js";
 export async function startServer(): Promise<void> {
   // 0. 解析数据根目录（在配置加载前，因为 resolveHome 依赖 --cwd / env）
   const home = resolveHome();
+
+  // 0.5 防止重复启动：检查 PID 文件中的进程是否仍在运行
+  const pidPath = join(home, "ouroboros.pid");
+  try {
+    const oldPid = parseInt(await readFile(pidPath, "utf-8"), 10);
+    if (!isNaN(oldPid)) {
+      try {
+        process.kill(oldPid, 0); // 仅检查进程是否存在
+        throw new Error(
+          `Ouroboros 已在运行 (PID: ${oldPid})。\n` +
+            `  如需重启，请先执行 ouroboros stop，或删除 ${pidPath}`,
+        );
+      } catch (err) {
+        // process.kill 抛出则进程不存在，清理残留 PID 文件
+        if (err instanceof Error && err.message.startsWith("Ouroboros 已在运行")) {
+          throw err;
+        }
+        await unlink(pidPath).catch(() => {});
+      }
+    }
+  } catch (err) {
+    // readFile 失败（文件不存在）→ 无残留，正常启动
+    if (err instanceof Error && err.message.startsWith("Ouroboros 已在运行")) {
+      throw err;
+    }
+  }
 
   // 1. 加载配置（支持 CLI --config 参数注入）
   const cliConfigPath = process.env.__OUROBOROS_CLI_CONFIG;
@@ -193,8 +219,7 @@ export async function startServer(): Promise<void> {
 
   await server.start();
 
-  // 写入 PID 文件
-  const pidPath = join(home, "ouroboros.pid");
+  // 写入 PID 文件（pidPath 在启动检查时已定义）
   try {
     await mkdir(home, { recursive: true });
     await writeFile(pidPath, String(process.pid));
