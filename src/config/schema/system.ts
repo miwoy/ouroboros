@@ -108,8 +108,6 @@ const apiConfigSchema = z.object({
 export const systemConfigSchema = z.object({
   /** 日志级别 */
   logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
-  /** 用户数据根目录（取代 workspacePath 硬编码路径） */
-  cwd: z.string().default("~/.ouroboros"),
   /** HTTP 代理地址，配置后系统所有对外请求使用此代理 */
   proxy: z
     .union([z.literal(""), z.string().url()])

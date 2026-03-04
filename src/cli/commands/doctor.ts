@@ -13,7 +13,7 @@
 
 import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { resolveConfigPath, expandTilde, OUROBOROS_HOME } from "../../config/resolver.js";
+import { resolveConfigPath, resolveHome } from "../../config/resolver.js";
 
 interface CheckResult {
   readonly name: string;
@@ -33,9 +33,7 @@ async function runChecks(): Promise<readonly CheckResult[]> {
   results.push({
     name: "Node.js 版本",
     status: major >= 20 ? "ok" : "fail",
-    message: major >= 20
-      ? `v${nodeVersion} (≥ 20 ✓)`
-      : `v${nodeVersion} (需要 ≥ 20)`,
+    message: major >= 20 ? `v${nodeVersion} (≥ 20 ✓)` : `v${nodeVersion} (需要 ≥ 20)`,
   });
 
   // 2. 配置文件
@@ -72,7 +70,7 @@ async function runChecks(): Promise<readonly CheckResult[]> {
   }
 
   // 3. 用户数据目录
-  const home = expandTilde(OUROBOROS_HOME);
+  const home = resolveHome();
   try {
     await access(home);
     results.push({
@@ -97,9 +95,7 @@ async function runChecks(): Promise<readonly CheckResult[]> {
     results.push({
       name: "OAuth 凭据",
       status: providerCount > 0 ? "ok" : "warn",
-      message: providerCount > 0
-        ? `${providerCount} 个提供商已认证`
-        : "无 OAuth 凭据",
+      message: providerCount > 0 ? `${providerCount} 个提供商已认证` : "无 OAuth 凭据",
     });
   } catch {
     results.push({

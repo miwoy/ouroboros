@@ -23,7 +23,7 @@ import {
   extractAvailableModels,
 } from "../config/schema/index.js";
 import { loadConfig } from "../config/loader.js";
-import { resolveConfigPath, expandTilde, resolveDataDir } from "../config/resolver.js";
+import { resolveConfigPath, expandTilde, resolveHome } from "../config/resolver.js";
 import { isV1Config, migrateV1ToV2 } from "../config/migration.js";
 
 // API
@@ -91,11 +91,9 @@ async function main(): Promise<void> {
     assert(!expanded.startsWith("~"), "expandTilde 展开 ~ 前缀");
     assert(expanded.endsWith("/test"), "expandTilde 保留路径后缀");
 
-    // resolveDataDir
-    const defaultDir = resolveDataDir();
-    assert(defaultDir.includes(".ouroboros"), "resolveDataDir 默认 → ~/.ouroboros");
-    const customDir = resolveDataDir("~/custom-data");
-    assert(customDir.includes("custom-data"), "resolveDataDir 自定义路径");
+    // resolveHome
+    const defaultDir = resolveHome();
+    assert(defaultDir.includes(".ouroboros"), "resolveHome 默认 → $PWD/.ouroboros");
 
     // ════════════════════════════════════════════════════════════
     // [2] Config Schema v2 — 新层级结构

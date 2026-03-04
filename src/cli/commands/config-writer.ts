@@ -5,7 +5,7 @@
 import { createInterface } from "node:readline";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
-import { USER_CONFIG_PATH } from "../../config/resolver.js";
+import { resolveConfigHome } from "../../config/resolver.js";
 
 /** 提供商模型信息 */
 interface ProviderModelInfo {
@@ -102,7 +102,7 @@ export async function selectModel(
 export async function readExistingConfig(
   configPath?: string,
 ): Promise<Record<string, unknown> | null> {
-  const path = configPath ?? USER_CONFIG_PATH;
+  const path = configPath ?? resolveConfigHome();
   try {
     const raw = await readFile(path, "utf-8");
     return JSON.parse(raw) as Record<string, unknown>;
@@ -125,7 +125,7 @@ export async function writeProviderConfig(options: {
   readonly baseUrl?: string;
   readonly configPath?: string;
 }): Promise<void> {
-  const configPath = options.configPath ?? USER_CONFIG_PATH;
+  const configPath = options.configPath ?? resolveConfigHome();
   const defaultModelRef = `${options.providerName}/${options.selectedModel}`;
 
   // 构建提供商配置

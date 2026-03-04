@@ -23,7 +23,6 @@ import { type ProviderConfig, getModelIds } from "./provider.js";
 export const configSchema = z.object({
   system: systemConfigSchema.default({
     logLevel: "info",
-    cwd: "~/.ouroboros",
     proxy: undefined,
     api: {
       port: 3000,

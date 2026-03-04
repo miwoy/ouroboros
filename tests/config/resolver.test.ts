@@ -1,13 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { writeFile, mkdir, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import {
   resolveConfigPath,
-  resolveDataDir,
+  resolveHome,
+  resolveConfigHome,
   expandTilde,
-  OUROBOROS_HOME,
-  USER_CONFIG_PATH,
 } from "../../src/config/resolver.js";
 
 const TEST_DIR = join(process.cwd(), ".test-resolver-tmp");
@@ -31,19 +30,64 @@ describe("expandTilde", () => {
   });
 });
 
-describe("resolveDataDir", () => {
-  it("无参数时返回默认 ~/.ouroboros", () => {
-    expect(resolveDataDir()).toBe(OUROBOROS_HOME);
+describe("resolveHome", () => {
+  const savedEnv: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    savedEnv.__OUROBOROS_CLI_CWD = process.env.__OUROBOROS_CLI_CWD;
+    savedEnv.OUROBOROS_HOME = process.env.OUROBOROS_HOME;
+    delete process.env.__OUROBOROS_CLI_CWD;
+    delete process.env.OUROBOROS_HOME;
   });
 
-  it("应该展开 ~ 前缀", () => {
-    const result = resolveDataDir("~/.my-ouroboros");
-    expect(result).toBe(join(homedir(), ".my-ouroboros"));
+  afterEach(() => {
+    if (savedEnv.__OUROBOROS_CLI_CWD !== undefined) {
+      process.env.__OUROBOROS_CLI_CWD = savedEnv.__OUROBOROS_CLI_CWD;
+    } else {
+      delete process.env.__OUROBOROS_CLI_CWD;
+    }
+    if (savedEnv.OUROBOROS_HOME !== undefined) {
+      process.env.OUROBOROS_HOME = savedEnv.OUROBOROS_HOME;
+    } else {
+      delete process.env.OUROBOROS_HOME;
+    }
   });
 
-  it("绝对路径原样返回", () => {
-    const result = resolveDataDir("/custom/data/dir");
-    expect(result).toBe("/custom/data/dir");
+  it("默认返回 $PWD/.ouroboros", () => {
+    const result = resolveHome();
+    expect(result).toBe(join(process.cwd(), ".ouroboros"));
+  });
+
+  it("--cwd 优先级最高", () => {
+    process.env.__OUROBOROS_CLI_CWD = "/tmp/test-cwd";
+    process.env.OUROBOROS_HOME = "/should/not/use";
+    const result = resolveHome();
+    expect(result).toBe(join(resolve("/tmp/test-cwd"), ".ouroboros"));
+  });
+
+  it("--cwd 支持 ~ 展开", () => {
+    process.env.__OUROBOROS_CLI_CWD = "~/";
+    const result = resolveHome();
+    expect(result).toBe(join(homedir(), ".ouroboros"));
+  });
+
+  it("$OUROBOROS_HOME 第二优先级", () => {
+    process.env.OUROBOROS_HOME = "/custom/home";
+    const result = resolveHome();
+    expect(result).toBe(resolve("/custom/home"));
+  });
+
+  it("$OUROBOROS_HOME 支持 ~ 展开", () => {
+    process.env.OUROBOROS_HOME = "~/.ouroboros";
+    const result = resolveHome();
+    expect(result).toBe(join(homedir(), ".ouroboros"));
+  });
+});
+
+describe("resolveConfigHome", () => {
+  it("返回 resolveHome()/config.json", () => {
+    const result = resolveConfigHome();
+    expect(result).toBe(join(resolveHome(), "config.json"));
   });
 });
 
@@ -105,7 +149,7 @@ describe("resolveConfigPath", () => {
     // 确保没有环境变量
     delete process.env.OUROBOROS_CONFIG;
 
-    // 注意：如果 ~/.ouroboros/config.json 或 ./config.json 存在会影响结果
+    // 注意：如果 config.json 存在会影响结果
     // 这里只验证返回值结构正确
     const result = await resolveConfigPath();
     expect(result.path).toBeTruthy();
@@ -118,15 +162,5 @@ describe("resolveConfigPath", () => {
     expect(result).toHaveProperty("path");
     expect(result).toHaveProperty("source");
     expect(typeof result.path).toBe("string");
-  });
-});
-
-describe("常量导出", () => {
-  it("OUROBOROS_HOME 应该在 home 目录下", () => {
-    expect(OUROBOROS_HOME).toBe(join(homedir(), ".ouroboros"));
-  });
-
-  it("USER_CONFIG_PATH 应该在 OUROBOROS_HOME 下", () => {
-    expect(USER_CONFIG_PATH).toBe(join(OUROBOROS_HOME, "config.json"));
   });
 });

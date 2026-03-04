@@ -7,13 +7,7 @@ export {
   PROVIDER_OAUTH_MAP,
   getModelIds,
 } from "./schema/index.js";
-export {
-  resolveConfigPath,
-  resolveDataDir,
-  expandTilde,
-  OUROBOROS_HOME,
-  USER_CONFIG_PATH,
-} from "./resolver.js";
+export { resolveConfigPath, resolveHome, resolveConfigHome, expandTilde } from "./resolver.js";
 export { isV1Config, migrateV1ToV2 } from "./migration.js";
 export type { ResolvedConfig } from "./resolver.js";
 export type {

@@ -8,8 +8,7 @@ vi.mock("node:fs/promises", () => ({
 
 vi.mock("../../src/config/resolver.js", () => ({
   resolveConfigPath: vi.fn(),
-  expandTilde: vi.fn((p: string) => p.replace("~", "/home/test")),
-  OUROBOROS_HOME: "~/.ouroboros",
+  resolveHome: vi.fn(() => "/home/test/.ouroboros"),
 }));
 
 vi.mock("@mariozechner/pi-ai", () => ({}));
@@ -25,7 +24,7 @@ describe("doctor 命令", () => {
   });
 
   it("应该检测 Node.js 版本", async () => {
-    vi.mocked(resolveConfigPath).mockResolvedValue(null);
+    vi.mocked(resolveConfigPath).mockResolvedValue(null as never);
     vi.mocked(access).mockRejectedValue(new Error("not found"));
     vi.mocked(readFile).mockRejectedValue(new Error("not found"));
 
@@ -60,7 +59,7 @@ describe("doctor 命令", () => {
   });
 
   it("应该在未找到配置文件时显示警告", async () => {
-    vi.mocked(resolveConfigPath).mockResolvedValue(null);
+    vi.mocked(resolveConfigPath).mockResolvedValue(null as never);
     vi.mocked(access).mockRejectedValue(new Error("not found"));
     vi.mocked(readFile).mockRejectedValue(new Error("not found"));
 
@@ -73,7 +72,7 @@ describe("doctor 命令", () => {
   });
 
   it("应该检查用户数据目录", async () => {
-    vi.mocked(resolveConfigPath).mockResolvedValue(null);
+    vi.mocked(resolveConfigPath).mockResolvedValue(null as never);
     vi.mocked(access).mockResolvedValue(undefined);
     vi.mocked(readFile).mockRejectedValue(new Error("not found"));
 

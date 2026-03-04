@@ -4,6 +4,7 @@
  */
 import { createInterface } from "node:readline";
 import { createAuthStore } from "../../auth/store.js";
+import { resolveHome } from "../../config/resolver.js";
 import { loginProvider } from "../../auth/login.js";
 import { setupGlobalProxy } from "../../auth/proxy.js";
 import { selectModel, writeProviderConfig } from "./config-writer.js";
@@ -147,7 +148,7 @@ export async function runConfigure(): Promise<void> {
     const providerName = selected.oauthId ?? selected.type;
 
     if (selected.auth === "oauth") {
-      const store = createAuthStore();
+      const store = createAuthStore(resolveHome());
       const existingCreds = await store.loadCredentials(selected.oauthId!);
 
       if (existingCreds && existingCreds.expires > Date.now()) {

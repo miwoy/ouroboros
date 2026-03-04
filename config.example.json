@@ -1,7 +1,6 @@
 {
   "system": {
     "logLevel": "info",
-    "cwd": "~/.ouroboros",
     "proxy": "",
     "api": {
       "port": 3000,

@@ -10,7 +10,7 @@ import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config/loader.js";
 import { parseModelRef } from "./config/schema.js";
-import { expandTilde, OUROBOROS_HOME } from "./config/resolver.js";
+import { resolveHome } from "./config/resolver.js";
 import { initWorkspace } from "./workspace/init.js";
 import { createLogger } from "./logger/logger.js";
 import { createHttpClient, type HttpClient } from "./http/index.js";
@@ -33,9 +33,12 @@ import { createAuthStore } from "./auth/store.js";
  * 抽取为独立函数，供 CLI start 命令和直接运行使用
  */
 export async function startServer(): Promise<void> {
+  // 0. 解析数据根目录（在配置加载前，因为 resolveHome 依赖 --cwd / env）
+  const home = resolveHome();
+
   // 1. 加载配置（支持 CLI --config 参数注入）
   const cliConfigPath = process.env.__OUROBOROS_CLI_CONFIG;
-  const { config, configDir } = await loadConfig(cliConfigPath);
+  const { config } = await loadConfig(cliConfigPath);
 
   // 2. 解析默认 Agent 的模型引用
   const defaultAgent = config.agents.default;
@@ -45,13 +48,11 @@ export async function startServer(): Promise<void> {
   }
   const defaultProvider = modelRef.provider;
 
-  // 解析 workspacePath：--cwd 覆盖 > 基于 configDir 解析相对路径
-  const cliCwd = process.env.__OUROBOROS_CLI_CWD;
-  const baseDir = cliCwd ? resolve(cliCwd) : configDir;
+  // 解析 workspacePath：相对路径基于 home 解析
   const rawWorkspacePath = defaultAgent.workspacePath;
   const workspacePath = rawWorkspacePath.startsWith("/")
     ? rawWorkspacePath
-    : resolve(baseDir, rawWorkspacePath);
+    : resolve(home, rawWorkspacePath);
 
   // 3. 初始化 workspace
   await initWorkspace(workspacePath);
@@ -94,7 +95,7 @@ export async function startServer(): Promise<void> {
   logger.info("main", "记忆管理器已创建");
 
   // 8. 创建 OAuth 凭据存储
-  const authStore = createAuthStore();
+  const authStore = createAuthStore(home);
 
   // 9. 启动 API 服务器配置
   // 检测静态文件目录：配置项 > 自动检测 web/dist/
@@ -193,10 +194,9 @@ export async function startServer(): Promise<void> {
   await server.start();
 
   // 写入 PID 文件
-  const pidDir = expandTilde(OUROBOROS_HOME);
-  const pidPath = join(pidDir, "ouroboros.pid");
+  const pidPath = join(home, "ouroboros.pid");
   try {
-    await mkdir(pidDir, { recursive: true });
+    await mkdir(home, { recursive: true });
     await writeFile(pidPath, String(process.pid));
     logger.info("main", `PID 文件已写入: ${pidPath}`);
   } catch (err) {

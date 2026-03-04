@@ -5,7 +5,7 @@
  * 每个步骤接受 readline 的 ask 函数，返回收集到的数据。
  */
 
-import { OUROBOROS_HOME } from "../../config/resolver.js";
+import { resolveHome } from "../../config/resolver.js";
 
 /** 提供商选项 */
 export interface ProviderOption {
@@ -295,4 +295,4 @@ export function buildConfigObject(data: InitWizardData): Record<string, unknown>
 }
 
 /** 数据目录路径 */
-export { OUROBOROS_HOME };
+export { resolveHome };

@@ -6,13 +6,13 @@
 
 import { readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import { expandTilde, OUROBOROS_HOME } from "../../config/resolver.js";
+import { resolveHome } from "../../config/resolver.js";
 
 /**
  * 获取 PID 文件路径
  */
 export function getPidPath(): string {
-  return join(expandTilde(OUROBOROS_HOME), "ouroboros.pid");
+  return join(resolveHome(), "ouroboros.pid");
 }
 
 /**
@@ -34,7 +34,9 @@ export async function runStop(): Promise<void> {
     console.error("PID 文件内容无效");
     try {
       await unlink(pidPath);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     process.exitCode = 1;
     return;
   }
@@ -46,7 +48,9 @@ export async function runStop(): Promise<void> {
     console.log(`Ouroboros 进程已终止 (PID: ${pid})，清理 PID 文件`);
     try {
       await unlink(pidPath);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return;
   }
 

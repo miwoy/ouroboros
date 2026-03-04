@@ -4,6 +4,7 @@
  * 登录成功后自动选择模型并写入 config.json
  */
 import { createAuthStore } from "../../auth/store.js";
+import { resolveHome } from "../../config/resolver.js";
 import {
   loginProvider,
   getSupportedOAuthProviders,
@@ -18,7 +19,7 @@ import { PROVIDER_MODELS, selectModel, writeProviderConfig } from "./config-writ
  * @param providerId - 要登录的 OAuth 提供商 ID（默认列出可选项）
  */
 export async function runLogin(providerId?: string): Promise<void> {
-  const store = createAuthStore();
+  const store = createAuthStore(resolveHome());
   const supported = getSupportedOAuthProviders();
 
   if (!providerId) {

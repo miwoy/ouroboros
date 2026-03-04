@@ -14,16 +14,31 @@ Ouroboros 使用 JSON 配置文件，支持 JSONC 格式（允许注释）。
 
 支持 `${ENV_VAR}` 格式引用环境变量（环境变量未设置时保留原值）。
 
-### 路径解析规则
+### 数据根目录（OUROBOROS_HOME）
 
-`agents.*.workspacePath` 中的相对路径基于**配置文件所在目录**解析。例如配置文件在 `~/.ouroboros/config.json`，则 `"./workspace"` 解析为 `~/.ouroboros/workspace`。
+所有数据文件（config.json、auth.json、workspace、PID、logs）统一存放在数据根目录下。解析规则（优先级从高到低）：
 
-使用 `--cwd <path>` CLI 选项可覆盖基准目录：
+| 优先级 | 来源 | 解析结果 | 说明 |
+|--------|------|----------|------|
+| 1 | `--cwd <path>` | `<path>/.ouroboros/` | CLI 参数指定基准目录 |
+| 2 | `$OUROBOROS_HOME` | 环境变量值（直接是完整路径） | 环境变量 |
+| 3 | （默认） | `$PWD/.ouroboros/` | 当前工作目录 |
 
 ```bash
-ouroboros start --cwd .          # 基于当前目录解析相对路径（开发模式）
-ouroboros start                  # 基于配置文件目录解析（生产模式）
+# 开发模式（默认）— 数据目录在项目目录下
+ouroboros start                    # → $PWD/.ouroboros/
+
+# 生产模式 — 数据目录在 home 下
+ouroboros start --cwd ~/           # → ~/.ouroboros/
+OUROBOROS_HOME=~/.ouroboros ouroboros start  # 等效
+
+# init 向导默认使用 --cwd ~/ （生产模式）
+ouroboros init
 ```
+
+`agents.*.workspacePath` 中的相对路径基于数据根目录解析。例如 `--cwd ~/` 时 `"./workspace"` 解析为 `~/.ouroboros/workspace`。
+
+> **向后兼容**：config 查找链保留 `~/.ouroboros/config.json` 作为遗留兜底，已有用户无需改动。
 
 ---
 
@@ -47,7 +62,6 @@ ouroboros start                  # 基于配置文件目录解析（生产模式
 | 字段 | 类型 | 必须 | 默认值 | 描述 |
 |------|------|------|--------|------|
 | `logLevel` | `"debug" \| "info" \| "warn" \| "error"` | 否 | `"info"` | 日志输出级别 |
-| `cwd` | `string` | 否 | `"~/.ouroboros"` | 用户数据根目录 |
 | `proxy` | `string` (URL) | 否 | — | HTTP 代理地址，配置后系统所有对外请求使用此代理。空字符串视为未配置 |
 
 ### system.api — Chat API 配置
@@ -211,7 +225,7 @@ npm run login
 npm run configure
 ```
 
-凭据自动保存到 `~/.ouroboros/auth.json`，Token 过期时自动刷新。
+凭据自动保存到 `<OUROBOROS_HOME>/auth.json`，Token 过期时自动刷新。
 
 ---
 
@@ -224,7 +238,7 @@ npm run configure
 | 字段 | 类型 | 必须 | 默认值 | 描述 |
 |------|------|------|--------|------|
 | `model` | `string` | **是** | — | 使用的模型，格式: `"provider/model"`（如 `"ollama/llama3"`）。provider 必须在 `provider` 中已定义 |
-| `workspacePath` | `string` | 否 | `"./workspace"` | 工作空间根目录路径。相对路径基于配置文件所在目录解析（`--cwd` 可覆盖） |
+| `workspacePath` | `string` | 否 | `"./workspace"` | 工作空间根目录路径。相对路径基于 OUROBOROS_HOME 解析 |
 | `maxTurns` | `number` | 否 | `50` | 默认最大交互轮次 |
 | `knowledgeMaxTokens` | `number` | 否 | `8000` | 知识库默认最大 token 数 |
 | `thinkLevel` | `"off" \| "low" \| "medium" \| "high"` | 否 | `"medium"` | thinking 级别。`"off"` 禁用 thinking，其他值控制推理深度（需提供商支持） |

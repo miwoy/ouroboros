@@ -1,14 +1,10 @@
 /**
  * OAuth 凭据持久化存储
- * 将凭据存储到 ~/.ouroboros/auth.json（权限 0600）
+ * 将凭据存储到 <home>/auth.json（权限 0600）
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { homedir } from "node:os";
 import type { AuthStore, OAuthCredentials } from "./types.js";
-
-/** 默认存储目录 */
-const DEFAULT_DIR = join(homedir(), ".ouroboros");
 
 /** 默认存储文件名 */
 const AUTH_FILE = "auth.json";
@@ -47,11 +43,11 @@ async function writeAuthData(filePath: string, data: AuthData): Promise<void> {
 /**
  * 创建 OAuth 凭据存储实例
  *
- * @param dir - 存储目录，默认 ~/.ouroboros
+ * @param dir - 存储目录（必填，由调用方通过 resolveHome() 提供）
  * @returns AuthStore 接口实现
  */
-export function createAuthStore(dir?: string): AuthStore {
-  const filePath = join(dir ?? DEFAULT_DIR, AUTH_FILE);
+export function createAuthStore(dir: string): AuthStore {
+  const filePath = join(dir, AUTH_FILE);
 
   return {
     async loadCredentials(providerId: string): Promise<OAuthCredentials | null> {

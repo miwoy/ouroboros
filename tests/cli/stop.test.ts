@@ -6,8 +6,7 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 vi.mock("../../src/config/resolver.js", () => ({
-  expandTilde: vi.fn((p: string) => p.replace("~", "/home/test")),
-  OUROBOROS_HOME: "~/.ouroboros",
+  resolveHome: vi.fn(() => "/home/test/.ouroboros"),
 }));
 
 import { readFile, unlink } from "node:fs/promises";

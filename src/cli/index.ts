@@ -35,15 +35,15 @@ Ouroboros CLI — 自指循环 Agent 框架
 
 全局选项:
   --config <path>   指定配置文件路径
-  --cwd <path>      工作目录基准（相对路径基于此解析）
+  --cwd <path>      数据根目录基准（OUROBOROS_HOME = <path>/.ouroboros）
   --verbose         详细输出
   --version, -v     版本号
   --help, -h        帮助
 
 示例:
   ouroboros init                     # 首次安装向导
-  ouroboros start                    # 启动服务器（workspace 在配置文件目录下）
-  ouroboros start --cwd .            # 开发模式（workspace 在当前目录下）
+  ouroboros start                    # 启动服务器（默认 $PWD/.ouroboros）
+  ouroboros start --cwd ~/           # 生产模式（数据目录 ~/.ouroboros）
   ouroboros start --config ./my.json # 指定配置启动
   ouroboros stop                     # 停止服务
   ouroboros login openai-codex       # OAuth 登录

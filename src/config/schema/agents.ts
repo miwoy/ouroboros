@@ -11,7 +11,7 @@ import { z } from "zod/v4";
 export const agentConfigSchema = z.object({
   /** 使用的模型，格式: "provider/model"（如 "ollama/llama3"） */
   model: z.string().min(1),
-  /** workspace 根目录路径（相对 system.cwd） */
+  /** workspace 根目录路径（相对 OUROBOROS_HOME） */
   workspacePath: z.string().default("./workspace"),
   /** 默认最大交互轮次 */
   maxTurns: z.number().int().positive().default(50),

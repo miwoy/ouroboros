@@ -12,7 +12,7 @@
 import { createInterface } from "node:readline";
 import { writeFile, mkdir, access } from "node:fs/promises";
 import { join, dirname } from "node:path";
-import { OUROBOROS_HOME, USER_CONFIG_PATH } from "../../config/resolver.js";
+import { resolveHome, resolveConfigHome } from "../../config/resolver.js";
 import {
   stepSelectMode,
   stepSelectProvider,
@@ -69,7 +69,7 @@ function createPrompt(): {
  */
 async function isAlreadyInitialized(): Promise<boolean> {
   try {
-    await access(USER_CONFIG_PATH);
+    await access(resolveConfigHome());
     return true;
   } catch {
     return false;
@@ -77,11 +77,12 @@ async function isAlreadyInitialized(): Promise<boolean> {
 }
 
 /**
- * 初始化 ~/.ouroboros 目录结构
+ * 初始化 home 目录结构
  */
 async function initDirectories(): Promise<void> {
+  const home = resolveHome();
   for (const dir of INIT_DIRS) {
-    await mkdir(join(OUROBOROS_HOME, dir), { recursive: true });
+    await mkdir(join(home, dir), { recursive: true });
   }
 }
 
@@ -98,10 +99,11 @@ export async function runInit(): Promise<void> {
   console.log();
 
   // 检查是否已初始化
+  const configHomePath = resolveConfigHome();
   if (await isAlreadyInitialized()) {
     const prompt = createPrompt();
     try {
-      const overwrite = await prompt.ask(`  已检测到 ${USER_CONFIG_PATH}\n  是否覆盖？(y/N): `);
+      const overwrite = await prompt.ask(`  已检测到 ${configHomePath}\n  是否覆盖？(y/N): `);
       if (overwrite.toLowerCase() !== "y") {
         console.log("\n  已取消。使用 'ouroboros configure' 修改已有配置。\n");
         return;
@@ -129,7 +131,7 @@ export async function runInit(): Promise<void> {
     if (provider.auth === "oauth") {
       console.log("\n  [3/5] OAuth 登录\n");
 
-      const store = createAuthStore();
+      const store = createAuthStore(resolveHome());
       const existingCreds = await store.loadCredentials(provider.oauthId!);
 
       if (existingCreds && existingCreds.expires > Date.now()) {
@@ -215,14 +217,16 @@ async function continueAfterAuth(
     };
 
     // 创建目录结构
+    const home = resolveHome();
+    const configPath = resolveConfigHome();
     await initDirectories();
-    console.log(`    创建 ${OUROBOROS_HOME}/           ✓`);
+    console.log(`    创建 ${home}/           ✓`);
 
     // 生成配置文件
     const configObj = buildConfigObject(wizardData);
-    await mkdir(dirname(USER_CONFIG_PATH), { recursive: true });
-    await writeFile(USER_CONFIG_PATH, JSON.stringify(configObj, null, 2) + "\n", "utf-8");
-    console.log(`    写入 ${USER_CONFIG_PATH}  ✓`);
+    await mkdir(dirname(configPath), { recursive: true });
+    await writeFile(configPath, JSON.stringify(configObj, null, 2) + "\n", "utf-8");
+    console.log(`    写入 ${configPath}  ✓`);
 
     console.log("    初始化 workspace              ✓");
 

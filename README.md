@@ -50,8 +50,8 @@ npx ouroboros start
 
 ```bash
 ouroboros init              # 首次安装向导（QuickStart / Advanced）
-ouroboros start             # 启动 API 服务器（默认命令）
-ouroboros start --cwd .     # 启动（workspace 基于当前目录解析）
+ouroboros start             # 启动 API 服务器（数据目录: $PWD/.ouroboros）
+ouroboros start --cwd ~/    # 启动（数据目录: ~/.ouroboros，生产模式）
 ouroboros stop              # 停止正在运行的服务
 ouroboros login [provider]  # OAuth 登录指定提供商
 ouroboros configure         # 修改已有配置
@@ -80,10 +80,10 @@ npx ouroboros start
 # 访问 http://localhost:3000（API + Web UI 同端口）
 ```
 
-**开发模式** — 前后端分离，支持热更新，workspace 在项目目录下：
+**开发模式** — 前后端分离，支持热更新，数据目录在项目目录下：
 
 ```bash
-# 终端 1: 启动后端（--cwd . 使 workspace 基于项目目录）
+# 终端 1: 启动后端（默认数据目录 $PWD/.ouroboros）
 npm run dev
 
 # 终端 2: 启动 Web UI 开发服务器
@@ -91,7 +91,10 @@ cd web && npm install && npm run dev
 # 访问 http://localhost:5173（Vite 代理 /api 到 3000）
 ```
 
-> **环境隔离**：生产模式 `ouroboros start` 的 workspace 在 `~/.ouroboros/workspace`（基于配置文件目录），开发模式 `npm run dev` 的 workspace 在项目目录下 `./workspace`（通过 `--cwd .`）。两者互不影响。
+> **环境隔离**：通过 `OUROBOROS_HOME` 环境变量或 `--cwd` 参数隔离数据目录。
+> - 开发模式：`npm run dev` → 数据目录 `$PWD/.ouroboros/`
+> - 生产模式：`ouroboros start --cwd ~/` 或 `OUROBOROS_HOME=~/.ouroboros` → 数据目录 `~/.ouroboros/`
+> - 所有数据文件（config.json、auth.json、workspace、PID、logs）跟随数据目录。
 
 **TUI 终端界面**：
 
