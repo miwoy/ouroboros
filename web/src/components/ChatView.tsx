@@ -133,9 +133,7 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
           )}
         </div>
         {showThought && (
-          <div className="message-thought">
-            {message.thought}
-          </div>
+          <ThoughtBlock thought={message.thought!} streaming={isStreaming} />
         )}
         {hasToolCalls && (
           <div className="tool-calls-container">
@@ -210,37 +208,73 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
   );
 }
 
+function ThoughtBlock({ thought, streaming }: { readonly thought: string; readonly streaming?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = thought.length > 200;
+  const displayText = isLong && !expanded ? thought.slice(0, 200) + "…" : thought;
+
+  return (
+    <div className={`message-thought ${streaming ? "thought-streaming" : ""}`}>
+      <div className="thought-header">
+        <span className="thought-icon">&#x1F4AD;</span>
+        <span className="thought-label">思考过程</span>
+        {streaming && <span className="thought-live">思考中...</span>}
+      </div>
+      <div className="thought-text">{displayText}</div>
+      {isLong && (
+        <button className="thought-toggle" onClick={() => setExpanded(!expanded)}>
+          {expanded ? "收起" : "展开全部"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ToolCallCard({ toolCall }: { readonly toolCall: ToolCallDisplay }) {
   const [expanded, setExpanded] = useState(false);
   const isPending = toolCall.status === "pending";
   const isSuccess = toolCall.success === true;
+  const isFailed = toolCall.success === false;
 
-  const statusIcon = isPending ? "\u23F3" : isSuccess ? "\u2705" : "\u274C";
+  const statusIcon = isPending ? "\u23F3" : isSuccess ? "\u2713" : "\u2717";
+  const statusClass = isPending ? "tc-pending" : isSuccess ? "tc-success" : "tc-failed";
+
+  // 简化输出预览
+  const outputPreview = toolCall.output
+    ? JSON.stringify(toolCall.output).slice(0, 100)
+    : toolCall.error
+      ? toolCall.error.slice(0, 100)
+      : null;
 
   return (
     <div
-      className={`tool-call-card ${isPending ? "tool-call-pending" : ""}`}
+      className={`tool-call-card ${isPending ? "tool-call-pending" : ""} ${isFailed ? "tool-call-failed" : ""}`}
       onClick={() => setExpanded(!expanded)}
     >
       <div className="tool-call-header">
+        <span className="tool-call-type-icon">T</span>
         <span className="tool-call-name">{toolCall.toolName}</span>
-        <span className="tool-call-status">{statusIcon}</span>
+        {!isPending && outputPreview && !expanded && (
+          <span className="tool-call-preview">{outputPreview}{outputPreview.length >= 100 ? "…" : ""}</span>
+        )}
+        <span className={`tool-call-status ${statusClass}`}>{statusIcon}</span>
       </div>
       {expanded && (
         <div className="tool-call-details">
           <div className="tool-call-section">
-            <strong>Input:</strong>
+            <span className="tool-detail-label">Input</span>
             <pre>{JSON.stringify(toolCall.input, null, 2)}</pre>
           </div>
           {toolCall.output && (
             <div className="tool-call-section">
-              <strong>Output:</strong>
+              <span className="tool-detail-label">Output</span>
               <pre>{JSON.stringify(toolCall.output, null, 2)}</pre>
             </div>
           )}
           {toolCall.error && (
             <div className="tool-call-section tool-call-error-text">
-              <strong>Error:</strong> {toolCall.error}
+              <span className="tool-detail-label">Error</span>
+              <pre>{toolCall.error}</pre>
             </div>
           )}
         </div>

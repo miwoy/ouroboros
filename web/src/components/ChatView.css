@@ -184,11 +184,69 @@
 
 /* Thought */
 .message-thought {
-  font-style: italic;
+  margin-bottom: 10px;
+  background: rgba(139, 92, 246, 0.06);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.thought-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 11px;
   color: var(--color-text-muted);
+}
+
+.thought-icon {
   font-size: 13px;
-  margin-bottom: 8px;
-  line-height: 1.4;
+}
+
+.thought-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.thought-live {
+  margin-left: auto;
+  color: #8b5cf6;
+  font-weight: 500;
+  animation: thought-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes thought-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.thought-text {
+  color: var(--color-text-muted);
+  font-style: italic;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.thought-streaming .thought-text {
+  color: var(--color-text-secondary);
+}
+
+.thought-toggle {
+  background: none;
+  border: none;
+  color: #8b5cf6;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 0;
+  margin-top: 4px;
+}
+
+.thought-toggle:hover {
+  text-decoration: underline;
 }
 
 /* Tool calls */
@@ -202,18 +260,23 @@
 .tool-call-card {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.02);
   cursor: pointer;
   overflow: hidden;
-  transition: border-color var(--transition);
+  transition: border-color var(--transition), background var(--transition);
 }
 .tool-call-card:hover {
   border-color: var(--color-text-muted);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .tool-call-pending {
   border-left: 3px solid var(--color-primary);
   animation: tool-pulse 1.5s ease-in-out infinite;
+}
+
+.tool-call-failed {
+  border-left: 3px solid var(--color-danger);
 }
 
 @keyframes tool-pulse {
@@ -223,44 +286,110 @@
 
 .tool-call-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 8px;
   padding: 6px 10px;
   font-size: 12px;
+}
+
+.tool-call-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+  color: #fff;
+  background: var(--color-success);
 }
 
 .tool-call-name {
   font-weight: 600;
   color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.tool-call-preview {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  font-family: 'SF Mono', Monaco, 'Cascadia Mono', monospace;
+  opacity: 0.7;
 }
 
 .tool-call-status {
-  font-size: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-left: auto;
+}
+
+.tc-pending {
+  color: var(--color-primary);
+  background: rgba(88, 166, 255, 0.1);
+}
+
+.tc-success {
+  color: var(--color-success);
+  background: rgba(63, 185, 80, 0.1);
+}
+
+.tc-failed {
+  color: var(--color-danger);
+  background: rgba(248, 81, 73, 0.1);
 }
 
 .tool-call-details {
-  padding: 0 10px 8px;
+  padding: 0 10px 10px;
   font-size: 12px;
+  border-top: 1px solid var(--color-border);
+  margin-top: 2px;
 }
 
 .tool-call-section {
-  margin-top: 4px;
+  margin-top: 6px;
+}
+
+.tool-detail-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
 }
 
 .tool-call-details pre {
   background: rgba(0, 0, 0, 0.2);
-  padding: 6px 8px;
+  padding: 8px 10px;
   border-radius: var(--radius-sm);
   max-height: 200px;
   overflow: auto;
   font-size: 11px;
-  margin: 4px 0 0;
+  margin: 0;
   white-space: pre-wrap;
   word-break: break-all;
+  line-height: 1.5;
 }
 
-.tool-call-error-text {
+.tool-call-error-text pre {
   color: var(--color-danger);
+  background: rgba(248, 81, 73, 0.06);
+  border: 1px solid rgba(248, 81, 73, 0.15);
 }
 
 /* Inline execution tree */

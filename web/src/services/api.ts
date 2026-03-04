@@ -249,7 +249,7 @@ export function streamMessage(
                   callbacks.onToolResult?.(data as { toolCallId: string; output?: Record<string, unknown>; success: boolean; error?: string });
                   break;
                 case "execution_log":
-                  callbacks.onExecutionLog?.(data as ExecutionLogEntry);
+                  callbacks.onExecutionLog?.(data as unknown as ExecutionLogEntry);
                   break;
                 case "tree_update":
                   callbacks.onTreeUpdate?.(data as unknown as ExecutionTree);

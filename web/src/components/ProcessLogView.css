@@ -1,26 +1,86 @@
 /* 过程日志面板 */
 
+.process-log-wrapper {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .process-log-view {
   background: var(--color-bg-primary, #0d1117);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  max-height: 300px;
+  border-radius: 0 0 var(--radius) var(--radius);
+  max-height: 280px;
   overflow-y: auto;
   font-family: 'SF Mono', Monaco, 'Cascadia Mono', monospace;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.7;
   padding: 8px 12px;
   position: relative;
 }
 
 .process-log-empty {
+  background: var(--color-bg-primary, #0d1117);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
   color: var(--color-text-muted);
   text-align: center;
-  padding: 20px;
-  font-style: italic;
+  padding: 30px 20px;
+  font-size: 13px;
 }
 
-/* 滚动到底部按钮 */
+.log-empty-icon {
+  font-size: 24px;
+  margin-bottom: 6px;
+}
+
+/* ─── 统计栏 ─── */
+
+.log-stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.log-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.log-stat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.log-stat-dot.log-step  { background: #58a6ff; }
+.log-stat-dot.log-tool  { background: #d29922; }
+.log-stat-dot.log-error { background: #f85149; }
+
+.log-stat-error {
+  color: var(--color-danger);
+}
+
+.log-stat-duration {
+  font-family: 'SF Mono', Monaco, 'Cascadia Mono', monospace;
+}
+
+.log-stat-count {
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+/* ─── 滚动到底部按钮 ─── */
+
 .log-scroll-btn {
   position: sticky;
   top: 0;
@@ -42,38 +102,63 @@
   background: var(--color-border);
 }
 
-/* 日志条目 */
+/* ─── 日志条目 ─── */
+
 .log-entry {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 1px 0;
-  white-space: nowrap;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.log-entry:last-child {
+  border-bottom: none;
 }
 
 .log-time {
   color: var(--color-text-muted);
   flex-shrink: 0;
+  font-size: 11px;
+  opacity: 0.7;
 }
 
 .log-level-badge {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  padding: 0 4px;
-  border-radius: 2px;
+  padding: 1px 5px;
+  border-radius: 3px;
   flex-shrink: 0;
+  min-width: 38px;
+  text-align: center;
+  letter-spacing: 0.3px;
 }
 
-.log-level-badge.log-step  { color: #58a6ff; background: rgba(88, 166, 255, 0.1); }
-.log-level-badge.log-model { color: #3fb950; background: rgba(63, 185, 80, 0.1); }
-.log-level-badge.log-tool  { color: #d29922; background: rgba(210, 153, 34, 0.1); }
-.log-level-badge.log-error { color: #f85149; background: rgba(248, 81, 73, 0.1); }
+.log-level-badge.log-step  { color: #58a6ff; background: rgba(88, 166, 255, 0.12); }
+.log-level-badge.log-model { color: #3fb950; background: rgba(63, 185, 80, 0.12); }
+.log-level-badge.log-tool  { color: #d29922; background: rgba(210, 153, 34, 0.12); }
+.log-level-badge.log-error { color: #f85149; background: rgba(248, 81, 73, 0.12); }
+
+.log-tool-id {
+  color: #8b5cf6;
+  font-size: 11px;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
 
 .log-message {
   color: var(--color-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+/* 错误级别消息高亮 */
+.log-entry.log-error .log-message {
+  color: #f85149;
 }
 
 .log-duration {
@@ -81,4 +166,24 @@
   font-size: 11px;
   flex-shrink: 0;
   margin-left: auto;
+  padding: 0 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 2px;
+}
+
+/* ─── 嵌入面板时的样式覆盖 ─── */
+
+.panel-body .process-log-wrapper {
+  border: none;
+}
+
+.panel-body .log-stats-bar {
+  border: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.panel-body .process-log-view {
+  border: none;
+  border-radius: 0;
 }
