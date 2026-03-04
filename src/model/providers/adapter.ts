@@ -136,13 +136,19 @@ function createPiModel(
     api = inferCopilotApi(modelId);
   }
 
+  // 仅原生支持 reasoning 的提供商启用 model.reasoning 标记
+  // openai-compatible / mistral / groq 等自行处理 thinking（如 qwen3 的 <think> 标签）
+  const effectiveReasoning =
+    reasoning &&
+    (REASONING_SUPPORTED_PROVIDERS.has(providerType) || providerType === "openai-codex");
+
   return {
     id: modelId,
     name: modelId,
     api,
     provider: providerType,
     baseUrl,
-    reasoning,
+    reasoning: effectiveReasoning,
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 128000,
@@ -255,6 +261,21 @@ function toStopReason(reason: string): StopReason {
 }
 
 /**
+ * 解析最终 stopReason（兼容 pi-ai openai-completions 的 tool_calls 检测缺陷）
+ *
+ * pi-ai 的 openai-completions provider 在收到 tool_calls 时可能仍返回 stopReason="stop"，
+ * 而非正确的 "toolUse"（openai-responses-shared 中有兜底但 openai-completions 中遗漏）。
+ * 这里根据实际 toolCalls 数量做二次修正。
+ */
+function resolveStopReason(piStopReason: string, toolCalls: readonly ToolCall[]): StopReason {
+  const mapped = toStopReason(piStopReason);
+  if (toolCalls.length > 0 && mapped !== "tool_use") {
+    return "tool_use";
+  }
+  return mapped;
+}
+
+/**
  * 从 pi-ai AssistantMessage 提取文本和工具调用
  */
 function extractFromAssistantMessage(msg: PiAssistantMessage): {
@@ -349,6 +370,7 @@ export function createPiAiProvider(config: ProviderConfig): ModelProvider {
 
       try {
         const assistantMsg = await piComplete(model, context, options);
+
         const { content, toolCalls } = extractFromAssistantMessage(assistantMsg);
         const usage = toUsage(assistantMsg);
 
@@ -358,7 +380,7 @@ export function createPiAiProvider(config: ProviderConfig): ModelProvider {
         return {
           content,
           toolCalls,
-          stopReason: toStopReason(assistantMsg.stopReason),
+          stopReason: resolveStopReason(assistantMsg.stopReason, toolCalls),
           usage,
           model: assistantMsg.model,
         };
@@ -401,7 +423,7 @@ export function createPiAiProvider(config: ProviderConfig): ModelProvider {
             finalResponse = {
               content: resolvedContent,
               toolCalls: resolvedToolCalls,
-              stopReason: toStopReason(assistantMsg.stopReason),
+              stopReason: resolveStopReason(assistantMsg.stopReason, resolvedToolCalls),
               usage,
               model: assistantMsg.model,
             };
@@ -420,7 +442,7 @@ export function createPiAiProvider(config: ProviderConfig): ModelProvider {
           finalResponse = {
             content: fullContent,
             toolCalls,
-            stopReason: "end_turn",
+            stopReason: toolCalls.length > 0 ? "tool_use" : "end_turn",
             usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
             model: model.id,
           };
