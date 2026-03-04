@@ -45,6 +45,62 @@ function resolveEnvVarsInObject(obj: unknown): unknown {
 }
 
 /**
+ * 移除 JSON 中的注释（// 和 /* ... * /），但保留字符串内的内容
+ * 逐字符扫描，追踪是否在字符串内部
+ */
+function stripJsonComments(input: string): string {
+  const result: string[] = [];
+  let i = 0;
+  let inString = false;
+
+  while (i < input.length) {
+    const ch = input[i];
+
+    if (inString) {
+      result.push(ch);
+      // 反斜杠转义：跳过下一个字符
+      if (ch === "\\" && i + 1 < input.length) {
+        i++;
+        result.push(input[i]);
+      } else if (ch === '"') {
+        inString = false;
+      }
+      i++;
+      continue;
+    }
+
+    // 不在字符串内
+    if (ch === '"') {
+      inString = true;
+      result.push(ch);
+      i++;
+    } else if (ch === "/" && i + 1 < input.length) {
+      if (input[i + 1] === "/") {
+        // 行注释：跳到行尾
+        while (i < input.length && input[i] !== "\n") {
+          i++;
+        }
+      } else if (input[i + 1] === "*") {
+        // 块注释：跳到 */
+        i += 2;
+        while (i + 1 < input.length && !(input[i] === "*" && input[i + 1] === "/")) {
+          i++;
+        }
+        i += 2; // 跳过 */
+      } else {
+        result.push(ch);
+        i++;
+      }
+    } else {
+      result.push(ch);
+      i++;
+    }
+  }
+
+  return result.join("");
+}
+
+/**
  * 从文件加载并验证配置
  *
  * 查找顺序（无显式路径时）：
@@ -78,8 +134,8 @@ export async function loadConfig(configPath?: string): Promise<LoadConfigResult>
 
   let rawJson: unknown;
   try {
-    // 支持 JSONC（移除注释）
-    const cleaned = rawContent.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+    // 支持 JSONC（移除注释，保留字符串内的 // 和 /*）
+    const cleaned = stripJsonComments(rawContent);
     rawJson = JSON.parse(cleaned);
   } catch (err) {
     throw new ConfigError(`配置文件 JSON 格式错误: ${filePath}`, err);
