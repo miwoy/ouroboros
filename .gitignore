@@ -12,3 +12,5 @@ web/test-results/
 UPDATE.md
 ROADMAP.md
 CLAUDE.md
+.ouroboros/
+.plan.md

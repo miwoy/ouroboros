@@ -32,7 +32,6 @@ function createTestConfig(modelOverrides?: Partial<Config["system"]["model"]>): 
   return {
     system: {
       logLevel: "info",
-      cwd: "~/.ouroboros",
       api: {
         port: 3000,
         host: "127.0.0.1",
