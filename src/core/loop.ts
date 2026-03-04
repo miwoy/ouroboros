@@ -23,6 +23,7 @@ import {
 } from "./execution-tree.js";
 import { detectPossibleLoop, buildExceptionPrompt } from "./exception.js";
 import { compressContext } from "./context-compression.js";
+import { buildScratchpad, toStepLogEntry, type StepLogEntry } from "./scratchpad.js";
 import {
   NodeType,
   TreeState,
@@ -76,6 +77,7 @@ export async function runReactLoop(
 
   // 5. 循环状态
   const steps: ReactStep[] = [];
+  const stepLog: StepLogEntry[] = [];
   let totalUsage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
   let answer = "";
   let stopReason: ReactResult["stopReason"] = "completed";
@@ -86,7 +88,20 @@ export async function runReactLoop(
       const stepStartTime = Date.now();
       logger.info("react-loop", `迭代 ${iteration + 1}`, { iteration: iteration + 1 });
 
-      // a. 调用模型
+      // a. 注入 scratchpad 步骤日志（防遗忘）
+      if (stepLog.length > 0) {
+        const scratchpadText = buildScratchpad(stepLog);
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && lastMsg.role === "tool") {
+          // tool result 后追加 scratchpad 上下文
+          messages.push({
+            role: "user",
+            content: `[步骤日志 — 已完成操作回顾]\n${scratchpadText}`,
+          });
+        }
+      }
+
+      // b. 调用模型
       const modelNodeResult = addNode(tree, tree.activeNodeId, {
         nodeType: NodeType.ModelCall,
         summary: `模型调用 #${iteration + 1}`,
@@ -196,6 +211,11 @@ export async function runReactLoop(
             toolCallId: tcr.requestId,
           };
           messages.push(toolResultMessage);
+        }
+
+        // 追加 scratchpad 日志条目
+        for (const tcr of toolCallResults.results) {
+          stepLog.push(toStepLogEntry(iteration, tcr));
         }
 
         // 记录步骤

@@ -11,6 +11,7 @@ export type WsServerMessageType =
   | "tool_call"
   | "tool_result"
   | "tree_update"
+  | "execution_log"
   | "text_delta"
   | "done"
   | "error"

@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import type { DisplayMessage, ToolCallDisplay } from "../hooks/useChat";
 import { ExecutionTreeView } from "./ExecutionTreeView";
+import { ProcessLogView } from "./ProcessLogView";
 import "./ChatView.css";
 
 interface ChatViewProps {
@@ -106,6 +107,12 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
   const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
   const showThought = message.thought && !message.content;
   const [treeExpanded, setTreeExpanded] = useState(false);
+  const [activePanel, setActivePanel] = useState<"tree" | "log">("tree");
+
+  const isStreaming = message.streaming === true;
+  const hasProcessLogs = message.processLogs && message.processLogs.length > 0;
+  const hasLiveTree = isStreaming && message.executionTree;
+  const showExecutionPanels = isStreaming && (hasLiveTree || hasProcessLogs);
 
   return (
     <div className={`message ${isUser ? "message-user" : "message-agent"}`}>
@@ -119,6 +126,11 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
               minute: "2-digit",
             })}
           </span>
+          {isStreaming && message.executionProgress && (
+            <span className="execution-progress-badge">
+              Steps: {message.executionProgress.stepCount} | Tools: {message.executionProgress.toolCallCount}
+            </span>
+          )}
         </div>
         {showThought && (
           <div className="message-thought">
@@ -132,7 +144,35 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
             ))}
           </div>
         )}
-        {message.executionTree && (
+        {/* 流式执行面板 — Tab 切换 */}
+        {showExecutionPanels && (
+          <div className="execution-panels">
+            <div className="panel-tabs">
+              <button
+                className={`panel-tab ${activePanel === "tree" ? "panel-tab-active" : ""}`}
+                onClick={() => setActivePanel("tree")}
+              >
+                执行树
+              </button>
+              <button
+                className={`panel-tab ${activePanel === "log" ? "panel-tab-active" : ""}`}
+                onClick={() => setActivePanel("log")}
+              >
+                过程日志 {hasProcessLogs ? `(${message.processLogs!.length})` : ""}
+              </button>
+            </div>
+            <div className="panel-body">
+              {activePanel === "tree" && message.executionTree && (
+                <ExecutionTreeView tree={message.executionTree} streaming={true} />
+              )}
+              {activePanel === "log" && hasProcessLogs && (
+                <ProcessLogView logs={message.processLogs!} />
+              )}
+            </div>
+          </div>
+        )}
+        {/* 完成后的执行树 — 可折叠 */}
+        {!isStreaming && message.executionTree && (
           <div className="execution-tree-inline">
             <button
               className="tree-toggle-btn"

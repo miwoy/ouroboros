@@ -122,7 +122,21 @@ export type SSEEventType =
   | "thinking"
   | "done"
   | "error"
-  | "tree_update";
+  | "tree_update"
+  | "execution_log";
+
+/** 执行日志级别 */
+export type ExecutionLogLevel = "step" | "model" | "tool" | "error";
+
+/** 执行日志条目（WS + SSE 推送） */
+export interface ExecutionLogEntry {
+  readonly timestamp: string;
+  readonly level: ExecutionLogLevel;
+  readonly message: string;
+  readonly stepIndex?: number;
+  readonly toolId?: string;
+  readonly duration?: number;
+}
 
 /** SSE 事件 */
 export interface SSEEvent {

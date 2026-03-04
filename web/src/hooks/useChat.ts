@@ -17,6 +17,23 @@ export interface ToolCallDisplay {
   readonly status: "pending" | "done";
 }
 
+/** 执行日志条目 */
+export interface ProcessLogEntry {
+  readonly timestamp: string;
+  readonly level: "step" | "model" | "tool" | "error";
+  readonly message: string;
+  readonly stepIndex?: number;
+  readonly toolId?: string;
+  readonly duration?: number;
+}
+
+/** 执行进度信息（流式过程中） */
+export interface ExecutionProgress {
+  readonly stepCount: number;
+  readonly toolCallCount: number;
+  readonly status: "running" | "completed" | "failed";
+}
+
 export interface DisplayMessage {
   readonly id: string;
   readonly role: "user" | "agent" | "system";
@@ -31,6 +48,10 @@ export interface DisplayMessage {
   readonly executionTree?: ExecutionTree;
   /** 附加元数据（如 totalUsage） */
   readonly metadata?: Readonly<Record<string, unknown>>;
+  /** 执行进度（流式过程中） */
+  readonly executionProgress?: ExecutionProgress;
+  /** 过程日志（流式过程中） */
+  readonly processLogs?: readonly ProcessLogEntry[];
 }
 
 export function useChat() {
@@ -141,9 +162,15 @@ export function useChat() {
           },
           onReactStep: (data) => {
             setMessages((prev) =>
-              prev.map((m) =>
-                m.id === agentMsgId ? { ...m, thought: data.thought } : m,
-              ),
+              prev.map((m) => {
+                if (m.id !== agentMsgId) return m;
+                const progress: ExecutionProgress = {
+                  stepCount: (m.executionProgress?.stepCount ?? 0) + 1,
+                  toolCallCount: m.executionProgress?.toolCallCount ?? 0,
+                  status: "running",
+                };
+                return { ...m, thought: data.thought, executionProgress: progress };
+              }),
             );
           },
           onToolCall: (data) => {
@@ -169,16 +196,48 @@ export function useChat() {
                     ? { ...tc, output: data.output, success: data.success, error: data.error, status: "done" as const }
                     : tc,
                 );
-                return { ...m, toolCalls: updatedCalls };
+                const progress: ExecutionProgress = {
+                  stepCount: m.executionProgress?.stepCount ?? 0,
+                  toolCallCount: (m.executionProgress?.toolCallCount ?? 0) + 1,
+                  status: "running",
+                };
+                return { ...m, toolCalls: updatedCalls, executionProgress: progress };
               }),
             );
           },
+          onExecutionLog: (entry) => {
+            setMessages((prev) =>
+              prev.map((m) => {
+                if (m.id !== agentMsgId) return m;
+                const logs = m.processLogs ?? [];
+                // 环形缓冲区：最多 500 条
+                const updated = logs.length >= 500
+                  ? [...logs.slice(1), entry]
+                  : [...logs, entry];
+                return { ...m, processLogs: updated };
+              }),
+            );
+          },
+          onTreeUpdate: (tree) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === agentMsgId ? { ...m, executionTree: tree } : m,
+              ),
+            );
+          },
           onDone: (data) => {
-            const donePayload = data as { sessionId: string; totalUsage?: Record<string, unknown> };
+            const donePayload = data as { sessionId: string; totalUsage?: Record<string, unknown>; stopReason?: string };
             // 将 totalUsage 附加到 agent 消息 metadata
             const msgMetadata = donePayload.totalUsage ? { totalUsage: donePayload.totalUsage } : undefined;
+            const finalStatus = donePayload.stopReason === "error" ? "failed" as const : "completed" as const;
             setMessages((prev) =>
-              prev.map((m) => (m.id === agentMsgId ? { ...m, streaming: false, metadata: msgMetadata } : m)),
+              prev.map((m) => {
+                if (m.id !== agentMsgId) return m;
+                const finalProgress: ExecutionProgress | undefined = m.executionProgress
+                  ? { ...m.executionProgress, status: finalStatus }
+                  : undefined;
+                return { ...m, streaming: false, metadata: msgMetadata, executionProgress: finalProgress, processLogs: undefined };
+              }),
             );
             const resolvedSessionId = sessionId || donePayload.sessionId;
             if (!sessionId && donePayload.sessionId) {

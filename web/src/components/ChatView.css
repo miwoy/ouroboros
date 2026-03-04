@@ -309,6 +309,69 @@
   color: var(--color-text-muted);
 }
 
+/* 执行进度徽章 */
+.execution-progress-badge {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: rgba(88, 166, 255, 0.1);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  margin-left: auto;
+}
+
+/* 执行面板（流式） */
+.execution-panels {
+  margin-bottom: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.panel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+.panel-tab {
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.panel-tab:hover {
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.panel-tab-active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.panel-body {
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.panel-body .execution-tree-view {
+  border: none;
+  border-radius: 0;
+}
+
+.panel-body .process-log-view {
+  border: none;
+  border-radius: 0;
+}
+
 @media (max-width: 768px) {
   .message { padding: 10px 16px; }
   .chat-input-bar { padding: 10px 16px 16px; }

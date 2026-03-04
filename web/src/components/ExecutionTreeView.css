@@ -88,6 +88,24 @@
   background: rgba(88, 166, 255, 0.06);
 }
 
+.tree-node-live {
+  animation: node-glow 2s ease-in-out infinite;
+}
+
+@keyframes node-glow {
+  0%, 100% { background: rgba(88, 166, 255, 0.06); }
+  50% { background: rgba(88, 166, 255, 0.12); }
+}
+
+.node-spinner {
+  animation: node-spin 1.2s linear infinite;
+}
+
+@keyframes node-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* ─── 子节点缩进 + 连接线 ─── */
 
 .tree-children {

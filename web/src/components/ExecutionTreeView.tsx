@@ -70,23 +70,30 @@ function TreeNodeCard({
   node,
   tree,
   depth,
+  isLive,
 }: {
   readonly node: ExecutionNode;
   readonly tree: ExecutionTree;
   readonly depth: number;
+  readonly isLive?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
   const icon = nodeTypeIcon(node.nodeType);
   const isActive = node.id === tree.activeNodeId;
+  const isRunning = node.state === "working" || node.state === "submitted";
 
   return (
     <div className="tree-node-wrapper">
       <div
-        className={`tree-node-card ${isActive ? "tree-node-active" : ""}`}
+        className={`tree-node-card ${isActive && isLive ? "tree-node-active tree-node-live" : isActive ? "tree-node-active" : ""}`}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        <span className={`node-type-icon ${icon.className}`}>{icon.letter}</span>
+        {isRunning && isLive ? (
+          <span className={`node-type-icon ${icon.className} node-spinner`}>{icon.letter}</span>
+        ) : (
+          <span className={`node-type-icon ${icon.className}`}>{icon.letter}</span>
+        )}
         <span className={`node-state-dot state-${stateClass(node.state)}`} />
         <span className="node-summary">{truncate(node.summary)}</span>
 
@@ -140,7 +147,7 @@ function TreeNodeCard({
             const child = tree.nodes[childId];
             if (!child) return null;
             return (
-              <TreeNodeCard key={childId} node={child} tree={tree} depth={depth + 1} />
+              <TreeNodeCard key={childId} node={child} tree={tree} depth={depth + 1} isLive={isLive} />
             );
           })}
         </div>
@@ -165,7 +172,7 @@ export function ExecutionTreeView({ tree, streaming }: ExecutionTreeViewProps) {
         </span>
       </div>
       <div className="tree-body">
-        <TreeNodeCard node={rootNode} tree={tree} depth={0} />
+        <TreeNodeCard node={rootNode} tree={tree} depth={0} isLive={streaming} />
       </div>
     </div>
   );

@@ -9,7 +9,7 @@
  */
 
 import type { SessionManager } from "./session.js";
-import type { ApiDeps, SSEEvent } from "./types.js";
+import type { ApiDeps, SSEEvent, ExecutionLogEntry } from "./types.js";
 import type { TreeState, ReactStep, ExecutionTree, ReactLoopConfig } from "../core/types.js";
 import type { CallModelFn, OuroborosTool } from "../tool/types.js";
 import type { ToolExecutor } from "../tool/executor.js";
@@ -168,16 +168,41 @@ async function* createReactStreamEvents(
     logger: deps.logger,
     workspacePath: deps.workspacePath,
     onStep: (step: ReactStep, tree: ExecutionTree) => {
+      const now = new Date().toISOString();
+
       pushEvent({
         event: "react_step",
         data: JSON.stringify({ stepIndex: step.stepIndex, thought: step.thought }),
       });
+
+      // 步骤级执行日志
+      const stepLog: ExecutionLogEntry = {
+        timestamp: now,
+        level: "step",
+        message: `步骤 ${step.stepIndex + 1} 开始`,
+        stepIndex: step.stepIndex,
+      };
+      pushEvent({ event: "execution_log", data: JSON.stringify(stepLog) });
 
       for (const tc of step.toolCalls) {
         pushEvent({
           event: "tool_call",
           data: JSON.stringify({ toolCallId: tc.requestId, toolName: tc.toolId, input: tc.input }),
         });
+
+        // 工具级执行日志
+        const toolLog: ExecutionLogEntry = {
+          timestamp: now,
+          level: tc.success ? "tool" : "error",
+          message: tc.success
+            ? `工具 ${tc.toolId} 执行成功`
+            : `工具 ${tc.toolId} 执行失败: ${tc.error ?? "未知错误"}`,
+          stepIndex: step.stepIndex,
+          toolId: tc.toolId,
+          duration: tc.duration,
+        };
+        pushEvent({ event: "execution_log", data: JSON.stringify(toolLog) });
+
         pushEvent({
           event: "tool_result",
           data: JSON.stringify({
@@ -210,7 +235,25 @@ async function* createReactStreamEvents(
             error: tc.error,
           });
         }
-        deps.wsServer.sendToSession(sessionId, "tree_update", tree);
+        // tree_update 附带 treeState 便于前端判断终态
+        deps.wsServer.sendToSession(sessionId, "tree_update", {
+          ...tree,
+          treeState: tree.state,
+        });
+        // 推送 execution_log
+        deps.wsServer.sendToSession(sessionId, "execution_log", stepLog);
+        for (const tc of step.toolCalls) {
+          deps.wsServer.sendToSession(sessionId, "execution_log", {
+            timestamp: now,
+            level: tc.success ? "tool" : "error",
+            message: tc.success
+              ? `工具 ${tc.toolId} 执行成功`
+              : `工具 ${tc.toolId} 执行失败: ${tc.error ?? "未知错误"}`,
+            stepIndex: step.stepIndex,
+            toolId: tc.toolId,
+            duration: tc.duration,
+          });
+        }
       }
 
       // Inspector 检查

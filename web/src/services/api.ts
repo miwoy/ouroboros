@@ -91,6 +91,16 @@ export interface HealthData {
   readonly uptime: number;
 }
 
+/** 执行日志条目 */
+export interface ExecutionLogEntry {
+  readonly timestamp: string;
+  readonly level: "step" | "model" | "tool" | "error";
+  readonly message: string;
+  readonly stepIndex?: number;
+  readonly toolId?: string;
+  readonly duration?: number;
+}
+
 /** SSE 事件回调 */
 export interface StreamCallbacks {
   onThinking?: () => void;
@@ -98,6 +108,8 @@ export interface StreamCallbacks {
   onReactStep?: (data: { stepIndex: number; thought: string }) => void;
   onToolCall?: (data: { toolCallId: string; toolName: string; input: Record<string, unknown> }) => void;
   onToolResult?: (data: { toolCallId: string; output?: Record<string, unknown>; success: boolean; error?: string }) => void;
+  onExecutionLog?: (entry: ExecutionLogEntry) => void;
+  onTreeUpdate?: (tree: ExecutionTree) => void;
   onDone?: (data: { sessionId: string }) => void;
   onError?: (error: string) => void;
 }
@@ -235,6 +247,12 @@ export function streamMessage(
                   break;
                 case "tool_result":
                   callbacks.onToolResult?.(data as { toolCallId: string; output?: Record<string, unknown>; success: boolean; error?: string });
+                  break;
+                case "execution_log":
+                  callbacks.onExecutionLog?.(data as ExecutionLogEntry);
+                  break;
+                case "tree_update":
+                  callbacks.onTreeUpdate?.(data as unknown as ExecutionTree);
                   break;
                 case "done":
                   receivedDone = true;
