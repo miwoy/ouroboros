@@ -23,12 +23,14 @@ export interface CallModelOptions {
  * @param config - 全局配置
  * @param registry - 提供商注册表
  * @param defaultProvider - 默认提供商名称（从 agents.default.model 解析）
+ * @param defaultModel - 默认模型 ID（从 agents.default.model 解析，如 "qwen3:8b"）
  * @returns callModel 函数
  */
 export function createCallModel(
   config: Readonly<Config>,
   registry: ProviderRegistry,
   defaultProvider: string,
+  defaultModel?: string,
 ): (request: ModelRequest, options?: CallModelOptions) => Promise<ModelResponse> {
   const { timeout, maxRetries, retryBaseDelay } = config.system.model;
 
@@ -45,10 +47,11 @@ export function createCallModel(
     const providerName = options?.provider ?? defaultProvider;
     const provider = await registry.get(providerName);
 
-    // 注入全局 think 默认值（request 中显式设置时优先）
+    // 注入默认模型 ID 和全局 think 默认值（request 中显式设置时优先）
     const resolvedThinkLevel = globalThinkLevel !== "off" ? globalThinkLevel : undefined;
     const finalRequest: ModelRequest = {
       ...request,
+      model: request.model ?? defaultModel,
       think: request.think ?? globalThink,
       thinkLevel: request.thinkLevel ?? resolvedThinkLevel,
     };

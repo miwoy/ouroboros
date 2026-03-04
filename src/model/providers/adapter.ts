@@ -57,6 +57,20 @@ const API_TYPE_MAP: Readonly<Record<string, PiApi>> = {
 const COPILOT_ANTHROPIC_PREFIXES = ["claude-"] as const;
 
 /**
+ * 原生支持 reasoning/thinking 参数的提供商类型
+ * openai-compatible / mistral / groq 等第三方兼容 API 不支持该参数
+ */
+const REASONING_SUPPORTED_PROVIDERS: ReadonlySet<string> = new Set([
+  "openai",
+  "anthropic",
+  "google",
+  "bedrock",
+  "github-copilot",
+  "google-gemini-cli",
+  "google-antigravity",
+]);
+
+/**
  * 默认 baseUrl 映射
  */
 const DEFAULT_BASE_URLS: Readonly<Record<string, string>> = {
@@ -300,15 +314,19 @@ function toStreamOptions(
   // 禁用 pi-ai 内部重试，由 Ouroboros retry.ts 处理
   options.maxRetryDelayMs = 0;
 
-  // Thinking/Reasoning 支持
+  // Thinking/Reasoning 支持（仅原生支持的提供商发送参数）
   if (request.think) {
     const level = request.thinkLevel ?? "medium";
-    // openai-codex 使用 reasoningEffort 参数（支持 none|minimal|low|medium|high|xhigh）
-    if ((config.type ?? config.api) === "openai-codex") {
+    const providerType = config.type ?? config.api ?? "";
+
+    if (providerType === "openai-codex") {
+      // Codex 使用 reasoningEffort 参数
       options.reasoningEffort = level;
-    } else {
+    } else if (REASONING_SUPPORTED_PROVIDERS.has(providerType)) {
+      // 原生支持 reasoning 的提供商
       options.reasoning = level;
     }
+    // openai-compatible / mistral / groq 等不支持 reasoning 参数，静默跳过
   }
 
   return options;
@@ -332,12 +350,16 @@ export function createPiAiProvider(config: ProviderConfig): ModelProvider {
       try {
         const assistantMsg = await piComplete(model, context, options);
         const { content, toolCalls } = extractFromAssistantMessage(assistantMsg);
+        const usage = toUsage(assistantMsg);
+
+        // 空响应校验：内容和工具调用都为空 + token 用量为零 → 上游很可能返回了错误
+        validateNonEmptyResponse(content, toolCalls, usage, model.id);
 
         return {
           content,
           toolCalls,
           stopReason: toStopReason(assistantMsg.stopReason),
-          usage: toUsage(assistantMsg),
+          usage,
           model: assistantMsg.model,
         };
       } catch (error) {
@@ -369,12 +391,18 @@ export function createPiAiProvider(config: ProviderConfig): ModelProvider {
           if (event.type === "done") {
             const assistantMsg = event.message;
             const { content, toolCalls: msgToolCalls } = extractFromAssistantMessage(assistantMsg);
+            const resolvedContent = content || fullContent;
+            const resolvedToolCalls = msgToolCalls.length > 0 ? msgToolCalls : toolCalls;
+            const usage = toUsage(assistantMsg);
+
+            // 空响应校验
+            validateNonEmptyResponse(resolvedContent, resolvedToolCalls, usage, model.id);
 
             finalResponse = {
-              content: content || fullContent,
-              toolCalls: msgToolCalls.length > 0 ? msgToolCalls : toolCalls,
+              content: resolvedContent,
+              toolCalls: resolvedToolCalls,
               stopReason: toStopReason(assistantMsg.stopReason),
-              usage: toUsage(assistantMsg),
+              usage,
               model: assistantMsg.model,
             };
 
@@ -447,6 +475,28 @@ function handleStreamEvent(
       break;
     }
     // start, text_start, text_end, thinking_*, done, error 不需要额外处理
+  }
+}
+
+/**
+ * 校验模型响应非空
+ * 当内容和工具调用都为空且 token 用量为零时，说明上游返回了无效响应（如模型不存在的 404）
+ */
+function validateNonEmptyResponse(
+  content: string,
+  toolCalls: readonly ToolCall[],
+  usage: TokenUsage,
+  modelId: string,
+): void {
+  const hasContent = content.length > 0;
+  const hasToolCalls = toolCalls.length > 0;
+  const hasUsage = usage.totalTokens > 0 || usage.promptTokens > 0;
+
+  if (!hasContent && !hasToolCalls && !hasUsage) {
+    throw new ModelError(
+      `模型 "${modelId}" 返回空响应（无内容、无工具调用、无 token 消耗）。` +
+        `请检查模型是否存在、API 密钥是否有效。`,
+    );
   }
 }
 

@@ -67,17 +67,21 @@ export async function processMessage(
     });
 
     sessionManager.setExecutionTree(sessionId, result.executionTree);
-    sessionManager.addMessage(sessionId, "agent", result.answer, buildReactMetadata(result));
+
+    // 空回答兜底：确保用户始终能看到有意义的响应
+    const answer = ensureNonEmptyAnswer(result.answer, result.stopReason);
+
+    sessionManager.addMessage(sessionId, "agent", answer, buildReactMetadata(result));
     if (deps.fullConfig?.agents?.default?.trackTokenUsage !== false) {
       sessionManager.addTokenUsage(sessionId, result.totalUsage);
     }
-    writebackMemory(deps, message, result.answer);
+    writebackMemory(deps, message, answer);
     triggerReflection(deps, message, result);
 
     return {
       sessionId,
-      response: result.answer,
-      formatted: formatAgentResponse(result.answer, [...result.steps]),
+      response: answer,
+      formatted: formatAgentResponse(answer, [...result.steps]),
     };
   }
 
@@ -86,13 +90,15 @@ export async function processMessage(
   const messages = await buildModelMessages(sessionManager, sessionId, deps, message);
   const response = await provider.complete({ messages });
 
-  sessionManager.addMessage(sessionId, "agent", response.content);
+  const directAnswer = ensureNonEmptyAnswer(response.content, "completed");
+
+  sessionManager.addMessage(sessionId, "agent", directAnswer);
   deps.logger.info("api", `消息已处理: session=${sessionId}`);
 
   return {
     sessionId,
-    response: response.content,
-    formatted: formatAgentResponse(response.content, []),
+    response: directAnswer,
+    formatted: formatAgentResponse(directAnswer, []),
   };
 }
 
@@ -224,9 +230,10 @@ async function* createReactStreamEvents(
     },
   })
     .then((result) => {
-      pushEvent({ event: "text_delta", data: JSON.stringify({ text: result.answer }) });
+      const answer = ensureNonEmptyAnswer(result.answer, result.stopReason);
+      pushEvent({ event: "text_delta", data: JSON.stringify({ text: answer }) });
       sessionManager.setExecutionTree(sessionId, result.executionTree);
-      sessionManager.addMessage(sessionId, "agent", result.answer, buildReactMetadata(result));
+      sessionManager.addMessage(sessionId, "agent", answer, buildReactMetadata(result));
       if (deps.fullConfig?.agents?.default?.trackTokenUsage !== false) {
         sessionManager.addTokenUsage(sessionId, result.totalUsage);
       }
@@ -239,7 +246,7 @@ async function* createReactStreamEvents(
           totalUsage: result.totalUsage,
         });
       }
-      writebackMemory(deps, message, result.answer);
+      writebackMemory(deps, message, answer);
       triggerReflection(deps, message, result);
       pushEvent({
         event: "done",
@@ -398,6 +405,17 @@ export function applyModelOverrides(deps: ApiDeps, provider?: string, model?: st
   }
 
   return result;
+}
+
+/**
+ * 确保回答非空 — 空回答时给出用户可见的错误提示
+ */
+function ensureNonEmptyAnswer(answer: string, stopReason: string): string {
+  if (answer.trim().length > 0) return answer;
+  if (stopReason === "error") {
+    return "[错误] 模型调用失败，请检查服务器日志获取详细信息。";
+  }
+  return "[错误] 模型返回了空响应，请检查模型配置是否正确。";
 }
 
 /** 从 provider 获取 callModel 函数 */

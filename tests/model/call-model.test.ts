@@ -136,6 +136,52 @@ describe("createCallModel", () => {
     expect(mockProvider.complete).toHaveBeenCalledTimes(1);
   });
 
+  it("应该将 defaultModel 注入到请求中", async () => {
+    const callModel = createCallModel(config, registry, "mock", "qwen3:8b");
+    await callModel({
+      messages: [{ role: "user", content: "你好" }],
+    });
+
+    // 检查传给 provider.complete 的 request 中包含正确的 model
+    const calledRequest = (mockProvider.complete as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(calledRequest.model).toBe("qwen3:8b");
+  });
+
+  it("请求中显式设置 model 时应优先于 defaultModel", async () => {
+    const callModel = createCallModel(config, registry, "mock", "default-model");
+    await callModel({
+      messages: [{ role: "user", content: "你好" }],
+      model: "explicit-model",
+    });
+
+    const calledRequest = (mockProvider.complete as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(calledRequest.model).toBe("explicit-model");
+  });
+
+  it("未传 defaultModel 且请求无 model 时，request.model 应为 undefined", async () => {
+    const callModel = createCallModel(config, registry, "mock");
+    await callModel({
+      messages: [{ role: "user", content: "你好" }],
+    });
+
+    const calledRequest = (mockProvider.complete as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(calledRequest.model).toBeUndefined();
+  });
+
+  it("应该注入全局 thinkLevel 到请求中", async () => {
+    const thinkConfig = createTestConfig();
+    thinkConfig.agents.default.thinkLevel = "medium";
+    const callModel = createCallModel(thinkConfig as Config, registry, "mock", "test-model");
+    await callModel({
+      messages: [{ role: "user", content: "你好" }],
+    });
+
+    const calledRequest = (mockProvider.complete as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(calledRequest.think).toBe(true);
+    expect(calledRequest.thinkLevel).toBe("medium");
+    expect(calledRequest.model).toBe("test-model");
+  });
+
   it("应该支持指定提供商", async () => {
     const anotherProvider = createMockProvider({
       name: "another",

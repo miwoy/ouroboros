@@ -164,17 +164,11 @@ export function registerHandlers(
       return;
     }
 
-    // 获取或创建会话
+    // 获取或创建会话（session 不存在时自动重建，兼容服务器重启）
     let sessionId = body.sessionId;
-    if (!sessionId) {
+    if (!sessionId || !sessionManager.getSession(sessionId)) {
       const session = sessionManager.createSession(body.agentId || DEFAULT_AGENT_ID);
       sessionId = session.sessionId;
-    }
-
-    const session = sessionManager.getSession(sessionId);
-    if (!session) {
-      ctx.respond(404, notFoundError("会话"));
-      return;
     }
 
     // 记录用户消息

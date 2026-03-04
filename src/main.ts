@@ -167,7 +167,7 @@ export async function startServer(): Promise<void> {
   logger.info("main", "审查程序已创建");
 
   // 14. 创建统一 callModel 函数（含超时 + 重试）
-  const callModelFn = createCallModel(config, providerRegistry, defaultProvider);
+  const callModelFn = createCallModel(config, providerRegistry, defaultProvider, modelRef.model);
 
   // 15. 创建反思器
   const reflector = createReflector(
@@ -254,8 +254,10 @@ export async function startServer(): Promise<void> {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
-// 直接运行时启动服务器
-startServer().catch((err) => {
-  console.error("[ouroboros] 启动失败:", err);
-  process.exit(1);
-});
+// 仅当直接运行 main.ts 时自动启动（CLI start 通过 import 调用 startServer，不应触发）
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  startServer().catch((err) => {
+    console.error("[ouroboros] 启动失败:", err);
+    process.exit(1);
+  });
+}
