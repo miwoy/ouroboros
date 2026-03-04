@@ -490,4 +490,117 @@ describe("ReAct 核心循环", () => {
       expect(result.totalUsage.totalTokens).toBe(30);
     });
   });
+
+  describe("thinking 容错", () => {
+    it("空响应但有 thinking 时应重试并成功", async () => {
+      const callModel = vi
+        .fn()
+        // 第一次：空内容 + thinking
+        .mockResolvedValueOnce({
+          content: "",
+          toolCalls: [],
+          stopReason: "end_turn",
+          usage: defaultUsage(),
+          model: "test",
+          thinking: "让我思考一下这个问题...",
+        } satisfies ModelResponse)
+        // 重试：返回实际内容
+        .mockResolvedValueOnce({
+          content: "根据思考，答案是42",
+          toolCalls: [],
+          stopReason: "end_turn",
+          usage: defaultUsage(),
+          model: "test",
+        } satisfies ModelResponse);
+
+      const deps: ReactDependencies = {
+        callModel: callModel as CallModelFn,
+        toolExecutor: createMockExecutor(new Map()),
+        toolRegistry: createMockRegistry([]),
+        logger: createMockLogger(),
+        workspacePath: "/workspace",
+      };
+
+      const result = await runReactLoop("问题", "", [], defaultConfig, deps);
+
+      expect(result.answer).toBe("根据思考，答案是42");
+      expect(result.stopReason).toBe("completed");
+      // 原始调用 + 重试 = 2 次
+      expect(callModel).toHaveBeenCalledTimes(2);
+    });
+
+    it("重试仍失败时应降级使用 thinking 内容", async () => {
+      const callModel = vi.fn().mockResolvedValue({
+        content: "",
+        toolCalls: [],
+        stopReason: "end_turn",
+        usage: defaultUsage(),
+        model: "test",
+        thinking: "我一直在思考但无法得出结论",
+      } satisfies ModelResponse);
+
+      const deps: ReactDependencies = {
+        callModel: callModel as CallModelFn,
+        toolExecutor: createMockExecutor(new Map()),
+        toolRegistry: createMockRegistry([]),
+        logger: createMockLogger(),
+        workspacePath: "/workspace",
+      };
+
+      const result = await runReactLoop("问题", "", [], defaultConfig, deps);
+
+      // 降级使用 thinking 内容
+      expect(result.answer).toBe("我一直在思考但无法得出结论");
+      expect(result.stopReason).toBe("completed");
+      // 原始调用 + 最多 2 次重试 = 3 次
+      expect(callModel).toHaveBeenCalledTimes(3);
+    });
+
+    it("无 thinking 的空响应不应重试", async () => {
+      const callModel = vi.fn().mockResolvedValue({
+        content: "",
+        toolCalls: [],
+        stopReason: "end_turn",
+        usage: defaultUsage(),
+        model: "test",
+      } satisfies ModelResponse);
+
+      const deps: ReactDependencies = {
+        callModel: callModel as CallModelFn,
+        toolExecutor: createMockExecutor(new Map()),
+        toolRegistry: createMockRegistry([]),
+        logger: createMockLogger(),
+        workspacePath: "/workspace",
+      };
+
+      const result = await runReactLoop("问题", "", [], defaultConfig, deps);
+
+      expect(result.answer).toBe("");
+      expect(callModel).toHaveBeenCalledTimes(1);
+    });
+
+    it("有内容时即使有 thinking 也不应重试", async () => {
+      const callModel = vi.fn().mockResolvedValue({
+        content: "正常回答",
+        toolCalls: [],
+        stopReason: "end_turn",
+        usage: defaultUsage(),
+        model: "test",
+        thinking: "思考过程...",
+      } satisfies ModelResponse);
+
+      const deps: ReactDependencies = {
+        callModel: callModel as CallModelFn,
+        toolExecutor: createMockExecutor(new Map()),
+        toolRegistry: createMockRegistry([]),
+        logger: createMockLogger(),
+        workspacePath: "/workspace",
+      };
+
+      const result = await runReactLoop("问题", "", [], defaultConfig, deps);
+
+      expect(result.answer).toBe("正常回答");
+      expect(callModel).toHaveBeenCalledTimes(1);
+    });
+  });
 });

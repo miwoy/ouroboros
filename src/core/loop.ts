@@ -115,13 +115,35 @@ export async function runReactLoop(
 
       // b. 检查停止原因
       if (response.stopReason === "end_turn" || response.stopReason === "stop_sequence") {
-        // 模型完成回答
-        answer = response.content;
+        // 空响应容错：模型只产生了 thinking 但未给出文本或工具调用
+        // 注入重试提示让模型根据 thinking 内容直接回答（最多重试 2 次）
+        if (!response.content.trim() && response.thinking) {
+          const retried = await retryWithThinking(
+            response.thinking,
+            messages,
+            toolDefinitions,
+            callModel,
+            logger,
+          );
+          if (retried) {
+            totalUsage = addUsage(totalUsage, retried.usage);
+            answer = retried.content;
+            logger.info("react-loop", "thinking 重试成功", { contentLength: answer.length });
+          } else {
+            // 重试失败，降级使用 thinking 内容
+            answer = response.thinking;
+            logger.warn("react-loop", "thinking 重试失败，降级使用 thinking 内容", {
+              thinkingLength: answer.length,
+            });
+          }
+        } else {
+          answer = response.content;
+        }
         logger.info("react-loop", "模型给出最终回答", { contentLength: answer.length });
 
         steps.push({
           stepIndex: iteration,
-          thought: response.content,
+          thought: response.thinking ?? response.content,
           toolCalls: [],
           duration: Date.now() - stepStartTime,
         });
@@ -411,4 +433,51 @@ function completeOrFailRoot(
     return failNode(tree, tree.rootNodeId, answer);
   }
   return completeNode(tree, tree.rootNodeId, answer.slice(0, 200));
+}
+
+/** 空响应重试时注入的提示 */
+const THINKING_RETRY_PROMPT =
+  "你刚才进行了思考但没有给出回答。请根据你的思考内容直接给出回答，不要重复思考过程。";
+
+/** 最大重试次数 */
+const MAX_THINKING_RETRIES = 2;
+
+/**
+ * 当模型只产生了 thinking 但未输出文本/工具调用时，
+ * 注入重试提示让模型根据已有 thinking 直接回答。
+ *
+ * @returns 成功时返回 ModelResponse，重试耗尽时返回 null
+ */
+async function retryWithThinking(
+  _thinking: string,
+  messages: readonly Message[],
+  toolDefinitions: readonly import("../model/types.js").ToolDefinition[],
+  callModel: ReactDependencies["callModel"],
+  logger: ReactDependencies["logger"],
+): Promise<ModelResponse | null> {
+  // 构建带 thinking 上下文的重试消息
+  const retryMessages: Message[] = [
+    ...messages,
+    { role: "assistant", content: "" },
+    { role: "user", content: THINKING_RETRY_PROMPT },
+  ];
+
+  for (let attempt = 0; attempt < MAX_THINKING_RETRIES; attempt++) {
+    try {
+      logger.info("react-loop", `thinking 重试 ${attempt + 1}/${MAX_THINKING_RETRIES}`);
+      const response = await callModel({
+        messages: retryMessages,
+        tools: toolDefinitions.length > 0 ? [...toolDefinitions] : undefined,
+      });
+      if (response.content.trim() || response.toolCalls.length > 0) {
+        return response;
+      }
+      logger.warn("react-loop", `thinking 重试 ${attempt + 1} 仍为空响应`);
+    } catch (err) {
+      logger.warn("react-loop", `thinking 重试 ${attempt + 1} 失败`, {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return null;
 }

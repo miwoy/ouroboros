@@ -231,6 +231,65 @@ describe("createPiAiProvider", () => {
 
       expect(result.stopReason).toBe("max_tokens");
     });
+
+    it("应该提取 thinking 内容到 ModelResponse.thinking", async () => {
+      const mockMsg = createMockAssistantMessage({
+        content: [
+          { type: "thinking", thinking: "让我思考一下...", redacted: false },
+          { type: "text", text: "答案是42" },
+        ],
+      });
+      vi.mocked(piAi.completeSimple).mockResolvedValue(mockMsg as any);
+
+      const provider = createPiAiProvider(config);
+      const result = await provider.complete({
+        messages: [{ role: "user", content: "问题" }],
+      });
+
+      expect(result.content).toBe("答案是42");
+      expect(result.thinking).toBe("让我思考一下...");
+    });
+
+    it("应该在只有 thinking 无文本时不抛出错误", async () => {
+      const mockMsg = createMockAssistantMessage({
+        content: [{ type: "thinking", thinking: "我在思考但没有结论", redacted: false }],
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+      });
+      vi.mocked(piAi.completeSimple).mockResolvedValue(mockMsg as any);
+
+      const provider = createPiAiProvider(config);
+      const result = await provider.complete({
+        messages: [{ role: "user", content: "问题" }],
+      });
+
+      expect(result.content).toBe("");
+      expect(result.thinking).toBe("我在思考但没有结论");
+    });
+
+    it("应该跳过被安全过滤的 thinking 内容", async () => {
+      const mockMsg = createMockAssistantMessage({
+        content: [
+          { type: "thinking", thinking: "[redacted]", redacted: true },
+          { type: "text", text: "回答" },
+        ],
+      });
+      vi.mocked(piAi.completeSimple).mockResolvedValue(mockMsg as any);
+
+      const provider = createPiAiProvider(config);
+      const result = await provider.complete({
+        messages: [{ role: "user", content: "问题" }],
+      });
+
+      expect(result.content).toBe("回答");
+      expect(result.thinking).toBeUndefined();
+    });
   });
 
   describe("stream()", () => {

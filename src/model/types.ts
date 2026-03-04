@@ -82,6 +82,8 @@ export interface ModelResponse {
   readonly usage: TokenUsage;
   /** 使用的模型 ID */
   readonly model: string;
+  /** 模型的 thinking/reasoning 内容（部分模型会产生思考过程但不输出文本或工具调用） */
+  readonly thinking?: string;
 }
 
 /** 流式事件类型 */

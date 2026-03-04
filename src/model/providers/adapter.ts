@@ -284,13 +284,19 @@ function resolveStopReason(piStopReason: string, toolCalls: readonly ToolCall[])
 }
 
 /**
- * 从 pi-ai AssistantMessage 提取文本和工具调用
+ * 从 pi-ai AssistantMessage 提取文本、工具调用和 thinking 内容
+ *
+ * pi-ai 统一解析响应中的 reasoning/reasoning_content 字段为 type:"thinking" block，
+ * 部分模型（如 qwen3）可能只产生 thinking 内容而无文本或工具调用，
+ * 此时 thinking 内容可用于容错降级。
  */
 function extractFromAssistantMessage(msg: PiAssistantMessage): {
   content: string;
   toolCalls: readonly ToolCall[];
+  thinking: string;
 } {
   let content = "";
+  let thinking = "";
   const toolCalls: ToolCall[] = [];
 
   for (const block of msg.content) {
@@ -303,10 +309,16 @@ function extractFromAssistantMessage(msg: PiAssistantMessage): {
         name: tc.name,
         arguments: JSON.stringify(tc.arguments),
       });
+    } else if (block.type === "thinking") {
+      // pi-ai 将 reasoning_content / reasoning 字段解析为 ThinkingContent block
+      const tb = block as import("@mariozechner/pi-ai").ThinkingContent;
+      if (!tb.redacted) {
+        thinking += tb.thinking;
+      }
     }
   }
 
-  return { content, toolCalls };
+  return { content, toolCalls, thinking };
 }
 
 /**
@@ -375,11 +387,11 @@ export function createPiAiProvider(config: ProviderConfig): ModelProvider {
 
       try {
         const assistantMsg = await piComplete(model, context, options);
-        const { content, toolCalls } = extractFromAssistantMessage(assistantMsg);
+        const { content, toolCalls, thinking } = extractFromAssistantMessage(assistantMsg);
         const usage = toUsage(assistantMsg);
 
-        // 空响应校验：内容和工具调用都为空 + token 用量为零 → 上游很可能返回了错误
-        validateNonEmptyResponse(content, toolCalls, usage, model.id);
+        // 空响应校验：内容、工具调用、thinking 都为空且 token 用量为零 → 上游返回了无效响应
+        validateNonEmptyResponse(content, toolCalls, thinking, usage, model.id);
 
         return {
           content,
@@ -387,6 +399,7 @@ export function createPiAiProvider(config: ProviderConfig): ModelProvider {
           stopReason: resolveStopReason(assistantMsg.stopReason, toolCalls),
           usage,
           model: assistantMsg.model,
+          ...(thinking ? { thinking } : {}),
         };
       } catch (error) {
         throw toModelError(error);
@@ -416,13 +429,17 @@ export function createPiAiProvider(config: ProviderConfig): ModelProvider {
 
           if (event.type === "done") {
             const assistantMsg = event.message;
-            const { content, toolCalls: msgToolCalls } = extractFromAssistantMessage(assistantMsg);
+            const {
+              content,
+              toolCalls: msgToolCalls,
+              thinking,
+            } = extractFromAssistantMessage(assistantMsg);
             const resolvedContent = content || fullContent;
             const resolvedToolCalls = msgToolCalls.length > 0 ? msgToolCalls : toolCalls;
             const usage = toUsage(assistantMsg);
 
             // 空响应校验
-            validateNonEmptyResponse(resolvedContent, resolvedToolCalls, usage, model.id);
+            validateNonEmptyResponse(resolvedContent, resolvedToolCalls, thinking, usage, model.id);
 
             finalResponse = {
               content: resolvedContent,
@@ -430,6 +447,7 @@ export function createPiAiProvider(config: ProviderConfig): ModelProvider {
               stopReason: resolveStopReason(assistantMsg.stopReason, resolvedToolCalls),
               usage,
               model: assistantMsg.model,
+              ...(thinking ? { thinking } : {}),
             };
 
             callback({ type: "done", response: finalResponse });
@@ -506,19 +524,26 @@ function handleStreamEvent(
 
 /**
  * 校验模型响应非空
- * 当内容和工具调用都为空且 token 用量为零时，说明上游返回了无效响应（如模型不存在的 404）
+ *
+ * 当内容、工具调用、thinking 都为空且 token 用量为零时，
+ * 说明上游返回了无效响应（如模型不存在的 404）。
+ *
+ * 如果模型只返回了 thinking 内容（无文本、无工具调用），
+ * 不抛出错误 — 由上层（ReAct loop）决定是否重试或降级。
  */
 function validateNonEmptyResponse(
   content: string,
   toolCalls: readonly ToolCall[],
+  thinking: string,
   usage: TokenUsage,
   modelId: string,
 ): void {
   const hasContent = content.length > 0;
   const hasToolCalls = toolCalls.length > 0;
+  const hasThinking = thinking.length > 0;
   const hasUsage = usage.totalTokens > 0 || usage.promptTokens > 0;
 
-  if (!hasContent && !hasToolCalls && !hasUsage) {
+  if (!hasContent && !hasToolCalls && !hasThinking && !hasUsage) {
     throw new ModelError(
       `模型 "${modelId}" 返回空响应（无内容、无工具调用、无 token 消耗）。` +
         `请检查模型是否存在、API 密钥是否有效。`,
