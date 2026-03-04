@@ -18,7 +18,9 @@
     },
     "tool": {
       "defaultTimeout": 30000,
-      "defaultMaxRetries": 0
+      "defaultMaxRetries": 0,
+      "codeGenerationProvider": "",
+      "codeGenerationModel": ""
     },
     "react": {
       "maxIterations": 20,

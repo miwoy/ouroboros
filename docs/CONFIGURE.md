@@ -297,9 +297,9 @@ npm run configure
 |------|------|------|--------|------|
 | `enabled` | `boolean` | 否 | `false` | 是否启用 Telegram |
 | `botToken` | `string` | 条件 | — | Bot Token（启用时必须） |
-| `dmPolicy` | `"pairing" \| "open"` | 否 | `"pairing"` | 私聊策略 |
-| `groupPolicy` | `"allowlist" \| "open"` | 否 | `"allowlist"` | 群组策略 |
-| `streaming` | `"off" \| "partial" \| "full"` | 否 | `"partial"` | 流式输出模式 |
+| `dmPolicy` | `"open" \| "pairing" \| "whitelist"` | 否 | `"pairing"` | 私聊策略 |
+| `groupPolicy` | `"open" \| "allowlist" \| "deny"` | 否 | `"allowlist"` | 群组策略 |
+| `streaming` | `"none" \| "partial" \| "full"` | 否 | `"partial"` | 流式输出模式 |
 | `proxy` | `string` (URL) | 否 | — | Telegram 专用代理 |
 
 ---
